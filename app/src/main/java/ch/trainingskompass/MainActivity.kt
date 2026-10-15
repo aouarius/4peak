@@ -1,0 +1,174 @@
+package ch.trainingskompass
+
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.os.Bundle
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * Die Handy-App zeigt den Trainingskompass (assets/index.html) in einer WebView.
+ * Über die Brücke "TKNative" schickt die Seite den Plan an die Uhr und holt Daten aus Health Connect.
+ * Von der Uhr gespeicherte Trainings kommen als Data-Layer-Einträge unter /log/... zurück.
+ */
+class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
+
+    private lateinit var web: WebView
+    private var pageReady = false
+    private val dataClient by lazy { Wearable.getDataClient(this) }
+    private val health by lazy { HealthBridge(this) }
+
+    private val healthPermissions =
+        registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
+            lifecycleScope.launch { deliverHealth() }
+        }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        web = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            addJavascriptInterface(Bridge(), "TKNative")
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    val url = request.url
+                    if (url.scheme == "http" || url.scheme == "https") {
+                        // Videos, Spotify und Quellen in der passenden App bzw. im Browser öffnen
+                        runCatching { startActivity(Intent(Intent.ACTION_VIEW, url)) }
+                        return true
+                    }
+                    return false
+                }
+
+                override fun onPageFinished(view: WebView, url: String) {
+                    pageReady = true
+                    pullWatchLogs()
+                }
+            }
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(web) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        setContentView(web)
+        if (savedInstanceState != null) web.restoreState(savedInstanceState)
+        else web.loadUrl("file:///android_asset/index.html")
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (web.canGoBack()) web.goBack() else finish()
+            }
+        })
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        web.saveState(outState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        dataClient.addListener(this)
+        pullWatchLogs()
+    }
+
+    override fun onPause() {
+        dataClient.removeListener(this)
+        super.onPause()
+    }
+
+    override fun onDataChanged(events: DataEventBuffer) {
+        if (events.any { it.dataItem.uri.path?.startsWith(LOG_PATH) == true }) pullWatchLogs()
+    }
+
+    /** Holt alle von der Uhr gespeicherten Trainings, übergibt sie der Seite und löscht sie danach. */
+    private fun pullWatchLogs() {
+        if (!pageReady) return
+        lifecycleScope.launch {
+            val found = runCatching {
+                val buffer = dataClient.dataItems.await()
+                try {
+                    buffer.filter { it.uri.path?.startsWith(LOG_PATH) == true }.mapNotNull { item ->
+                        val json = DataMapItem.fromDataItem(item).dataMap.getString("json") ?: return@mapNotNull null
+                        item.uri to json
+                    }
+                } finally {
+                    buffer.release()
+                }
+            }.getOrDefault(emptyList())
+            if (found.isEmpty()) return@launch
+
+            val arr = JSONArray()
+            found.forEach { (_, json) -> runCatching { arr.put(JSONObject(json)) } }
+            web.evaluateJavascript("window.onWatchSessions ? window.onWatchSessions($arr) : null") { result ->
+                // Nur löschen, wenn die Seite die Daten angenommen hat
+                if (result != null && result != "null") {
+                    lifecycleScope.launch { found.forEach { (uri, _) -> runCatching { dataClient.deleteDataItems(uri).await() } } }
+                }
+            }
+        }
+    }
+
+    private suspend fun deliverHealth() {
+        val obj = if (!health.available()) {
+            JSONObject().put("error", "Health Connect ist auf diesem Handy nicht installiert oder nicht eingerichtet.")
+        } else if (!health.hasAny()) {
+            JSONObject().put("error", "Ohne Freigabe in Health Connect kann die App Puls, HRV und Schlaf nicht lesen.")
+        } else {
+            runCatching { health.read() }.getOrElse {
+                JSONObject().put("error", "Die Daten aus Health Connect konnten nicht gelesen werden.")
+            }
+        }
+        web.evaluateJavascript("window.onNativeHealth && window.onNativeHealth($obj)", null)
+    }
+
+    inner class Bridge {
+        @JavascriptInterface
+        fun sendToWatch(json: String) {
+            val request = PutDataMapRequest.create(PLAN_PATH).apply {
+                dataMap.putString("json", json)
+                dataMap.putLong("t", System.currentTimeMillis())
+            }.asPutDataRequest().setUrgent()
+            dataClient.putDataItem(request)
+        }
+
+        @JavascriptInterface
+        fun requestHealth() {
+            runOnUiThread {
+                lifecycleScope.launch {
+                    when {
+                        !health.available() -> deliverHealth()
+                        health.hasAll() -> deliverHealth()
+                        else -> healthPermissions.launch(HealthBridge.PERMISSIONS)
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        const val PLAN_PATH = "/plan"
+        const val LOG_PATH = "/log/"
+    }
+}

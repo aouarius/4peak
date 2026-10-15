@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.Trainingskompass" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+</resources>

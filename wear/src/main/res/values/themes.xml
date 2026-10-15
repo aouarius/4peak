@@ -1,0 +1,6 @@
+<resources>
+    <!-- Wischen zum Schliessen aus, damit ein laufendes Training nicht versehentlich endet -->
+    <style name="Theme.Trainingskompass" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+</resources>

@@ -1,0 +1,1448 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Trainingskompass</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: Trainingsbuch mit Reiter oben, Inhalt in einer Spalte; Farben der Einheiten nach dem Hantelscheiben-Code (rot 25, blau 20, gelb 15, grün 10 kg). */
+:root{
+  --bg:#F1F3F6; --surface:#FFFFFF; --sunk:#E7EBF0; --ink:#12161C; --muted:#586272; --line:#D9DFE6;
+  --accent:#1D4ED8; --accent-ink:#FFFFFF;
+  --red:#D33A3A; --blue:#2F6FE0; --yellow:#D9A50E; --green:#2E9B5E;
+  --warn-bg:#FFF4D6; --warn-ink:#6B4F00;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1217; --surface:#161B22; --sunk:#1E252E; --ink:#E7EBF0; --muted:#9AA5B4; --line:#2A323C;
+  --accent:#7097FF; --accent-ink:#0B1020;
+  --red:#F06464; --blue:#5C93FF; --yellow:#F2C230; --green:#4CC285;
+  --warn-bg:#3A2F0E; --warn-ink:#F5DC8E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1217; --surface:#161B22; --sunk:#1E252E; --ink:#E7EBF0; --muted:#9AA5B4; --line:#2A323C;
+  --accent:#7097FF; --accent-ink:#0B1020;
+  --red:#F06464; --blue:#5C93FF; --yellow:#F2C230; --green:#4CC285;
+  --warn-bg:#3A2F0E; --warn-ink:#F5DC8E; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:700;font-size:2.4rem;letter-spacing:.01em;line-height:1;margin:0;text-transform:uppercase}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.6rem;margin:0;text-transform:uppercase;letter-spacing:.02em;text-wrap:balance}
+h3{font-size:1rem;margin:0;font-weight:600}
+.sub{color:var(--muted);margin:4px 0 0}
+.sync{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);border:1px solid var(--line);padding:3px 8px;border-radius:99px;white-space:nowrap}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:4px;overflow-x:auto;margin:18px 0 20px;border-bottom:2px solid var(--line);scrollbar-width:none}
+nav.tabs button{font:600 .95rem var(--f-body);background:none;border:0;color:var(--muted);padding:10px 12px;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:default}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.note{background:var(--warn-bg);color:var(--warn-ink);border-radius:6px;padding:10px 12px;font-size:.88rem}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--sunk);white-space:nowrap}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.c-red{background:var(--red)}.c-blue{background:var(--blue)}.c-yellow{background:var(--yellow)}.c-green{background:var(--green)}
+/* Kalender */
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .wd{font:600 .72rem var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center;padding-bottom:2px}
+.day{min-height:62px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:4px 5px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;min-width:0}
+.day.out{opacity:.4}
+.day.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.day.sel{background:var(--sunk)}
+.day .n{font:500 .8rem var(--f-mono)}
+.day .bar{height:5px;border-radius:3px;width:100%}
+.day .lbl{font-size:.66rem;line-height:1.15;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.day .chk{position:absolute;top:3px;right:5px;font-size:.75rem;color:var(--green);font-weight:700}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:.78rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+/* Übungszeilen */
+.exlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.exlist li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:9px 0;border-top:1px solid var(--line)}
+.exlist li:first-child{border-top:0}
+.exlist .presc{font:500 .85rem var(--f-mono);text-align:right;white-space:nowrap}
+.exlist .meta{grid-column:1/-1;font-size:.8rem;color:var(--muted)}
+a{color:var(--accent)}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;text-align:left;font-weight:600}
+/* Formulare */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600}
+label.f select,label.f input{font-weight:400;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.wdpick{display:flex;gap:6px;flex-wrap:wrap}
+.wdpick label{display:inline-flex;align-items:center;justify-content:center;width:42px;height:38px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-weight:600;font-size:.85rem;background:var(--surface)}
+.wdpick input{position:absolute;opacity:0;pointer-events:none}
+.wdpick label:has(input:checked){background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.wdpick label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+/* Supplements */
+.grade{font:700 .9rem var(--f-display);letter-spacing:.04em;padding:2px 8px;border-radius:4px;color:#fff}
+.g-A{background:var(--green)}.g-B{background:var(--blue)}.g-C{background:var(--yellow);color:#1b1500}.g-D{background:var(--red)}
+.supp{display:flex;flex-direction:column;gap:8px}
+.supp dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:0;font-size:.88rem}
+.supp dt{color:var(--muted)}
+.supp dd{margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.ex-card{display:flex;flex-direction:column;gap:8px}
+.ex-card ol,.ex-card ul{margin:0;padding-left:20px;font-size:.88rem}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.filters input,.filters select{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);min-width:0}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.bpm{font:700 3.4rem var(--f-display);line-height:1}
+.zonebar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--sunk)}
+.sources{font-size:.8rem;color:var(--muted)}
+.sources a{word-break:break-word}
+.checkline{display:flex;align-items:baseline;gap:8px;font-size:.9rem;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+.panel .tile{background:var(--bg)}
+.tl{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.tv{font:700 1.9rem var(--f-display);line-height:1.1}
+.progress{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.progress span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.bigtimer{font:700 4.5rem var(--f-display);line-height:1}
+.badge{display:inline-block;font-size:.8rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--sunk);border:1px solid var(--line)}
+.badge.off{color:var(--muted);opacity:.6}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;cursor:pointer;font-size:.85rem}
+.chip:hover{border-color:var(--accent)}
+.chartwrap{overflow-x:auto}
+.chartwrap svg{width:100%;min-width:320px;height:auto;display:block}
+.chartwrap .grid{stroke:var(--line);stroke-width:1}
+.chartwrap .axis{fill:var(--muted);font:500 15px var(--f-mono)}
+.chartwrap .mark{fill:var(--accent)}
+.chartwrap .bar:hover .mark{opacity:.75}
+.chartwrap .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round}
+.chartwrap .dotm{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.btn.big{padding:12px 16px;font-size:1rem}
+.plates{display:flex;align-items:center;gap:2px;min-height:64px;overflow-x:auto}
+.sleeve{width:26px;height:10px;background:var(--muted);border-radius:2px 0 0 2px;flex:none}
+.sleeve.end{width:10px;border-radius:0 2px 2px 0}
+.plate{width:20px;flex:none;border-radius:3px;display:flex;align-items:center;justify-content:center;font:600 10px var(--f-mono);writing-mode:vertical-rl;color:#fff}
+.p25{background:var(--red)}.p20{background:var(--blue)}.p15{background:var(--yellow);color:#1b1500}.p10{background:var(--green)}
+.p5{background:var(--surface);color:var(--ink);border:1.5px solid var(--ink)}.p2_5{background:var(--ink);color:var(--bg)}.p1_25{background:var(--muted);color:var(--bg)}
+.warm{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+.warm summary{cursor:pointer}
+.warm ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mrows{display:flex;flex-direction:column;gap:8px}
+.mrow{display:grid;grid-template-columns:96px minmax(0,1fr) 84px;gap:10px;align-items:center;font-size:.85rem}
+.mrow .mono{text-align:right}
+.mtrack{position:relative;height:14px;background:var(--sunk);border-radius:4px}
+.mband{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--green) 25%,transparent)}
+.mbar{position:absolute;left:0;top:3px;bottom:3px;background:var(--accent);border-radius:0 4px 4px 0}
+.mplan{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--ink)}
+.mlegend{display:flex;gap:14px;flex-wrap:wrap}
+.mlegend span{display:inline-flex;align-items:center;gap:6px}
+.lg-bar{width:14px;height:8px;background:var(--accent);border-radius:2px;display:inline-block}
+.lg-plan{width:2px;height:12px;background:var(--ink);display:inline-block}
+.lg-band{width:14px;height:10px;background:color-mix(in srgb,var(--green) 25%,transparent);display:inline-block}
+.edlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.edlist li{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.edlist select,select[data-pe="add"]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);max-width:100%}
+.edctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.stepper button{background:none;border:0;width:32px;height:32px;cursor:pointer;font-size:1.1rem;color:var(--ink)}
+.stepper .mono{min-width:22px;text-align:center}
+.icon{width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;color:var(--ink)}
+.icon:disabled{opacity:.35;cursor:default}
+.btn.small{padding:4px 10px;font-size:.8rem}
+.spot{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.9rem;color:var(--green);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:6px 12px;background:var(--surface)}
+.spot:hover{border-color:var(--green)}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.prod h3{margin-top:2px}
+.rec{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg);display:flex;flex-direction:column;gap:4px}
+.rec .grade{font-size:.75rem;padding:1px 6px;vertical-align:1px}
+.rec-nein{opacity:.75}
+.ex-card.blocked{opacity:.7}
+.chip.off-on{background:var(--sunk);color:var(--red);border-color:var(--red)}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Trainingskompass</h1>
+      <p class="sub">Trainingstage, Plan aus deinen Zielen, Supplements nach Studienlage, Übungen und Wearables.</p>
+    </div>
+    <span class="sync" id="sync">Lokal gespeichert</span>
+  </header>
+
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="kalender" aria-selected="true">Kalender</button>
+    <button role="tab" data-tab="training">Training</button>
+    <button role="tab" data-tab="fortschritt">Fortschritt</button>
+    <button role="tab" data-tab="ernaehrung">Ernährung</button>
+    <button role="tab" data-tab="plan">Plan</button>
+    <button role="tab" data-tab="uebungen">Übungen</button>
+    <button role="tab" data-tab="supps">Supplements</button>
+    <button role="tab" data-tab="wear">Wearables</button>
+    <button role="tab" data-tab="profil">Ziele &amp; Profil</button>
+  </nav>
+
+  <main id="view"></main>
+</div>
+
+<script>
+/* ---------- Daten: Übungen ---------- */
+const EX = {
+  squat:{n:"Kniebeuge (Langhantel)",m:"Quadrizeps, Gesäß, Rumpf",e:"gym",alt:{kh:"goblet",kg:"splitsquat"},
+    s:["Stange auf dem oberen Trapez, Füße schulterbreit, Zehen leicht nach außen.","Einatmen, Rumpf anspannen, Hüfte und Knie gleichzeitig beugen.","So tief gehen, wie du den Rücken neutral halten kannst (Hüftfalte mindestens auf Kniehöhe).","Über die ganze Fußsohle nach oben drücken."],
+    f:["Knie fallen nach innen","Fersen heben ab","Rücken rundet unten aus"]},
+  goblet:{n:"Goblet Squat",m:"Quadrizeps, Gesäß",e:"kh",
+    s:["Kurzhantel senkrecht vor der Brust halten.","Ellbogen zwischen die Knie absenken, Oberkörper aufrecht.","Aus der Tiefe kontrolliert hochdrücken."],f:["Hantel weit vom Körper","Oberkörper kippt nach vorn"]},
+  splitsquat:{n:"Bulgarian Split Squat",m:"Quadrizeps, Gesäß",e:"kg",
+    s:["Hinteren Fuß auf eine Bank legen, vorderer Fuß gut einen Schritt vor.","Senkrecht absenken, bis das hintere Knie fast den Boden berührt.","Über die vordere Ferse hochdrücken. Optional Kurzhanteln halten."],f:["Schritt zu kurz, Ferse hebt ab","Becken dreht sich"]},
+  bench:{n:"Bankdrücken (Langhantel)",m:"Brust, Trizeps, vordere Schulter",e:"gym",alt:{kh:"dbbench",kg:"pushup"},
+    s:["Schulterblätter zusammen und nach unten, Füße fest am Boden.","Stange kontrolliert zur unteren Brust senken, Unterarme senkrecht.","Kurz berühren, dann leicht Richtung Rack drücken."],f:["Ellbogen 90° abgespreizt","Gesäß hebt ab","Stange prallt von der Brust"]},
+  dbbench:{n:"Kurzhantel-Bankdrücken",m:"Brust, Trizeps",e:"kh",
+    s:["Mit Hanteln auf den Oberschenkeln hinlegen und hochbringen.","Hanteln bis auf Brusthöhe absenken, Ellbogen etwa 45° zum Körper.","Nach oben drücken, ohne die Hanteln oben zusammenzuschlagen."],f:["Zu kleine Bewegungsamplitude","Handgelenke abgeknickt"]},
+  pushup:{n:"Liegestütz",m:"Brust, Trizeps, Rumpf",e:"kg",
+    s:["Hände etwas breiter als schulterbreit, Körper in einer Linie.","Brust bis knapp über den Boden senken.","Hochdrücken. Leichter mit Händen erhöht, schwerer mit Füßen erhöht."],f:["Hüfte hängt durch","Kopf nach vorn geschoben"]},
+  row:{n:"Langhantelrudern",m:"Oberer Rücken, Latissimus, Bizeps",e:"gym",alt:{kh:"dbrow",kg:"invrow"},
+    s:["Hüfte beugen, Oberkörper etwa 45°, Rücken neutral.","Stange zum Bauchnabel ziehen, Schulterblätter zusammen.","Kontrolliert ablassen."],f:["Schwung aus dem Rücken","Rundrücken"]},
+  dbrow:{n:"Einarmiges Kurzhantelrudern",m:"Latissimus, oberer Rücken",e:"kh",
+    s:["Knie und Hand auf der Bank abstützen.","Hantel Richtung Hüfte ziehen, Ellbogen nah am Körper.","Unten Schulter lang werden lassen."],f:["Oberkörper dreht auf","Zug nur aus dem Arm"]},
+  invrow:{n:"Umgekehrtes Rudern",m:"Oberer Rücken, Bizeps",e:"kg",
+    s:["Unter einer Stange, Ringen oder einem stabilen Tisch hängen.","Körper gestreckt, Brust zur Stange ziehen.","Je flacher der Körper, desto schwerer."],f:["Hüfte knickt ein","Kinn statt Brust zur Stange"]},
+  rdl:{n:"Rumänisches Kreuzheben",m:"Beinbeuger, Gesäß, unterer Rücken",e:"gym",alt:{kh:"dbrdl",kg:"slrdl"},
+    s:["Stange vor den Oberschenkeln, Knie leicht gebeugt.","Hüfte nach hinten schieben, Stange nah an den Beinen gleiten lassen.","Bis zur Dehnung der Beinbeuger senken, dann Hüfte nach vorn bringen."],f:["Rücken rundet","Knie beugen zu stark (wird zur Kniebeuge)"]},
+  dbrdl:{n:"Rumänisches Kreuzheben mit Kurzhanteln",m:"Beinbeuger, Gesäß",e:"kh",
+    s:["Hanteln vor den Oberschenkeln.","Hüfte nach hinten, Rücken neutral, bis zur Dehnung senken.","Aufrichten durch Hüftstreckung."],f:["Hanteln weit vor dem Körper","Rundrücken"]},
+  slrdl:{n:"Einbeiniges Kreuzheben",m:"Beinbeuger, Gesäß, Gleichgewicht",e:"kg",
+    s:["Auf einem Bein stehen, Knie leicht gebeugt.","Oberkörper nach vorn, freies Bein nach hinten strecken.","Becken bleibt waagerecht, dann zurück in den Stand."],f:["Becken dreht auf","Standknie durchgestreckt"]},
+  deadlift:{n:"Kreuzheben",m:"Gesamte hintere Kette",e:"gym",alt:{kh:"dbrdl",kg:"slrdl"},
+    s:["Mittelfuß unter der Stange, schulterbreit greifen.","Brust hoch, Latissimus anspannen, Stange an die Schienbeine.","Boden wegdrücken, Stange nah am Körper, oben Hüfte strecken ohne Hohlkreuz."],f:["Stange entfernt sich vom Körper","Hüfte schießt zuerst hoch","Rundrücken"]},
+  ohp:{n:"Schulterdrücken stehend",m:"Schultern, Trizeps",e:"gym",alt:{kh:"dbohp",kg:"pikepush"},
+    s:["Stange auf Schlüsselbeinhöhe, Gesäß und Bauch fest.","Kopf leicht zurück, Stange senkrecht nach oben drücken.","Oben Kopf unter die Stange bringen."],f:["Starkes Hohlkreuz","Stange bewegt sich im Bogen"]},
+  dbohp:{n:"Kurzhantel-Schulterdrücken",m:"Schultern, Trizeps",e:"kh",
+    s:["Sitzend oder stehend, Hanteln auf Schulterhöhe.","Nach oben drücken, bis die Arme fast gestreckt sind.","Kontrolliert ablassen."],f:["Hohlkreuz","Halbe Wiederholungen"]},
+  pikepush:{n:"Pike Push-up",m:"Schultern, Trizeps",e:"kg",
+    s:["Umgekehrtes V: Hüfte hoch, Hände schulterbreit.","Kopf zwischen den Händen Richtung Boden senken.","Hochdrücken. Schwerer mit erhöhten Füßen."],f:["Hüfte sinkt ab","Ellbogen weit nach außen"]},
+  latpull:{n:"Latziehen",m:"Latissimus, Bizeps",e:"gym",alt:{kh:"pullup",kg:"pullup"},
+    s:["Etwas breiter als schulterbreit greifen, Oberschenkel fixieren.","Brust heben, Stange zur oberen Brust ziehen.","Oben Arme vollständig strecken."],f:["Starkes Zurücklehnen","Ziehen in den Nacken"]},
+  pullup:{n:"Klimmzug",m:"Latissimus, Bizeps",e:"kg",
+    s:["Stange schulterbreit greifen, aus dem gestreckten Hang starten.","Schulterblätter nach unten, Brust zur Stange ziehen.","Kontrolliert ablassen. Leichter mit Widerstandsband oder nur negativ."],f:["Schwung aus den Beinen","Halber Bewegungsumfang"]},
+  legcurl:{n:"Beinbeuger-Maschine",m:"Beinbeuger",e:"gym",alt:{kh:"nordic",kg:"nordic"},
+    s:["Polster knapp über der Ferse einstellen.","Fersen Richtung Gesäß ziehen.","Langsam zurück in die Streckung."],f:["Hüfte hebt vom Polster ab","Gewicht fällt zurück"]},
+  nordic:{n:"Nordic Hamstring Curl",m:"Beinbeuger",e:"kg",
+    s:["Kniend, Fersen fixiert (Partner, Sofa, Hantelstange).","Körper gerade halten und so langsam wie möglich nach vorn sinken.","Mit den Händen abfangen und wieder hochdrücken."],f:["Hüfte knickt ein","Zu schnelles Fallen"]},
+  hipthrust:{n:"Hip Thrust",m:"Gesäß",e:"kh",
+    s:["Oberer Rücken an einer Bank, Gewicht auf der Hüfte.","Füße so stellen, dass oben die Schienbeine senkrecht sind.","Hüfte strecken, oben Gesäß 1 s anspannen. Ohne Gewicht als Glute Bridge."],f:["Hohlkreuz statt Hüftstreckung","Füße zu weit vorn"]},
+  lunge:{n:"Ausfallschritte",m:"Quadrizeps, Gesäß",e:"kg",
+    s:["Großen Schritt nach vorn oder hinten.","Hinteres Knie Richtung Boden senken.","Zurück in den Stand, Seite wechseln. Optional mit Kurzhanteln."],f:["Vorderes Knie knickt nach innen","Oberkörper fällt vor"]},
+  calf:{n:"Wadenheben",m:"Waden",e:"kg",
+    s:["Vorfuß auf einer Stufe, Fersen frei.","Fersen weit absenken, unten 1 s halten.","So hoch wie möglich drücken."],f:["Federn ohne Pause","Kleine Amplitude"]},
+  lateral:{n:"Seitheben",m:"Seitliche Schulter",e:"kh",
+    s:["Leichte Hanteln, Arme leicht gebeugt.","Seitlich bis Schulterhöhe heben.","Langsam absenken."],f:["Schwung","Schultern ziehen zu den Ohren"]},
+  curl:{n:"Kurzhantel-Curl",m:"Bizeps",e:"kh",
+    s:["Ellbogen am Körper.","Hanteln hochbeugen, Handflächen nach oben.","Langsam vollständig strecken."],f:["Ellbogen wandern nach vorn","Schwung aus dem Rücken"]},
+  triceps:{n:"Trizepsdrücken am Kabel",m:"Trizeps",e:"gym",alt:{kh:"dips",kg:"dips"},
+    s:["Oberarme am Körper fixieren.","Seil oder Stange nach unten strecken.","Kontrolliert zurück bis etwa 90° im Ellbogen."],f:["Oberarme bewegen sich mit","Oberkörper drückt mit"]},
+  dips:{n:"Dips (Barren oder Bank)",m:"Trizeps, Brust",e:"kg",
+    s:["Am Barren oder mit Händen hinter dir auf einer Bank stützen.","Absenken, bis die Oberarme etwa waagerecht sind.","Hochdrücken bis zur Streckung."],f:["Schultern rollen nach vorn","Zu tief bei Schulterschmerzen"]},
+  plank:{n:"Unterarmstütz (Plank)",m:"Rumpf",e:"kg",r:"30–60 s",
+    s:["Ellbogen unter den Schultern, Körper in einer Linie.","Gesäß und Bauch anspannen, Becken leicht einrollen.","Ruhig weiteratmen."],f:["Hüfte hängt durch","Gesäß zu hoch"]},
+  deadbug:{n:"Dead Bug",m:"Tiefe Bauchmuskulatur",e:"kg",r:"8–12 je Seite",
+    s:["Rückenlage, Arme zur Decke, Knie 90° über der Hüfte.","Gegengleich Arm und Bein strecken, Lendenwirbelsäule bleibt am Boden.","Zurück und Seite wechseln."],f:["Hohlkreuz","Zu schnell"]},
+  z2:{n:"Zone-2-Ausdauer",m:"Herz-Kreislauf, Fettstoffwechsel",e:"kg",cardio:true,
+    s:["Laufen, Rad, Rudern oder zügiges Gehen.","Herzfrequenz in Zone 2 (siehe Wearables), du kannst noch in ganzen Sätzen reden.","Gleichmäßig bleiben, kein Endspurt."],f:["Zu schnell, landet in Zone 3","Jede Einheit wird zur harten Einheit"]},
+  intervals:{n:"4×4-Intervalle",m:"VO₂max",e:"kg",cardio:true,
+    s:["10 min locker einlaufen.","4 × 4 min bei 90–95 % der maximalen Herzfrequenz.","Dazwischen je 3 min locker weiterbewegen, danach 5 min auslaufen."],f:["Erstes Intervall zu schnell","Pausen im Stehen statt aktiv"]}
+};
+const NEW_EX={"inclinedb": {"n": "Schrägbankdrücken mit Kurzhanteln", "en": "incline dumbbell press", "m": "Obere Brust, vordere Schulter, Trizeps", "e": "kh", "s": ["Bank auf 30–45° stellen, Hanteln auf den Oberschenkeln mit hochnehmen.", "Schulterblätter zurück und nach unten, Hanteln seitlich der oberen Brust ablassen.", "Nach oben drücken, ohne die Hanteln oben zusammenzuschlagen."], "f": ["Bank zu steil, dann arbeitet vor allem die Schulter", "Zu kurze Bewegung"], "tip": "Hanteln tief ablassen, die Dehnung unten bringt viel für den Muskelaufbau."}, "inclinebb": {"n": "Schrägbankdrücken mit Langhantel", "en": "incline barbell bench press", "m": "Obere Brust, vordere Schulter, Trizeps", "e": "gym", "s": ["Bank auf 30–45°, Schulterblätter zusammen, Füße fest am Boden.", "Stange kontrolliert zur oberen Brust knapp unter dem Schlüsselbein senken.", "Gerade nach oben drücken."], "f": ["Gesäß hebt ab", "Stange prallt von der Brust"], "tip": "Die Stange Richtung Schlüsselbein führen, nicht zur Brustmitte.", "alt": {"kh": "inclinedb", "kg": "pushup"}}, "dbfly": {"n": "Kurzhantel-Fliegende", "en": "dumbbell fly", "m": "Brust", "e": "kh", "s": ["Rückenlage auf der Bank, Hanteln über der Brust, Ellbogen leicht gebeugt.", "Arme in einem weiten Bogen seitlich absenken, bis die Brust gedehnt ist.", "Im gleichen Bogen zurück nach oben führen."], "f": ["Arme ganz gestreckt (belastet den Ellbogen)", "Wird zur Drückbewegung"], "tip": "Ellbogen etwa 15° gebeugt fixieren und leichtes Gewicht wählen."}, "cablefly": {"n": "Kabelzug-Fliegende (Cable Crossover)", "en": "cable fly crossover", "m": "Brust", "e": "gym", "s": ["Kabelzüge etwa auf Schulterhöhe, einen Schritt nach vorn treten.", "Mit leicht gebeugten Armen die Griffe im Bogen vor der Brust zusammenführen.", "Langsam zurück, bis die Brust gedehnt ist."], "f": ["Ellbogenwinkel ändert sich (Drückbewegung)", "Oberkörper schwingt mit"], "tip": "Die Dehnung hinten betonen und den Ellbogenwinkel fixieren.", "alt": {"kh": "dbfly", "kg": "pushup"}}, "chestpress": {"n": "Brustpresse (Maschine)", "en": "machine chest press", "m": "Brust, Trizeps, vordere Schulter", "e": "gym", "s": ["Sitz so einstellen, dass die Griffe auf Höhe der mittleren Brust sind.", "Schulterblätter an die Lehne, Griffe nach vorn drücken.", "Kontrolliert zurück, bis die Brust gedehnt ist."], "f": ["Schultern rollen nach vorn", "Gewicht knallt zurück"], "tip": "Gut für sichere Sätze bis nah ans Muskelversagen.", "alt": {"kh": "dbbench", "kg": "pushup"}}, "pecdeck": {"n": "Butterfly-Maschine (Pec Deck)", "en": "pec deck machine fly", "m": "Brust", "e": "gym", "s": ["Sitz so einstellen, dass die Arme auf Schulterhöhe sind.", "Griffe oder Polster vor der Brust zusammenführen.", "Langsam öffnen, bis die Brust gedehnt ist."], "f": ["Schultern heben sich", "Zu kleine Bewegung"], "alt": {"kh": "dbfly", "kg": "pushup"}}, "chinup": {"n": "Chin-up (Klimmzug im Untergriff)", "en": "chin-up", "m": "Latissimus, Bizeps", "e": "kg", "s": ["Stange schulterbreit im Untergriff (Handflächen zu dir) greifen.", "Aus dem gestreckten Hang die Brust zur Stange ziehen.", "Kontrolliert ganz ablassen."], "f": ["Halbe Wiederholungen", "Schwung aus den Beinen"], "tip": "Etwas leichter als der Klimmzug im Obergriff und gut für den Bizeps."}, "cablerow": {"n": "Rudern am Kabelzug (sitzend)", "en": "seated cable row", "m": "Mittlerer Rücken, Latissimus, Bizeps", "e": "gym", "s": ["Füße abstützen, Knie leicht gebeugt, Oberkörper aufrecht.", "Griff zum Bauch ziehen, Schulterblätter zusammenziehen.", "Vorne die Schulterblätter bewusst auseinandergehen lassen."], "f": ["Oberkörper schaukelt vor und zurück", "Schultern ziehen hoch"], "tip": "Vorn die Schulterblätter aufgehen lassen, hinten zusammenziehen.", "alt": {"kh": "dbrow", "kg": "invrow"}}, "tbarrow": {"n": "T-Bar-Rudern", "en": "t-bar row", "m": "Mittlerer Rücken, Latissimus", "e": "gym", "s": ["Über die Stange stellen oder Brust ans Polster legen.", "Mit neutralem Rücken die Griffe zur unteren Brust ziehen.", "Kontrolliert ablassen, unten strecken."], "f": ["Rundrücken", "Schwung aus der Hüfte"], "alt": {"kh": "chestrow", "kg": "invrow"}}, "chestrow": {"n": "Brustgestütztes Kurzhantelrudern", "en": "chest supported dumbbell row", "m": "Oberer Rücken, Latissimus", "e": "kh", "s": ["Bank auf etwa 30°, Brust auf das Polster legen.", "Hanteln Richtung Hüfte ziehen, Ellbogen nah am Körper.", "Unten die Schulterblätter auseinandergehen lassen."], "f": ["Brust hebt vom Polster ab", "Zug nur aus den Armen"], "tip": "Die Brust am Polster nimmt den Schwung raus, so arbeitet nur der Rücken."}, "straightpull": {"n": "Überzüge am Kabel (Straight-Arm Pulldown)", "en": "straight arm cable pulldown pullover", "m": "Latissimus", "e": "gym", "s": ["Vor dem hohen Kabelzug stehen, leicht vorgebeugt, Arme fast gestreckt.", "Stange oder Seil im Bogen bis zu den Oberschenkeln ziehen.", "Langsam zurück, bis der Latissimus gedehnt ist."], "f": ["Arme beugen sich (wird zum Trizepsdrücken)", "Oberkörper wippt"], "alt": {"kh": "dbpullover", "kg": "pullup"}}, "dbpullover": {"n": "Kurzhantel-Pullover", "en": "dumbbell pullover", "m": "Latissimus, Brust", "e": "kh", "s": ["Quer oder längs auf der Bank, Hantel mit beiden Händen über der Brust.", "Mit leicht gebeugten Armen hinter den Kopf absenken.", "Im Bogen zurück über die Brust."], "f": ["Zu tief bei Schulterproblemen", "Hohlkreuz"]}, "shrug": {"n": "Shrugs (Schulterheben)", "en": "shrugs", "m": "Oberer Trapezmuskel", "e": "kh", "s": ["Hanteln oder Langhantel seitlich bzw. vor dem Körper halten.", "Schultern gerade nach oben zu den Ohren ziehen.", "Oben kurz halten, langsam absenken."], "f": ["Schultern kreisen", "Zu kleiner Bewegungsumfang"]}, "backext": {"n": "Rückenstrecker (45° Hyperextension)", "en": "back extension hyperextension", "m": "Unterer Rücken, Gesäß, Beinbeuger", "e": "gym", "s": ["Polster knapp unter der Hüfte, Füße fixiert.", "Oberkörper aus der Hüfte absenken.", "Hüfte strecken und Gesäß anspannen, bis der Körper eine Linie bildet."], "f": ["Überstrecken ins Hohlkreuz", "Schwung"], "tip": "Mit rundem oberen Rücken und Fokus aufs Gesäß wird es eine sehr gute Gesäßübung.", "alt": {"kh": "dbrdl", "kg": "slrdl"}}, "machinepress": {"n": "Schulterpresse (Maschine)", "en": "machine shoulder press", "m": "Schultern, Trizeps", "e": "gym", "s": ["Sitz so einstellen, dass die Griffe auf Schulterhöhe sind.", "Rücken an die Lehne, Griffe nach oben drücken.", "Kontrolliert bis Schulterhöhe zurück."], "f": ["Hohlkreuz", "Halbe Wiederholungen"], "alt": {"kh": "dbohp", "kg": "pikepush"}}, "reversefly": {"n": "Reverse Flys (hintere Schulter)", "en": "rear delt fly reverse pec deck", "m": "Hintere Schulter, oberer Rücken", "e": "kh", "s": ["Vorgebeugt oder mit der Brust auf einer Schrägbank, leichte Hanteln.", "Arme seitlich nach außen heben, Ellbogen leicht gebeugt.", "Langsam absenken."], "f": ["Zu schweres Gewicht", "Schulterblätter statt Schultern arbeiten"], "tip": "Leicht bleiben und die hintere Schulter arbeiten lassen."}, "facepull": {"n": "Face Pull", "en": "face pull", "m": "Hintere Schulter, Rotatorenmanschette, oberer Rücken", "e": "gym", "s": ["Seil am Kabelzug auf Stirnhöhe, Ellbogen hoch.", "Seil Richtung Gesicht ziehen und die Hände dabei nach außen drehen.", "Kontrolliert zurück."], "f": ["Zu schwer, wird zum Rudern", "Ellbogen fallen ab"], "tip": "Viele Wiederholungen (15–20) mit leichtem Gewicht.", "alt": {"kh": "reversefly", "kg": "bandpull"}}, "cablelateral": {"n": "Seitheben am Kabel", "en": "cable lateral raise", "m": "Seitliche Schulter", "e": "gym", "s": ["Seitlich neben den tiefen Kabelzug stellen, Griff mit der entfernten Hand.", "Arm seitlich bis Schulterhöhe heben.", "Langsam ab, unten nicht ablegen."], "f": ["Schwung", "Schulter zieht zum Ohr"], "tip": "Das Kabel hält die Spannung auch unten, deshalb oft besser als Kurzhanteln.", "alt": {"kh": "lateral", "kg": "pikepush"}}, "uprow": {"n": "Aufrechtes Rudern", "en": "upright row", "m": "Seitliche Schulter, Trapez", "e": "kh", "s": ["Stange oder Hanteln vor den Oberschenkeln, etwas weiter als schulterbreit greifen.", "Ellbogen voran bis etwa Brusthöhe hochziehen.", "Langsam absenken."], "f": ["Zu enger Griff", "Zu hoch gezogen bei Schulterschmerzen"], "tip": "Weiter Griff und nur bis Brusthöhe schont die Schulter."}, "bandpull": {"n": "Band Pull-Aparts", "en": "band pull apart", "m": "Hintere Schulter, oberer Rücken", "e": "kh", "s": ["Widerstandsband schulterbreit vor der Brust halten, Arme gestreckt.", "Band auseinanderziehen, bis es die Brust berührt.", "Kontrolliert zurück."], "f": ["Hohlkreuz", "Schultern ziehen hoch"], "tip": "Gut als Aufwärmübung vor Bank- und Schulterdrücken."}, "frontraise": {"n": "Frontheben", "en": "front raise", "m": "Vordere Schulter", "e": "kh", "s": ["Hanteln vor den Oberschenkeln halten.", "Arme gestreckt nach vorn bis Schulterhöhe heben.", "Langsam absenken."], "f": ["Schwung aus dem Rücken", "Zu hoch"], "tip": "Meist überflüssig, wenn du schon drückst, die vordere Schulter arbeitet dabei viel mit."}, "hammer": {"n": "Hammer-Curls", "en": "hammer curl", "m": "Bizeps, Oberarmspeichenmuskel, Unterarme", "e": "kh", "s": ["Hanteln mit neutralem Griff (Daumen nach oben) seitlich halten.", "Hanteln hochbeugen, Ellbogen am Körper.", "Langsam absenken."], "f": ["Schwung", "Ellbogen wandern nach vorn"]}, "bbcurl": {"n": "Langhantel- oder SZ-Curl", "en": "barbell ez bar curl", "m": "Bizeps", "e": "gym", "s": ["Stange schulterbreit im Untergriff, Ellbogen am Körper.", "Stange zu den Schultern beugen.", "Langsam vollständig ablassen."], "f": ["Schwung aus dem Rücken", "Ellbogen nach vorn"], "tip": "Die SZ-Stange ist angenehmer für die Handgelenke.", "alt": {"kh": "curl", "kg": "chinup"}}, "inclinecurl": {"n": "Schrägbank-Curls", "en": "incline dumbbell curl", "m": "Bizeps (langer Kopf)", "e": "kh", "s": ["Bank auf etwa 45°, Arme hängen gerade nach unten.", "Hanteln hochbeugen, Oberarme bleiben senkrecht.", "Ganz langsam ablassen bis zur Dehnung."], "f": ["Schultern rollen nach vorn", "Zu schwer"], "tip": "Die gedehnte Position macht diese Übung besonders wirksam."}, "preacher": {"n": "Scottcurls (Preacher Curl)", "en": "preacher curl", "m": "Bizeps", "e": "gym", "s": ["Oberarme auf das Pult legen, Achseln an die Kante.", "Hantel oder Stange hochbeugen.", "Fast ganz strecken, ohne abzulegen."], "f": ["Unten ruckartig", "Gesäß hebt ab"], "alt": {"kh": "curl", "kg": "chinup"}}, "cablecurl": {"n": "Kabel-Curls (Bayesian Curl)", "en": "cable curl bayesian", "m": "Bizeps", "e": "gym", "s": ["Mit dem Rücken zum tiefen Kabelzug, Arm hinter dem Körper.", "Griff nach vorn oben beugen.", "Langsam zurück bis zur Dehnung."], "f": ["Ellbogen wandert nach vorn", "Oberkörper dreht mit"], "alt": {"kh": "inclinecurl", "kg": "chinup"}}, "ohext": {"n": "Trizepsdrücken über Kopf", "en": "overhead triceps extension", "m": "Trizeps (langer Kopf)", "e": "kh", "s": ["Hantel oder Seil mit beiden Händen über den Kopf.", "Unterarme hinter den Kopf absenken, Oberarme bleiben oben.", "Arme wieder strecken."], "f": ["Ellbogen gehen weit auseinander", "Hohlkreuz"], "tip": "Die Dehnung über Kopf trainiert den langen Trizepskopf besonders gut."}, "skull": {"n": "Stirndrücken (Skull Crusher)", "en": "skull crusher lying triceps extension", "m": "Trizeps", "e": "gym", "s": ["Rückenlage, SZ-Stange mit gestreckten Armen über der Brust.", "Stange hinter den Kopf absenken, Oberarme bleiben ruhig.", "Arme strecken."], "f": ["Ellbogen gehen nach außen", "Zu schwer für die Ellbogen"], "tip": "Stange hinter den Kopf statt zur Stirn führen, das dehnt den Trizeps mehr.", "alt": {"kh": "ohext", "kg": "diamond"}}, "closebench": {"n": "Enges Bankdrücken", "en": "close grip bench press", "m": "Trizeps, Brust", "e": "gym", "s": ["Wie Bankdrücken, Griff etwa schulterbreit.", "Stange zur unteren Brust senken, Ellbogen nah am Körper.", "Nach oben drücken."], "f": ["Griff zu eng (Handgelenke)", "Ellbogen weit ausgestellt"], "alt": {"kh": "dips", "kg": "diamond"}}, "kickback": {"n": "Trizeps-Kickbacks", "en": "triceps kickback", "m": "Trizeps", "e": "kh", "s": ["Vorgebeugt, Oberarm parallel zum Boden am Körper.", "Unterarm nach hinten strecken.", "Langsam zurück."], "f": ["Oberarm sinkt ab", "Schwung"]}, "diamond": {"n": "Diamant-Liegestütz", "en": "diamond push-up", "m": "Trizeps, Brust", "e": "kg", "s": ["Hände unter der Brust, Daumen und Zeigefinger bilden ein Dreieck.", "Körper gerade, Brust zu den Händen senken.", "Hochdrücken."], "f": ["Hüfte hängt", "Ellbogen weit außen"]}, "wristcurl": {"n": "Handgelenk-Curls", "en": "wrist curl", "m": "Unterarme", "e": "kh", "s": ["Unterarme auf den Oberschenkeln oder der Bank, Handgelenke frei.", "Hantel nur aus dem Handgelenk hochrollen.", "Langsam ab bis in die Finger."], "f": ["Unterarm hebt ab", "Zu schwer"]}, "reversecurl": {"n": "Reverse Curls (Obergriff)", "en": "reverse curl", "m": "Unterarme, Oberarmspeichenmuskel", "e": "kh", "s": ["Stange oder Hanteln im Obergriff (Handrücken oben).", "Hochbeugen, Ellbogen am Körper.", "Langsam absenken."], "f": ["Handgelenk knickt ab", "Schwung"]}, "farmer": {"n": "Farmer's Walk", "en": "farmers walk carry", "m": "Griff, Unterarme, Rumpf, Trapez", "e": "kh", "s": ["Schwere Hanteln oder Kettlebells seitlich aufnehmen.", "Aufrecht mit kurzen, zügigen Schritten gehen.", "Nach 20–40 m kontrolliert abstellen."], "f": ["Rundrücken beim Aufnehmen", "Schultern hängen nach vorn"], "r": "20–40 m"}, "legpress": {"n": "Beinpresse", "en": "leg press", "m": "Quadrizeps, Gesäß", "e": "gym", "s": ["Füße schulterbreit mittig auf der Plattform, Rücken an der Lehne.", "Plattform absenken, bis die Knie etwa 90° oder tiefer gebeugt sind.", "Hochdrücken, ohne die Knie durchzustrecken."], "f": ["Gesäß hebt vom Polster ab", "Knie fallen nach innen"], "tip": "Nur so tief gehen, wie der untere Rücken am Polster bleibt.", "alt": {"kh": "goblet", "kg": "splitsquat"}}, "legext": {"n": "Beinstrecker", "en": "leg extension", "m": "Quadrizeps", "e": "gym", "s": ["Drehachse der Maschine auf Höhe des Knies, Rücken an der Lehne.", "Beine strecken, oben kurz halten.", "Langsam zurück."], "f": ["Schwung", "Gesäß hebt ab"], "tip": "Langsam ablassen bringt mehr als schweres Gewicht.", "alt": {"kh": "sissy", "kg": "sissy"}}, "hack": {"n": "Hackenschmidt-Kniebeuge", "en": "hack squat", "m": "Quadrizeps, Gesäß", "e": "gym", "s": ["Rücken an das Polster, Schultern unter die Polster.", "Tief in die Hocke gehen.", "Über die ganze Sohle hochdrücken."], "f": ["Halbe Tiefe", "Fersen heben ab"], "tip": "Füße weiter unten auf der Platte heißt mehr Quadrizeps.", "alt": {"kh": "goblet", "kg": "splitsquat"}}, "frontsquat": {"n": "Frontkniebeuge", "en": "front squat", "m": "Quadrizeps, Rumpf, oberer Rücken", "e": "gym", "s": ["Stange auf den vorderen Schultern, Ellbogen hoch.", "Aufrecht tief in die Hocke gehen.", "Ellbogen oben halten und hochdrücken."], "f": ["Ellbogen fallen ab", "Oberkörper kippt"], "tip": "Die Stange liegt auf den Schultern, nicht in den Händen.", "alt": {"kh": "goblet", "kg": "splitsquat"}}, "stepup": {"n": "Step-ups", "en": "step up", "m": "Quadrizeps, Gesäß", "e": "kg", "s": ["Vor eine kniehohe Box oder Bank stellen, optional Hanteln halten.", "Einen Fuß auf die Box, über dieses Bein hochsteigen.", "Kontrolliert wieder absteigen."], "f": ["Abdrücken mit dem hinteren Bein", "Knie fällt nach innen"]}, "smithsquat": {"n": "Kniebeuge an der Multipresse", "en": "smith machine squat", "m": "Quadrizeps, Gesäß", "e": "gym", "s": ["Stange auf dem oberen Rücken, Füße etwas vor dem Körper.", "Tief in die Hocke gehen.", "Hochdrücken."], "f": ["Füße zu weit hinten", "Halbe Tiefe"], "alt": {"kh": "goblet", "kg": "splitsquat"}}, "sissy": {"n": "Sissy Squat", "en": "sissy squat reverse nordic", "m": "Quadrizeps", "e": "kg", "s": ["Mit einer Hand festhalten, auf die Fußballen gehen.", "Knie nach vorn schieben und den Körper als Linie nach hinten lehnen.", "Mit den Oberschenkeln wieder hochdrücken."], "f": ["Hüfte knickt ein", "Zu tief am Anfang"]}, "seatedcurl": {"n": "Beinbeuger sitzend", "en": "seated leg curl", "m": "Beinbeuger", "e": "gym", "s": ["Polster über den Knien fixieren, Polster unten knapp über der Ferse.", "Fersen unter den Sitz ziehen.", "Langsam zurück bis kurz vor den Anschlag."], "f": ["Schwung", "Unvollständige Streckung"], "tip": "Sitzend wird der Beinbeuger mehr gedehnt als liegend, das wirkt meist besser.", "alt": {"kh": "nordic", "kg": "nordic"}}, "sldl": {"n": "Kreuzheben mit gestreckten Beinen", "en": "stiff leg deadlift", "m": "Beinbeuger, Gesäß, unterer Rücken", "e": "gym", "s": ["Stange vor den Oberschenkeln, Knie fast gestreckt.", "Hüfte nach hinten, Stange nah an den Beinen absenken.", "Hüfte nach vorn strecken."], "f": ["Rundrücken", "Stange weit vom Körper"], "alt": {"kh": "dbrdl", "kg": "slrdl"}}, "goodmorning": {"n": "Good Morning", "en": "good morning", "m": "Beinbeuger, unterer Rücken, Gesäß", "e": "gym", "s": ["Stange auf dem oberen Rücken wie bei der Kniebeuge.", "Knie leicht gebeugt, Hüfte nach hinten schieben, Oberkörper neigen.", "Mit gestrecktem Rücken aufrichten."], "f": ["Rundrücken", "Zu schwer"], "alt": {"kh": "dbrdl", "kg": "slrdl"}}, "sumo": {"n": "Sumo-Kreuzheben", "en": "sumo deadlift", "m": "Gesäß, Oberschenkel, Rücken", "e": "gym", "s": ["Breiter Stand, Zehen nach außen, Hände innen zwischen den Beinen.", "Brust hoch, Knie nach außen drücken.", "Stange nah am Körper hochziehen, oben Hüfte strecken."], "f": ["Knie fallen nach innen", "Hüfte schießt zuerst hoch"], "alt": {"kh": "goblet", "kg": "glutebridge"}}, "hipabd": {"n": "Abduktoren-Maschine", "en": "hip abduction machine", "m": "Seitliches Gesäß", "e": "gym", "s": ["Polster außen an den Knien, aufrecht oder leicht vorgelehnt sitzen.", "Beine nach außen drücken.", "Langsam zurück."], "f": ["Schwung", "Zu kleiner Bewegungsumfang"], "tip": "Leicht nach vorn lehnen trifft das Gesäß besser.", "alt": {"kh": "glutebridge", "kg": "glutebridge"}}, "glutebridge": {"n": "Glute Bridge (Beckenheben)", "en": "glute bridge", "m": "Gesäß, Beinbeuger", "e": "kg", "s": ["Rückenlage, Füße hüftbreit aufgestellt.", "Becken hochdrücken, bis Oberkörper und Oberschenkel eine Linie bilden.", "Oben Gesäß anspannen, langsam ab. Schwerer einbeinig oder mit Gewicht."], "f": ["Hohlkreuz statt Hüftstreckung", "Füße zu weit weg"]}, "cablekick": {"n": "Kickbacks am Kabel", "en": "cable glute kickback", "m": "Gesäß", "e": "gym", "s": ["Manschette am Fuß, vor dem tiefen Kabelzug leicht vorgebeugt.", "Bein nach hinten strecken.", "Kontrolliert zurück."], "f": ["Hohlkreuz", "Oberkörper dreht"], "alt": {"kh": "glutebridge", "kg": "glutebridge"}}, "pullthrough": {"n": "Cable Pull-Through", "en": "cable pull through", "m": "Gesäß, Beinbeuger", "e": "gym", "s": ["Mit dem Rücken zum tiefen Kabelzug, Seil zwischen den Beinen.", "Hüfte nach hinten schieben.", "Hüfte nach vorn strecken und Gesäß anspannen."], "f": ["Wird zur Kniebeuge", "Ziehen mit den Armen"], "alt": {"kh": "kbswing", "kg": "glutebridge"}}, "seatedcalf": {"n": "Wadenheben sitzend", "en": "seated calf raise", "m": "Waden (Schollenmuskel)", "e": "gym", "s": ["Polster auf den Oberschenkeln, Vorfüße auf der Stufe.", "Fersen weit absenken.", "So hoch wie möglich drücken, oben kurz halten."], "f": ["Federn", "Kleiner Bewegungsumfang"], "alt": {"kh": "calf", "kg": "calf"}}, "legpresscalf": {"n": "Wadendrücken an der Beinpresse", "en": "leg press calf raise", "m": "Waden", "e": "gym", "s": ["Nur die Vorfüße unten auf der Plattform, Beine fast gestreckt.", "Plattform mit den Zehen wegdrücken.", "Fersen langsam weit zurück."], "f": ["Federn ohne Dehnung", "Knie gebeugt"], "alt": {"kh": "calf", "kg": "calf"}}, "hlr": {"n": "Hängendes Beinheben", "en": "hanging leg raise", "m": "Bauch, Hüftbeuger", "e": "kg", "s": ["An der Klimmzugstange hängen.", "Becken einrollen und Knie oder gestreckte Beine anheben.", "Langsam ablassen ohne Schwung."], "f": ["Schwingen", "Nur die Beine heben, Becken bleibt"], "tip": "Das Becken einrollen ist der eigentliche Bauchteil der Übung."}, "cablecrunch": {"n": "Kabel-Crunch (kniend)", "en": "cable crunch", "m": "Bauch", "e": "gym", "s": ["Vor dem hohen Kabelzug knien, Seil neben dem Kopf.", "Mit den Bauchmuskeln zur C-Form einrollen.", "Oben wieder ganz strecken."], "f": ["Ziehen mit den Armen", "Hüfte schaukelt"], "tip": "Gilt in Foren und bei Trainern als eine der besten Bauchübungen.", "alt": {"kh": "crunch", "kg": "crunch"}}, "crunch": {"n": "Crunches / Sit-ups", "en": "crunch sit up", "m": "Bauch", "e": "kg", "s": ["Rückenlage, Füße aufgestellt.", "Oberkörper einrollen, Lendenwirbel bleiben unten (Crunch) oder ganz hoch (Sit-up).", "Langsam ab."], "f": ["Ziehen am Nacken", "Schwung"]}, "abwheel": {"n": "Bauchroller (Ab Wheel)", "en": "ab wheel rollout", "m": "Bauch, Rumpf", "e": "kh", "s": ["Kniend, Rad unter den Schultern.", "Rad nach vorn rollen, Becken eingerollt, kein Hohlkreuz.", "Mit dem Bauch zurückziehen."], "f": ["Hohlkreuz", "Zu weit am Anfang"]}, "pallof": {"n": "Pallof Press", "en": "pallof press", "m": "Seitliche Bauchmuskeln, Rumpfstabilität", "e": "gym", "s": ["Seitlich zum Kabelzug oder Band, Griff vor der Brust.", "Arme gerade nach vorn drücken und dem Zug widerstehen.", "Zurück zur Brust."], "f": ["Oberkörper dreht mit", "Zu schwer"], "alt": {"kh": "sideplank", "kg": "sideplank"}}, "sidebend": {"n": "Seitbeugen mit Kurzhantel", "en": "dumbbell side bend", "m": "Seitliche Bauchmuskeln", "e": "kh", "s": ["Hantel in einer Hand, aufrecht stehen.", "Seitlich zur Hantel neigen.", "Über die Gegenseite aufrichten."], "f": ["Vorbeugen", "Schwung"]}, "sideplank": {"n": "Seitstütz", "en": "side plank", "m": "Seitliche Bauchmuskeln", "e": "kg", "s": ["Seitlich auf dem Unterarm, Ellbogen unter der Schulter.", "Hüfte hoch, Körper in einer Linie.", "Halten, dann Seite wechseln."], "f": ["Hüfte sinkt", "Oberkörper kippt nach vorn"], "r": "20–45 s je Seite"}, "pushpress": {"n": "Push Press", "en": "push press", "m": "Schultern, Trizeps, Beine", "e": "gym", "s": ["Stange auf den vorderen Schultern.", "Kurz in die Knie dippen und explosiv strecken.", "Den Schwung nutzen, um die Stange über Kopf zu drücken."], "f": ["Dip zu tief", "Stange vor dem Gesicht"], "alt": {"kh": "dbohp", "kg": "pikepush"}}, "kbswing": {"n": "Kettlebell Swing", "en": "kettlebell swing", "m": "Gesäß, Beinbeuger, Rumpf", "e": "kh", "s": ["Kettlebell vor dir, Hüfte nach hinten, Rücken gerade.", "Kettlebell zwischen die Beine schwingen.", "Hüfte explosiv strecken, Kettlebell schwingt bis Brusthöhe."], "f": ["Wird zur Kniebeuge", "Heben mit den Armen"], "tip": "Die Kraft kommt aus der Hüfte, die Arme führen nur."}, "powerclean": {"n": "Umsetzen (Power Clean)", "en": "power clean", "m": "Ganzkörper, Schnellkraft", "e": "gym", "s": ["Startposition wie Kreuzheben, Stange nah an den Schienbeinen.", "Explosiv strecken, Stange hochziehen.", "Unter die Stange gehen und sie auf den vorderen Schultern fangen."], "f": ["Ziehen mit den Armen", "Stange schwingt vom Körper weg"], "tip": "Technisch anspruchsvoll, am besten mit Trainer lernen.", "alt": {"kh": "kbswing", "kg": "glutebridge"}}, "kbsnatch": {"n": "Kettlebell Reißen (Snatch)", "en": "kettlebell snatch", "m": "Ganzkörper, Schultern", "e": "kh", "s": ["Swing-Bewegung einhändig beginnen.", "Kettlebell nah am Körper nach oben ziehen.", "Hand um die Kugel drehen und über Kopf fixieren."], "f": ["Kettlebell schlägt auf den Unterarm", "Hohlkreuz oben"]}, "treadmill": {"n": "Laufband", "en": "treadmill", "m": "Herz-Kreislauf", "e": "gym", "s": ["Mit Gehen beginnen, Tempo langsam steigern.", "Für Zone 2 ein Tempo wählen, bei dem du noch reden kannst.", "Leichte Steigung (1–2 %) entspricht dem Laufen draußen."], "f": ["Zu hohe Intensität bei lockeren Einheiten", "Schlechte Haltung, an den Griffen hängen"], "alt": {"kh": "z2", "kg": "z2"}, "cardio": true}, "stepper": {"n": "Stepper / Treppensteiger", "en": "stair climber stepmill", "m": "Herz-Kreislauf, Beine", "e": "gym", "s": ["Aufrecht stehen, nur leicht am Geländer halten.", "Gleichmäßiges Tempo wählen.", "Ganze Fußsohle aufsetzen."], "f": ["Zu hohe Intensität bei lockeren Einheiten", "Schlechte Haltung, an den Griffen hängen"], "alt": {"kh": "z2", "kg": "z2"}, "cardio": true}, "bike": {"n": "Fahrradergometer", "en": "stationary bike", "m": "Herz-Kreislauf, Beine", "e": "gym", "s": ["Sattel so hoch, dass das Knie unten leicht gebeugt ist.", "Trittfrequenz etwa 80–90 pro Minute.", "Widerstand nach Herzfrequenz-Zone wählen."], "f": ["Zu hohe Intensität bei lockeren Einheiten", "Schlechte Haltung, an den Griffen hängen"], "alt": {"kh": "z2", "kg": "z2"}, "cardio": true}, "elliptical": {"n": "Crosstrainer", "en": "elliptical", "m": "Herz-Kreislauf, Ganzkörper", "e": "gym", "s": ["Aufrecht stehen, Arme mitarbeiten lassen.", "Gleichmäßiger Rhythmus.", "Gelenkschonend, gut bei Knieproblemen."], "f": ["Zu hohe Intensität bei lockeren Einheiten", "Schlechte Haltung, an den Griffen hängen"], "alt": {"kh": "z2", "kg": "z2"}, "cardio": true}, "rower": {"n": "Rudergerät", "en": "rowing machine", "m": "Herz-Kreislauf, Rücken, Beine", "e": "gym", "s": ["Reihenfolge: Beine, dann Oberkörper, dann Arme.", "Zurück in umgekehrter Reihenfolge.", "Etwa 20–24 Schläge pro Minute für lockere Einheiten."], "f": ["Zu hohe Intensität bei lockeren Einheiten", "Schlechte Haltung, an den Griffen hängen"], "alt": {"kh": "z2", "kg": "z2"}, "cardio": true}, "inclinepush": {"n": "Schräg-Liegestütz (Hände erhöht)", "en": "incline push up", "m": "Brust, Trizeps", "e": "kg", "s": ["Hände auf Bank, Stuhl oder Tischkante, Körper in einer Linie.", "Brust zur Kante senken, Ellbogen etwa 45° zum Körper.", "Hochdrücken, oben die Schulterblätter auseinanderschieben."], "f": ["Hüfte hängt durch", "Unterlage zu schnell zu tief"], "tip": "Einstieg in den Liegestütz: die Unterlage Woche für Woche tiefer wählen."}, "declinepush": {"n": "Liegestütz mit erhöhten Füßen", "en": "decline push up", "m": "Obere Brust, Schultern, Trizeps", "e": "kg", "s": ["Füße auf Bank oder Stuhl, Hände schulterbreit am Boden.", "Körper gerade, Brust Richtung Boden senken.", "Hochdrücken bis die Arme gestreckt sind."], "f": ["Hüfte knickt ein", "Kopf hängt"]}, "ppush": {"n": "Pseudo-Planche-Liegestütz", "en": "pseudo planche push up", "m": "Brust, vordere Schulter, Trizeps", "e": "kg", "s": ["Hände auf Hüfthöhe neben dem Körper, Finger zeigen seitlich oder nach hinten.", "Schultern deutlich vor die Hände lehnen.", "Mit gleicher Vorlage absenken und hochdrücken."], "f": ["Vorlage geht während der Wiederholung verloren", "Schultern ziehen hoch"], "tip": "Schwerste Liegestütz-Stufe der BWF-Routine: je weiter die Vorlage, desto schwerer."}, "archhang": {"n": "Schulterblatt-Klimmzug (Scapular Pull)", "en": "scapular pull up arch hang", "m": "Unterer Trapez, Latissimus", "e": "kg", "s": ["Mit gestreckten Armen an der Stange hängen.", "Nur die Schulterblätter nach unten und hinten ziehen, Brust hebt sich.", "Kontrolliert zurück in den Hang."], "f": ["Arme beugen sich", "Schultern ziehen zu den Ohren"], "tip": "Erste Stufe der Klimmzug-Progression aus der BWF-Routine."}, "deadhang": {"n": "Hängen an der Stange (Dead Hang)", "en": "dead hang", "m": "Griffkraft, Schultern", "e": "kg", "s": ["Stange schulterbreit greifen und hängen.", "Passiv: locker hängen. Aktiv: Schultern weg von den Ohren.", "Ruhig atmen und Zeit steigern."], "f": ["Schultern verkrampft hochgezogen", "Schwingen"], "tip": "Wer noch nicht frei hängen kann, nimmt eine niedrige Stange und lässt die Füße am Boden.", "r": "20–60 s"}, "tuckfl": {"n": "Gehockter Frontlever", "en": "tuck front lever", "m": "Latissimus, Rumpf", "e": "kg", "s": ["Hang an Stange oder Ringen, Knie an die Brust ziehen.", "Mit gestreckten Armen den Rücken waagerecht bringen.", "Position halten, Schulterblätter nach unten drücken."], "f": ["Arme beugen sich", "Rücken rundet zu stark"], "tip": "Fortgeschrittener Ersatz für Rudern, sobald 3×8 breites Rudern sauber klappt.", "r": "3×10–20 s"}, "superman": {"n": "Superman / Umgekehrte Hyperextension", "en": "superman reverse hyperextension", "m": "Unterer Rücken, Gesäß", "e": "kg", "s": ["Bauchlage am Boden oder mit Hüfte auf einer Bankkante.", "Arme und Beine bzw. nur die Beine anheben.", "Oben kurz halten, kontrolliert absenken."], "f": ["Schwung", "Ins Hohlkreuz reißen statt aus dem Gesäß"], "tip": "Rückenstrecker-Platz in der BWF-Routine. Steigern mit Knöchelgewichten."}, "underrow": {"n": "Rudern im Untergriff (Körpergewicht)", "en": "underhand inverted row", "m": "Bizeps, oberer Rücken", "e": "kg", "s": ["Unter einer Stange, enger Untergriff.", "Körper gerade, Brust zur Stange ziehen.", "Kontrolliert ablassen."], "f": ["Hüfte sinkt ab", "Halbe Wiederholungen"], "tip": "Ohne Hanteln eine der besten Bizepsübungen."}, "hspu": {"n": "Handstand-Liegestütz an der Wand", "en": "wall handstand push up", "m": "Schultern, Trizeps", "e": "kg", "s": ["Im Handstand mit dem Bauch zur Wand.", "Kopf kontrolliert Richtung Boden senken, leicht vor die Hände.", "Hochdrücken bis die Arme gestreckt sind."], "f": ["Rücken zur Wand (Hohlkreuz)", "Ellbogen weit nach außen"], "tip": "Progression: Pike, Pike mit erhöhten Füßen, negative Handstand-Liegestütz, dann voll.", "alt": {"kh": "pikepush", "kg": "pikepush"}}, "bandface": {"n": "Face Pull mit Band", "en": "band face pull", "m": "Hintere Schulter, oberer Rücken", "e": "kg", "s": ["Band auf Gesichtshöhe befestigen.", "Zum Gesicht ziehen, Ellbogen hoch, Hände nach außen drehen.", "Langsam zurück."], "f": ["Ellbogen fallen ab", "Nach hinten lehnen"]}, "supporthold": {"n": "Stützhalten am Barren", "en": "dip support hold", "m": "Trizeps, Schultern", "e": "kg", "s": ["Am Barren oder an zwei Stühlen hochstützen.", "Arme gestreckt, Schultern aktiv nach unten drücken.", "Position halten."], "f": ["Schultern sacken zu den Ohren", "Ellbogen gebeugt"], "tip": "Erste Dip-Stufe der BWF-Routine, Ziel 3×60 s.", "r": "3×30–60 s"}, "benchdip": {"n": "Bank-Dips", "en": "bench dips", "m": "Trizeps", "e": "kg", "s": ["Hände hinter dir auf eine Bank, Beine nach vorn.", "Absenken bis höchstens 90° im Ellbogen.", "Hochdrücken."], "f": ["Zu tief", "Schultern rollen nach vorn"], "tip": "Schulterbelastend: Barren-Dips sind in den Foren der Standard."}, "bandpushdown": {"n": "Trizepsdrücken mit Band", "en": "band triceps pushdown", "m": "Trizeps", "e": "kg", "s": ["Band oben befestigen, Oberarme am Körper.", "Nach unten strecken.", "Langsam zurück bis 90°."], "f": ["Oberarme bewegen sich", "Oberkörper drückt mit"]}, "bandcurl": {"n": "Bizeps-Curl mit Band", "en": "band biceps curl", "m": "Bizeps", "e": "kg", "s": ["Mit beiden Füßen auf dem Band stehen.", "Ellbogen am Körper, Hände zur Schulter beugen.", "Langsam strecken."], "f": ["Ellbogen wandern nach vorn", "Schwung"]}, "bwsquat": {"n": "Kniebeuge ohne Gewicht", "en": "bodyweight squat", "m": "Quadrizeps, Gesäß", "e": "kg", "s": ["Füße schulterbreit, Zehen leicht nach außen.", "Hüfte unter Kniehöhe senken, Knie folgen den Zehen.", "Oben ganz aufrichten."], "f": ["Knie fallen nach innen", "Fersen heben ab"], "tip": "Fersen und großen Zeh am Boden halten."}, "pistol": {"n": "Pistol Squat (einbeinige Kniebeuge)", "en": "pistol squat", "m": "Quadrizeps, Gesäß, Gleichgewicht", "e": "kg", "s": ["Auf einem Bein, freies Bein nach vorn gestreckt.", "Hüfte nach hinten und unten bis ganz tief.", "Ohne Schwung hochdrücken."], "f": ["Knie wackelt seitlich", "Ferse hebt ab"], "tip": "Gleichgewichtsprobleme liegen meist an den Sprunggelenken. Ein Gegengewicht vorn hilft."}, "shrimp": {"n": "Shrimp Squat", "en": "shrimp squat", "m": "Quadrizeps, Gesäß", "e": "kg", "s": ["Auf einem Bein, das andere Knie nach hinten gebeugt.", "Absenken, bis Knie (und Zehen) des hinteren Beins den Boden berühren.", "Hochdrücken."], "f": ["Oberkörper kippt weit vor", "Abstoßen mit dem hinteren Fuß"]}, "cossack": {"n": "Kosakenkniebeuge", "en": "cossack squat", "m": "Quadrizeps, Adduktoren, Gesäß", "e": "kg", "s": ["Sehr breiter Stand.", "Gewicht auf eine Seite verlagern und tief beugen, anderes Bein gestreckt.", "Zur anderen Seite wechseln."], "f": ["Ferse hebt ab", "Rundrücken unten"], "tip": "Kraft und Hüftbeweglichkeit zugleich."}, "tibraise": {"n": "Schienbeinheben an der Wand", "en": "tibialis raise", "m": "Schienbein (Tibialis)", "e": "kg", "s": ["Mit dem Rücken an die Wand lehnen, Füße etwas vor.", "Zehen hochziehen, Fersen bleiben am Boden.", "Kontrolliert absenken."], "f": ["Schwung", "Fersen heben ab"], "tip": "Beliebt bei Läufern gegen Schienbeinkantensyndrom."}, "clamshell": {"n": "Clamshell (Muschel)", "en": "clamshell exercise", "m": "Seitliches Gesäß", "e": "kg", "s": ["Seitlage, Knie gebeugt, Hüften übereinander.", "Oberes Knie öffnen, Füße bleiben zusammen.", "Langsam schließen."], "f": ["Hüfte rollt nach hinten", "Schwung"], "tip": "Teil der Myrtl-Routine für Läufer, mit Mini-Band schwerer."}, "copenhagen": {"n": "Kopenhagener Seitstütz", "en": "copenhagen plank", "m": "Adduktoren, seitlicher Rumpf", "e": "kg", "s": ["Seitstütz, oberes Bein auf einer Bank (Knie = leichter, Fuß = schwerer).", "Hüfte heben, Körper in einer Linie.", "Halten, dann Seite wechseln."], "f": ["Hüfte sinkt ab", "Rumpf verdreht"], "tip": "Stärkt die Adduktoren, bei Läufern und Fußballern sehr beliebt.", "r": "3×15–30 s je Seite"}, "hollow": {"n": "Hollow Body Hold", "en": "hollow body hold", "m": "Bauch, Rumpf", "e": "kg", "s": ["Rückenlage, unteren Rücken in den Boden drücken.", "Schultern und gestreckte Beine anheben.", "Halten und weiteratmen."], "f": ["Hohlkreuz", "Luft anhalten"], "tip": "Beine nur so tief senken, wie der Rücken am Boden bleibt. Ab 60 s zu Hollow Rocks.", "r": "3×20–60 s"}, "lsit": {"n": "L-Sitz", "en": "l-sit", "m": "Bauch, Hüftbeuger, Trizeps", "e": "kg", "s": ["Am Boden, an Parallettes oder am Barren stützen.", "Schultern nach unten drücken, gestreckte Beine waagerecht halten.", "Halten. Leichter: ein Fuß am Boden oder gehockt."], "f": ["Schultern sacken hoch", "Knie gebeugt"], "r": "3×10–30 s"}, "birddog": {"n": "Bird Dog (Vierfüßlerstand diagonal)", "en": "bird dog", "m": "Rumpf, unterer Rücken", "e": "kg", "s": ["Vierfüßlerstand, Rücken neutral.", "Gegengleich Arm und Bein strecken.", "Kurz halten, zurück, Seite wechseln."], "f": ["Becken kippt", "Zu schnell"], "r": "8–12 je Seite"}, "tgu": {"n": "Türkisches Aufstehen (Turkish Get-up)", "en": "turkish get up", "m": "Ganzkörper, Schultern, Rumpf", "e": "kh", "s": ["Rückenlage, Kettlebell mit gestrecktem Arm über der Schulter.", "Über Ellbogen und Hand aufrichten, Hüfte heben, Bein durchfädeln.", "In den Kniestand und Stand, dann rückwärts zurück."], "f": ["Arm mit der Bell beugt sich", "Blick verliert die Bell"], "tip": "Zuerst ohne Gewicht oder mit Schuh auf der Faust lernen. Teil von Simple & Sinister.", "r": "1–3 je Seite"}, "kbpress": {"n": "Kettlebell Umsetzen und Drücken", "en": "kettlebell clean and press", "m": "Schultern, Trizeps, Hüfte", "e": "kh", "s": ["Kettlebell aus dem Swing in die Rack-Position umsetzen.", "Ellbogen an den Rippen, Bell an der Brust.", "Gerade über Kopf drücken und kontrolliert zurück."], "f": ["Bell schlägt aufs Handgelenk", "Ellbogen stellt aus"], "tip": "Die Hand um die Bell einfädeln, nicht drüberschlagen lassen."}, "deepsquat": {"n": "Tiefe Hocke halten", "en": "deep squat hold", "m": "Sprunggelenke, Hüfte", "e": "kg", "s": ["Füße etwas breiter als schulterbreit, ganz tief hocken.", "Brust hoch, Fersen am Boden.", "Anfangs an etwas festhalten, Zeit steigern."], "f": ["Fersen heben ab", "Rücken rundet stark"], "tip": "Täglich ein paar Minuten verbessert Kniebeuge und Pistol.", "r": "1–3 min", "mob": true}, "hip9090": {"n": "90/90-Hüftwechsel", "en": "90 90 hip switch", "m": "Hüftrotation", "e": "kg", "s": ["Sitzen, beide Knie 90° gebeugt (vorne und seitlich).", "Knie zur anderen Seite kippen.", "Aufrecht bleiben, über das vordere Schienbein lehnen."], "f": ["Rundrücken", "Mit den Händen ziehen"], "r": "8–10 Wechsel", "mob": true}, "couch": {"n": "Couch Stretch (Hüftbeuger)", "en": "couch stretch", "m": "Hüftbeuger, Quadrizeps", "e": "kg", "s": ["Hinteres Knie an der Wand oder am Sofa, Fuß hochgestellt.", "Gesäß anspannen, Becken einrollen.", "Oberkörper langsam aufrichten."], "f": ["Hohlkreuz", "Zu schnell zu weit"], "tip": "Teil von Limber 11. Anfänger stützen die Hände am Boden ab.", "r": "1–2 min je Seite", "mob": true}, "wgs": {"n": "World's Greatest Stretch", "en": "worlds greatest stretch", "m": "Hüfte, Brustwirbelsäule", "e": "kg", "s": ["Großer Ausfallschritt, Hände innen neben den vorderen Fuß.", "Ellbogen Richtung Boden, dann Arm zur Decke drehen.", "Seite wechseln."], "f": ["Hinteres Bein sackt ab", "Hektisch"], "r": "5 je Seite", "mob": true}, "pancake": {"n": "Pancake / Pike-Dehnung", "en": "pancake stretch", "m": "Beinbeuger, Adduktoren", "e": "kg", "s": ["Sitzen, Beine gegrätscht (Pancake) oder geschlossen (Pike).", "Mit geradem Rücken aus der Hüfte nach vorn lehnen.", "10 leichte Wipp-Bewegungen, dann 10, 20, 30 s halten."], "f": ["Rücken rundet", "Ziehen bis Schmerz"], "tip": "Protokoll aus dem r/flexibility-Wiki „Starting to Stretch“.", "r": "3×30 s", "mob": true}, "frog": {"n": "Frosch-Schaukel (Rocking Frog)", "en": "rocking frog stretch", "m": "Adduktoren, Hüfte", "e": "kg", "s": ["Vierfüßlerstand, Knie weit auseinander.", "Hüfte langsam nach hinten und wieder vor schaukeln.", "Bewegung langsam vergrößern."], "f": ["Rücken rundet", "Zu schnell zu weit"], "tip": "Aus Limber 11.", "r": "10 Wiederholungen", "mob": true}, "dislocate": {"n": "Schulterkreisen mit Band oder Stab", "en": "band shoulder dislocates", "m": "Schultern, Brust", "e": "kg", "s": ["Band oder Stab weit fassen, Arme gestreckt.", "Langsam über Kopf nach hinten und zurück führen.", "Griff schrittweise enger."], "f": ["Arme beugen sich", "Bei Schmerz weitermachen"], "tip": "Aufwärmen der BWF-Routine.", "r": "10 Wiederholungen", "mob": true}, "wristprep": {"n": "Handgelenk-Vorbereitung", "en": "wrist warm up mobility", "m": "Handgelenke, Unterarme", "e": "kg", "s": ["Im Vierfüßlerstand Handflächen in verschiedene Richtungen drehen.", "Gewicht vor, zurück und seitlich verlagern.", "Auch auf den Handrücken leicht belasten."], "f": ["Zu viel Gewicht", "Schmerz ignorieren"], "tip": "3–5 Minuten vor Liegestütz, Handstand und L-Sitz.", "r": "3–5 min", "mob": true}, "catcow": {"n": "Katze-Kuh", "en": "cat cow", "m": "Wirbelsäule", "e": "kg", "s": ["Vierfüßlerstand.", "Ausatmen und Rücken runden, einatmen und Brust nach vorn öffnen.", "Langsam im Atemrhythmus."], "f": ["Hektisch", "Nur im Nacken bewegen"], "r": "10 Wiederholungen", "mob": true}};
+Object.assign(EX,NEW_EX);
+const EX_TIPS={"bench": "Füße fest in den Boden drücken und die Schulterblätter die ganze Zeit zusammenhalten.", "squat": "Vor dem Abstieg tief einatmen und den Bauch fest anspannen. Lieber weniger Gewicht und volle Tiefe.", "deadlift": "Vor dem Ziehen Spannung aufbauen, die Stange nicht vom Boden reißen.", "latpull": "Mit den Ellbogen ziehen, nicht mit den Händen.", "ohp": "Gesäß und Bauch fest, strikt drücken ohne Schwung aus den Beinen.", "row": "Wenn die Hüfte mitschwingt, ist das Gewicht zu schwer.", "lateral": "Nur bis Schulterhöhe und ohne Schwung, lieber leichter.", "pullup": "Volle Bewegung: unten ganz strecken, oben die Brust zur Stange.", "rdl": "Nur so tief, wie der Rücken gerade bleibt.", "triceps": "Die Oberarme bleiben fest am Körper, nur der Unterarm bewegt sich.", "dips": "Für die Brust leicht nach vorn lehnen, für den Trizeps aufrecht bleiben.", "splitsquat": "Das vordere Bein arbeitet, das hintere hält nur die Balance.", "legcurl": "Hüfte bleibt am Polster, langsam zurück.", "hipthrust": "Oben die Knie etwa 90° und das Gesäß fest anspannen.", "calf": "Unten volle Dehnung und kurz halten, nicht federn.", "plank": "Für Muskelaufbau weniger wirksam als Kabel-Crunch oder Beinheben, gut für Stabilität.", "pushup": "Ellbogen eng am Körper, oben die Schulterblätter auseinanderschieben.", "invrow": "Rudern ist laut BWF-Routine Pflicht und wird nicht durch Klimmzüge ersetzt.", "pikepush": "Kopf vor die Hände bringen, nicht zwischen sie, dann bleiben die Ellbogen eng.", "nordic": "Mit Band unterstützen, bis du die Absenkung kontrollierst.", "slrdl": "Flüssig bewegen statt roboterhaft, bei Wackeln mit einer Hand abstützen.", "goblet": "Ellbogen drücken die Knie unten nach außen, kurz in der Tiefe „hebeln“.", "deadbug": "Nur so weit strecken, wie der untere Rücken am Boden bleibt.", "lunge": "Rückwärts-Ausfallschritte sind knieschonender als vorwärts."};
+for(const [k,t] of Object.entries(EX_TIPS)) if(EX[k]&&!EX[k].tip) EX[k].tip=t;
+const EQ_RANK = {kg:0,kh:1,gym:2};
+function resolveEx(id, equip){
+  let cur=id, guard=0;
+  while(cur && EQ_RANK[EX[cur].e] > EQ_RANK[equip] && guard++<4){ cur = EX[cur].alt ? EX[cur].alt[equip] : null; }
+  return cur;
+}
+
+/* ---------- Daten: Supplements ---------- */
+const SUPPS = [
+  {id:"kreatin",n:"Kreatin-Monohydrat",g:"A",dose:p=>"3–5 g täglich",time:"Jederzeit, täglich, auch an trainingsfreien Tagen. Ladephase (0,3 g/kg für 5–7 Tage) ist optional.",
+    eff:"Steigert Kraft, Leistung bei kurzen intensiven Belastungen und den Muskelzuwachs im Krafttraining. Eine der am besten untersuchten Substanzen.",
+    risk:"Gut verträglich. 1–2 kg Gewichtszunahme durch Wasser im Muskel ist normal. Bei Nierenerkrankungen ärztlich abklären.",
+    src:[["ISSN Position Stand Kreatin (Kreider et al., 2017)","https://doi.org/10.1186/s12970-017-0173-z"],["IOC-Konsens Supplements (Maughan et al., 2018)","https://doi.org/10.1136/bjsports-2018-099027"]]},
+  {id:"protein",n:"Protein (Nahrung oder Pulver)",g:"A",dose:p=>`${Math.round(p.weight*1.6)}–${Math.round(p.weight*2.2)} g Protein pro Tag gesamt (1,6–2,2 g/kg)`,time:"Auf 3–5 Mahlzeiten mit je ca. 0,3–0,4 g/kg verteilen. Pulver nur, um die Tagesmenge zu erreichen.",
+    eff:"Ab etwa 1,6 g/kg pro Tag flacht der Zusatznutzen für den Muskelaufbau ab. Im Kaloriendefizit eher am oberen Ende bleiben.",
+    risk:"Für Gesunde unbedenklich. Bei eingeschränkter Nierenfunktion ärztlich abklären.",
+    src:[["Meta-Analyse Proteinzufuhr (Morton et al., 2018)","https://doi.org/10.1136/bjsports-2017-097608"],["ISSN Position Stand Protein (Jäger et al., 2017)","https://doi.org/10.1186/s12970-017-0177-8"]]},
+  {id:"koffein",n:"Koffein",g:"A",dose:p=>`${Math.round(p.weight*3)}–${Math.round(p.weight*6)} mg (3–6 mg/kg)`,time:"30–60 min vor dem Training. Nicht später als 6–8 h vor dem Schlafen.",
+    eff:"Verbessert Ausdauer, Kraftausdauer und Konzentration. Schon niedrige Dosen (ca. 3 mg/kg) wirken.",
+    risk:"Schlafstörungen, Unruhe, Herzrasen. Mehr als 9 mg/kg bringt nichts zusätzlich. Nicht bei Herzrhythmusstörungen oder in der Schwangerschaft ohne Rücksprache.",
+    src:[["ISSN Position Stand Koffein (Guest et al., 2021)","https://doi.org/10.1186/s12970-020-00383-4"]]},
+  {id:"betaalanin",n:"Beta-Alanin",g:"B",dose:p=>"3,2–6,4 g täglich, auf Einzeldosen von 0,8–1,6 g verteilt",time:"Täglich über mindestens 4 Wochen. Wirkt über aufgefüllte Speicher, nicht vor dem Training akut.",
+    eff:"Kleiner Vorteil bei Belastungen von etwa 1–4 Minuten (Intervalle, Rudern, Kampfsport). Für reines Krafttraining wenig relevant.",
+    risk:"Harmloses Kribbeln der Haut bei höheren Einzeldosen.",
+    src:[["ISSN Position Stand Beta-Alanin (Trexler et al., 2015)","https://doi.org/10.1186/s12970-015-0090-y"]]},
+  {id:"nitrat",n:"Nitrat (Rote-Bete-Saft)",g:"B",dose:p=>"ca. 6–8 mmol Nitrat (etwa 70–140 ml Konzentrat)",time:"2–3 h vor der Belastung.",
+    eff:"Kleine Verbesserungen bei Ausdauer und Intervallen, vor allem bei Freizeitsportlern. Bei Spitzensportlern geringer.",
+    risk:"Roter Urin ist harmlos. Antibakterielle Mundspülung hebt die Wirkung auf.",
+    src:[["IOC-Konsens Supplements (Maughan et al., 2018)","https://doi.org/10.1136/bjsports-2018-099027"]]},
+  {id:"vitd",n:"Vitamin D",g:"B",dose:p=>"Nur bei nachgewiesenem Mangel, Dosis nach Blutwert (25-OH-D)",time:"Mit einer fetthaltigen Mahlzeit. Im Winter in Mitteleuropa häufiger relevant.",
+    eff:"Gleicht einen Mangel aus, der Muskel- und Knochengesundheit beeinträchtigt. Ohne Mangel kein Leistungsvorteil belegt.",
+    risk:"Dauerhaft hohe Dosen ohne Kontrolle können zu Überdosierung führen. Vorher Blutwert messen lassen.",
+    src:[["IOC-Konsens Supplements (Maughan et al., 2018)","https://doi.org/10.1136/bjsports-2018-099027"]]},
+  {id:"omega3",n:"Omega-3 (EPA/DHA)",g:"C",dose:p=>"1–2 g EPA+DHA täglich, falls kaum Fisch gegessen wird",time:"Mit einer Mahlzeit.",
+    eff:"Für die allgemeine Gesundheit sinnvoll, wenn wenig fetter Fisch gegessen wird. Direkte Leistungs- oder Erholungsvorteile sind uneinheitlich belegt.",
+    risk:"Bei Blutverdünnern ärztlich abklären.",
+    src:[["IOC-Konsens Supplements (Maughan et al., 2018)","https://doi.org/10.1136/bjsports-2018-099027"]]},
+  {id:"bcaa",n:"BCAA / EAA",g:"D",dose:p=>"Nicht empfohlen bei ausreichender Proteinzufuhr",time:"–",
+    eff:"Bei ausreichender Gesamtproteinzufuhr kein zusätzlicher Effekt auf den Muskelaufbau. Vollwertiges Protein ist die bessere Quelle.",
+    risk:"Unnötige Kosten.",
+    src:[["Wolfe, 2017: BCAA und Muskelproteinsynthese","https://doi.org/10.1186/s12970-017-0184-9"]]},
+  {id:"testo",n:"„Testo-Booster“, Fatburner",g:"D",dose:p=>"Nicht empfohlen",time:"–",
+    eff:"Keine belastbare Wirkung. Solche Produkte sind am häufigsten mit nicht deklarierten, teils verbotenen Substanzen verunreinigt.",
+    risk:"Verunreinigung, Doping-Risiko, Nebenwirkungen.",
+    src:[["IOC-Konsens Supplements (Maughan et al., 2018)","https://doi.org/10.1136/bjsports-2018-099027"]]}
+];
+const GRADE_TXT={A:"Starke Evidenz",B:"Wirkt in bestimmten Situationen",C:"Unklare Evidenz",D:"Kein Nutzen belegt"};
+
+/* ---------- Ziele und Vorgaben ---------- */
+const GOALS = {
+  hyper:{n:"Muskelaufbau",main:{s:[3,4,4],r:"6–10",rir:"1–2",rest:"2–3 min"},acc:{s:[2,3,3],r:"10–15",rir:"1–2",rest:"60–90 s"}},
+  kraft:{n:"Maximalkraft",main:{s:[3,4,5],r:"3–5",rir:"2",rest:"3–5 min"},acc:{s:[2,3,3],r:"6–10",rir:"2",rest:"2 min"}},
+  fett:{n:"Fettabbau",main:{s:[3,3,4],r:"6–10",rir:"2",rest:"2 min"},acc:{s:[2,3,3],r:"10–15",rir:"1–2",rest:"60 s"},finisher:"20–30 min"},
+  ausd:{n:"Ausdauer",main:{s:[2,3,3],r:"5–8",rir:"2–3",rest:"2 min"},acc:{s:[2,2,3],r:"10–15",rir:"2",rest:"60 s"}},
+  fit:{n:"Allgemeine Fitness",main:{s:[2,3,3],r:"8–12",rir:"2–3",rest:"90 s"},acc:{s:[2,2,3],r:"10–15",rir:"2–3",rest:"60 s"},finisher:"15–20 min"}
+};
+const LEVELS={anf:"Einsteiger (unter 1 Jahr)",fort:"Fortgeschritten (1–3 Jahre)",erf:"Erfahren (über 3 Jahre)"};
+const LVL_I={anf:0,fort:1,erf:2};
+const EQUIP={gym:"Fitnessstudio",kh:"Kurzhanteln und Bank zu Hause",kg:"Nur Körpergewicht"};
+
+const T = {
+  gkA:{n:"Ganzkörper A",c:"blue",x:[["squat","main"],["bench","main"],["row","main"],["lateral","acc"],["curl","acc"],["plank","core"]]},
+  gkB:{n:"Ganzkörper B",c:"blue",x:[["rdl","main"],["ohp","main"],["latpull","main"],["lunge","acc"],["triceps","acc"],["deadbug","core"]]},
+  upA:{n:"Oberkörper A",c:"red",x:[["bench","main"],["row","main"],["ohp","acc"],["latpull","acc"],["curl","acc"],["triceps","acc"]]},
+  loA:{n:"Unterkörper A",c:"yellow",x:[["squat","main"],["rdl","main"],["lunge","acc"],["calf","acc"],["plank","core"]]},
+  upB:{n:"Oberkörper B",c:"red",x:[["ohp","main"],["pullup","main"],["dbbench","acc"],["dbrow","acc"],["lateral","acc"],["dips","acc"]]},
+  loB:{n:"Unterkörper B",c:"yellow",x:[["deadlift","main"],["splitsquat","main"],["hipthrust","acc"],["legcurl","acc"],["calf","acc"],["deadbug","core"]]},
+  push:{n:"Push",c:"red",x:[["bench","main"],["ohp","main"],["dbbench","acc"],["lateral","acc"],["triceps","acc"],["dips","acc"]]},
+  pull:{n:"Pull",c:"red",x:[["pullup","main"],["row","main"],["latpull","acc"],["dbrow","acc"],["curl","acc"],["deadbug","core"]]},
+  legs:{n:"Beine",c:"yellow",x:[["squat","main"],["rdl","main"],["lunge","acc"],["legcurl","acc"],["calf","acc"],["plank","core"]]},
+  z2long:{n:"Zone 2 lang",c:"green",x:[["z2","cardio","45–90 min"]]},
+  z2:{n:"Zone 2 locker",c:"green",x:[["z2","cardio","30–45 min"]]},
+  int:{n:"Intervalle 4×4",c:"green",x:[["intervals","cardio","ca. 40 min gesamt"]]}
+};
+
+const SPLITS={gk:{n:"Ganzkörper, abwechselnd A/B",seq:["gkA","gkB"]},ul:{n:"Oberkörper/Unterkörper",seq:["upA","loA","upB","loB"]},ppl:{n:"Push/Pull/Beine",seq:["push","pull","legs"]}};
+function splitFor(p){
+  const d=p.weekdays.length;
+  if(p.goal!=="ausd"&&SPLITS[p.split]) return SPLITS[p.split];
+  if(p.goal==="ausd") return {n:"Polarisiert (ca. 80 % locker, 20 % hart) plus Kraft",seq:["z2long","int","gkA","z2","gkB","z2long","z2"].slice(0,Math.max(d,1))};
+  if(d<=3) return {n:"Ganzkörper, abwechselnd A/B",seq:["gkA","gkB"]};
+  if(d===4) return {n:"Oberkörper/Unterkörper",seq:["upA","loA","upB","loB"]};
+  if(d===5) return {n:"Push/Pull/Beine + Ober/Unter",seq:["push","pull","legs","upA","loA"]};
+  return {n:"Push/Pull/Beine, zweimal pro Woche",seq:["push","pull","legs","push","pull","legs","legs"].slice(0,d)};
+}
+function altCands(id,used){
+  const p=state.profile, prim=MUS[id]?MUS[id][0]:[], block=state.block||[], fav=state.fav||[];
+  return Object.keys(EX).filter(c=>c!==id&&!EX[c].cardio===!EX[id].cardio&&!EX[c].mob&&EQ_RANK[EX[c].e]<=EQ_RANK[p.equip]&&!block.includes(c)&&!(used&&used.has(c))&&MUS[c]&&MUS[c][0].some(m=>prim.includes(m)))
+    .map(c=>({c,sc:(fav.includes(c)?2:0)+MUS[c][0].filter(m=>prim.includes(m)).length*3-Math.abs(MUS[c][0].length-prim.length)+(EX[c].e===EX[id].e?1:0)}))
+    .sort((a,b)=>b.sc-a.sc).map(x=>x.c);
+}
+function altFor(id,used){return altCands(id,used)[0]||null}
+function favFor(id,used){const fav=state.fav||[]; if(!fav.length||fav.includes(id)) return null; const prim=MUS[id]?MUS[id][0]:[];
+  return altCands(id,used).find(c=>fav.includes(c)&&prim.length&&prim.every(m=>MUS[c][0].includes(m)))||null}
+function maxStrength(len){return len<=45?4:len<=60?5:6}
+function buildSession(key,p,deload){
+  const t=T[key], G=GOALS[p.goal], li=LVL_I[p.level];
+  const out=[]; let strength=0; const cap=maxStrength(p.len);
+  const tmpl=state.custom&&state.custom[key]; const used=new Set();
+  const list=tmpl||t.x.map(([id,role,dur])=>({id,role,dur}));
+  for(const x of list){
+    const role=x.role;
+    if(role==="cardio"){out.push({id:x.id,role,txt:x.dur});continue}
+    if(!tmpl&&strength>=cap) continue;
+    let id=tmpl?x.id:resolveEx(x.id,p.equip); if(!id||!EX[id]) continue;
+    if((state.block||[]).includes(id)){id=altFor(id,used); if(!id) continue}
+    else if(!tmpl&&role==="acc"){const fv=favFor(id,used); if(fv) id=fv}
+    if(!tmpl&&used.has(id)){id=altFor(id,used); if(!id) continue}
+    used.add(id);
+    strength++;
+    const half=n=>deload?Math.max(1,Math.ceil(n/2)):n;
+    if(role==="core"){out.push({id,role,sets:x.sets?half(x.sets):(deload?2:3),reps:x.reps||EX[id].r||"30–60 s",rir:"",rest:"60 s"});continue}
+    const pr=G[role]||G.acc;
+    out.push({id,role,sets:half(x.sets||pr.s[li]),reps:x.reps||pr.r,rir:deload?"3–4":pr.rir,rest:pr.rest});
+  }
+  if(!tmpl && G.finisher && t.c!=="green") out.push({id:"z2",role:"cardio",txt:G.finisher+" Zone 2 im Anschluss"});
+  return {key,name:t.n,c:t.c,items:out,deload};
+}
+
+/* ---------- Zustand ---------- */
+const DAY=86400000;
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parseIso=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const isoWd=d=>(d.getDay()+6)%7; // 0=Mo
+function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-isoWd(x));return x}
+const TODAY=new Date(); const todayIso=iso(TODAY);
+
+function defaults(){return{
+  profile:{goal:"hyper",level:"anf",weekdays:[0,2,4],len:60,equip:"gym",split:"auto",bar:20,weight:75,height:178,sex:"m",age:30,restHr:60,start:iso(mondayOf(TODAY)),example:true},
+  done:{},supps:{},mySupps:["kreatin","protein"],acts:[],bw:[],food:{},custom:{},myProducts:[],customProducts:[],fav:[],block:[]}}
+function normalize(x){const d=defaults(); const o=Object.assign(d,x); o.profile=Object.assign(defaults().profile,x.profile||{}); return o}
+let state=defaults();
+const LS_KEY="trainingskompass.v1";
+try{const raw=localStorage.getItem(LS_KEY); if(raw) state=normalize(JSON.parse(raw));}catch(e){}
+let ui={tab:"kalender",month:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),sel:todayIso,exFilter:"",exEquip:"all",openEx:null,run:null,prodQ:"",prodBrand:"",summary:null,foodDay:todayIso};
+try{const t=localStorage.getItem(LS_KEY+".tab"); if(t) ui.tab=t;}catch(e){}
+
+let dbRef=null, saveTimer=null;
+function save(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}
+  pushWatch();
+  if(!dbRef) return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    try{await dbRef.set({json:JSON.stringify(state),updated:new Date().toISOString()}); setSync("Mit deinem Konto synchronisiert")}
+    catch(e){setSync("Nur lokal gespeichert")}
+  },600);
+}
+
+/* ---------- Handy-App: Uhr (Wear OS) und Health Connect ---------- */
+const NATIVE=window.TKNative||null;
+function watchPayload(){
+  const p=state.profile, out=[];
+  for(let i=0;i<14&&out.length<3;i++){
+    const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)), s=sessionFor(k);
+    if(!s||state.done[k]) continue;
+    out.push({date:k,name:s.name,deload:!!s.deload,items:s.items.map(it=>{const x=EX[it.id], c=it.role==="cardio";
+      return {id:it.id,n:x.n,cardio:c,txt:it.txt||"",sets:it.sets||0,reps:it.reps||"",rest:it.rest?restSec(it.rest):0,
+        w:c?0:(Number(suggestion(it,k).w)||0),uni:UNI.has(it.id),bw:x.e==="kg",step:BB.has(it.id)?2.5:1}})});
+  }
+  return {v:1,maxHr:Math.round(208-0.7*p.age),restHr:p.restHr,sessions:out};
+}
+let lastWatch="";
+function pushWatch(){if(!NATIVE) return; try{const j=JSON.stringify(watchPayload()); if(j===lastWatch) return; lastWatch=j; NATIVE.sendToWatch(j)}catch(e){}}
+window.onWatchSessions=function(arr){
+  let n=0;
+  for(const x of arr||[]){
+    if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date)||!x.sets||typeof x.sets!=="object") continue;
+    const prev=state.done[x.date]; if(prev&&prev.at===x.at) continue;
+    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; return o});
+    state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},src:"uhr"}; n++;
+  }
+  if(n){save(); render()} return n;
+};
+window.onNativeHealth=function(h){
+  if(!h||typeof h!=="object") return;
+  state.health={at:new Date().toISOString(),rest:Array.isArray(h.rest)?h.rest:[],hrv:Array.isArray(h.hrv)?h.hrv:[],sleep:Array.isArray(h.sleep)?h.sleep:[],error:h.error||""};
+  const r=state.health.rest.slice(-7).map(x=>Number(x.v)).filter(v=>v>30&&v<110); if(r.length) state.profile.restHr=Math.round(r.reduce((x,y)=>x+y,0)/r.length)
+  save(); if(ui.tab==="wear") render();
+};
+function recovery(h){
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  const hv=h.hrv.map(x=>x.v), rs=h.rest.map(x=>x.v);
+  if(hv.length<3&&rs.length<3) return null;
+  const hl=hv.length?hv[hv.length-1]:null, ha=avg(hv.slice(0,-1)), rl=rs.length?rs[rs.length-1]:null, ra=avg(rs.slice(0,-1));
+  const low=(hl!=null&&ha&&hl<ha*0.9)||(rl!=null&&ra&&rl>ra+5);
+  return low?{t:"Erholung eingeschränkt",d:"Die HRV liegt unter oder der Ruhepuls über deinem Wochenschnitt. Heute leichter trainieren oder Zone 2 statt Intervalle."}
+            :{t:"Gut erholt",d:"HRV und Ruhepuls liegen im Bereich deines Wochenschnitts. Das geplante Training passt."};
+}
+function nativeHtml(){
+  const h=state.health, last=a=>a&&a.length?a[a.length-1]:null;
+  const sl=h&&last(h.sleep), rc=h&&recovery(h);
+  return `<section class="panel stack">
+    <h2>Uhr und Health Connect</h2>
+    <p class="small muted" style="margin:0">Die Uhr bekommt automatisch deine nächsten Trainings. Sätze, die du auf der Uhr speicherst, erscheinen hier im Kalender und im Fortschritt.</p>
+    ${h&&!h.error?`<div class="tiles">${tile("Ruhepuls",last(h.rest)?Math.round(last(h.rest).v)+" bpm":"–")}${tile("HRV",last(h.hrv)?Math.round(last(h.hrv).v)+" ms":"–")}${tile("Schlaf",sl?Math.floor(sl.min/60)+" h "+String(sl.min%60).padStart(2,"0")+" min":"–")}</div>`:""}
+    ${rc?`<p style="margin:0"><b>${rc.t}.</b> ${rc.d}</p>`:""}
+    ${h&&h.error?`<p class="small" style="margin:0">${esc(h.error)}</p>`:""}
+    <div><button class="btn" data-health="1">${h?"Gesundheitsdaten aktualisieren":"Gesundheitsdaten aus Health Connect laden"}</button></div>
+    ${h?`<p class="small muted" style="margin:0">Stand ${new Date(h.at).toLocaleString("de-CH")}. Dein Ruhepuls-Schnitt der letzten 7 Tage wird für die Pulszonen übernommen.</p>`:""}
+  </section>`;
+}
+function setSync(t){document.getElementById("sync").textContent=t}
+(async()=>{
+  try{
+    if(!window.claude||!window.claude.use) return;
+    const [db,user]=await Promise.all([window.claude.use("db"),window.claude.use("user")]);
+    if(!db||!user) return;
+    const uid=await user.id(); if(!uid) return;
+    dbRef=db.doc(`data/users/${uid}/app`);
+    const snap=await dbRef.get();
+    if(snap.exists){const d=snap.data(); if(d&&d.json){state=normalize(JSON.parse(d.json)); try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){} render();}}
+    else save();
+    setSync("Mit deinem Konto synchronisiert");
+  }catch(e){setSync("Nur lokal gespeichert")}
+})();
+
+/* ---------- Plan-Berechnung für ein Datum ---------- */
+function sessionFor(dateIso){
+  const p=state.profile, d=parseIso(dateIso), start=parseIso(p.start);
+  if(d<start||!p.weekdays.includes(isoWd(d))) return null;
+  let count=0;
+  for(let t=start.getTime(); t<d.getTime(); t+=DAY){const x=new Date(t); if(p.weekdays.includes(isoWd(x))) count++;}
+  // Sommerzeit-sicher: count über Kalendertage
+  const sp=splitFor(p);
+  const week=Math.floor(Math.round((mondayOf(d)-mondayOf(start))/DAY)/7);
+  const deload=p.level!=="anf" && (week+1)%5===0;
+  const s=buildSession(sp.seq[count%sp.seq.length],p,deload);
+  s.week=week+1; return s;
+}
+
+/* ---------- Rendering ---------- */
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
+const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const yt=n=>`https://www.youtube.com/results?search_query=${encodeURIComponent(n+" richtige Ausführung")}`;
+
+function prescTxt(it){
+  if(it.role==="cardio") return esc(it.txt);
+  return `${it.sets} × ${esc(it.reps)}`;
+}
+function sessionHtml(s){
+  return `<ul class="exlist">${s.items.map(it=>`<li>
+    <button class="linkbtn" data-ex="${it.id}">${esc(EX[it.id].n)}</button>
+    <span class="presc">${prescTxt(it)}</span>
+    <span class="meta">${it.role==="cardio"?"Ausdauer":it.role==="main"?"Hauptübung":it.role==="core"?"Rumpf":"Ergänzung"}${it.rir?` · RIR ${esc(it.rir)}`:""}${it.rest&&it.role!=="cardio"?` · Pause ${esc(it.rest)}`:""}</span>
+  </li>`).join("")}</ul>`;
+}
+
+function viewKalender(){
+  const m=ui.month, first=new Date(m.getFullYear(),m.getMonth(),1);
+  const gridStart=mondayOf(first);
+  let cells="";
+  for(let i=0;i<42;i++){
+    const d=new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+i);
+    if(i===35&&d.getMonth()!==m.getMonth()) break;
+    const k=iso(d), s=sessionFor(k), done=state.done[k], act=state.acts.some(a=>a.date===k);
+    cells+=`<button class="day${d.getMonth()!==m.getMonth()?" out":""}${k===todayIso?" today":""}${k===ui.sel?" sel":""}" data-day="${k}" aria-label="${d.getDate()}. ${MONTHS[d.getMonth()]}${s?", "+esc(s.name):""}">
+      <span class="n">${d.getDate()}</span>
+      ${done?'<span class="chk" aria-hidden="true">✓</span>':""}
+      ${s?`<span class="bar c-${s.c}"></span><span class="lbl">${esc(s.name)}${s.deload?" · Deload":""}</span>`:""}
+      ${act&&!s?`<span class="bar c-green" style="opacity:.5"></span><span class="lbl">Aktivität</span>`:""}
+    </button>`;
+  }
+  const sel=ui.sel, s=sessionFor(sel), dSel=parseIso(sel), done=state.done[sel];
+  const supsToday=state.supps[sel]||[];
+  const acts=state.acts.filter(a=>a.date===sel);
+  const p=state.profile;
+  const upcoming=[]; for(let i=0;i<21&&upcoming.length<3;i++){const d=new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i);const ss=sessionFor(iso(d)); if(ss) upcoming.push([d,ss]);}
+  return `
+  ${p.example?`<p class="note">Das ist ein Beispielprofil (Muskelaufbau, Mo/Mi/Fr, 75 kg). Passe es unter <button class="linkbtn" data-goto="profil">Ziele &amp; Profil</button> an, dann berechnet sich der Plan neu.</p>`:""}
+  <div class="grid2" style="margin-top:12px">
+    <section class="panel">
+      <div class="cal-head">
+        <button class="btn ghost" data-mon="-1" aria-label="Voriger Monat">‹</button>
+        <h2>${MONTHS[m.getMonth()]} ${m.getFullYear()}</h2>
+        <button class="btn ghost" data-mon="1" aria-label="Nächster Monat">›</button>
+      </div>
+      <div class="cal">${WD.map(w=>`<div class="wd">${w}</div>`).join("")}${cells}</div>
+      <div class="legend">
+        <span><i class="dot c-blue"></i>Ganzkörper</span><span><i class="dot c-red"></i>Oberkörper</span>
+        <span><i class="dot c-yellow"></i>Beine</span><span><i class="dot c-green"></i>Ausdauer</span>
+        <span>Farben wie Hantelscheiben (25/20/15/10 kg)</span>
+      </div>
+    </section>
+    <section class="panel stack">
+      <div>
+        <div class="muted small">${WD[isoWd(dSel)]}, ${dSel.getDate()}. ${MONTHS[dSel.getMonth()]}${s?` · Woche ${s.week}`:""}</div>
+        <h2>${s?esc(s.name):"Trainingsfrei"}</h2>
+        ${s&&s.deload?`<p class="small muted" style="margin:4px 0 0">Deload-Woche: halbe Sätze, mehr Reserve. Danach geht es mit mehr Gewicht weiter.</p>`:""}
+      </div>
+      ${s?sessionHtml(s):`<p class="muted" style="margin:0">Erholung. Lockere Bewegung wie Spazieren ist gut.${upcoming.length?` Nächste Einheit: ${WD[isoWd(upcoming[0][0])]}, ${upcoming[0][0].getDate()}.${upcoming[0][0].getMonth()+1}. (${esc(upcoming[0][1].name)})`:""}</p>`}
+      ${s?`<div class="row">
+        ${done?`<span class="pill"><i class="dot c-green"></i>Erledigt${done.rpe?` · Anstrengung ${done.rpe}/10`:""}</span><button class="btn ghost" data-undone="${sel}">Zurücksetzen</button>`
+        :`<label class="f" style="flex-direction:row;align-items:center;gap:8px" for="rpe">Anstrengung
+            <select id="rpe">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
+          <button class="btn" data-start="${sel}">Training starten</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>`}
+      </div>`:""}
+      ${acts.map(a=>`<div class="small"><b>Wearable-Aktivität:</b> ${a.dur} min, Ø ${a.avg||"–"} bpm, max ${a.max||"–"} bpm <span class="muted">(${esc(a.src)})</span></div>`).join("")}
+      ${state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
+        ${state.mySupps.filter(id=>suppDue(id,sel)).map(id=>{const sp=SUPPS.find(x=>x.id===id); if(!sp) return ""; return `<label class="checkline"><input type="checkbox" data-supp="${id}" ${supsToday.includes(id)?"checked":""}> ${esc(sp.n)} <span class="muted small">${esc(suppLineProducts(id)||sp.dose(p))}</span></label>`}).join("")}
+      </div>`:""}
+    </section>
+  </div>`;
+}
+
+function viewPlan(){
+  const p=state.profile, sp=splitFor(p), G=GOALS[p.goal];
+  const uniq=[...new Set(sp.seq)];
+  const wds=p.weekdays.map(i=>WD[i]).join(", ");
+  return `<div class="stack">
+    <section class="panel stack">
+      <div><div class="muted small">${esc(G.n)} · ${esc(LEVELS[p.level])} · ${esc(EQUIP[p.equip])}</div>
+      <h2>${esc(sp.n)}</h2>
+      <p style="margin:4px 0 0">${p.weekdays.length} Trainingstage pro Woche (${wds}), etwa ${p.len} Minuten pro Einheit.</p></div>
+      <div class="row">
+        <button class="btn${ui.editPlan?"":" ghost"}" data-editplan="1">${ui.editPlan?"Fertig":"Plan bearbeiten"}</button>
+        ${p.goal!=="ausd"?`<label class="f" for="planSplit" style="flex-direction:row;align-items:center;gap:8px">Aufteilung<select id="planSplit">
+          ${[["auto","Automatisch nach Trainingstagen"],["gk","Ganzkörper"],["ul","Oberkörper/Unterkörper"],["ppl","Push/Pull/Beine"]].map(([v,t])=>`<option value="${v}"${(p.split||"auto")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:""}
+      </div>
+      ${p.split==="ppl"&&p.weekdays.length<6?`<p class="small muted" style="margin:0">Mit Push/Pull/Beine und weniger als 6 Tagen wird jeder Muskel seltener als zweimal pro Woche trainiert.</p>`:""}
+      ${ui.editPlan?`<p class="small muted" style="margin:0">Tausche Übungen, ändere Sätze und Wiederholungen oder die Reihenfolge. Kalender und Trainingsmodus übernehmen die Änderungen sofort.</p>`:""}
+      <div class="cards">${uniq.map(k=>{if(ui.editPlan) return editCardHtml(k); const s=buildSession(k,p,false);return `<div class="panel" style="background:var(--bg)">
+        <h3 class="row" style="gap:8px"><i class="dot c-${s.c}"></i>${esc(s.name)}${state.custom[k]?' <span class="pill">angepasst</span>':""}</h3>${sessionHtml(s)}</div>`}).join("")}</div>
+    </section>
+    <section class="panel stack"><h2>Sätze pro Muskelgruppe</h2>${muscleHtml()}</section>
+    <section class="panel stack">
+      <h2>Warum dieser Plan</h2>
+      <ul style="margin:0;padding-left:20px">
+        ${p.goal==="ausd"?`<li>Etwa 80 % der Einheiten locker in Zone 2, der Rest hart. So trainieren die meisten Ausdauer-Spitzensportler.</li>
+        <li>4×4-Intervalle bei 90–95 % der maximalen Herzfrequenz verbessern die VO₂max deutlich stärker als lockeres Training allein.</li>
+        <li>Zwei kurze Krafteinheiten schützen vor Verletzungen und verbessern die Laufökonomie.</li>`
+        :`<li>Jeder Muskel wird etwa zweimal pro Woche trainiert. Das bringt bei gleichem Volumen mehr als einmal pro Woche.</li>
+        <li>Wochenvolumen: grob 10–20 harte Sätze pro Muskelgruppe für Muskelaufbau. Einsteiger beginnen am unteren Ende.</li>
+        <li>RIR heißt „Wiederholungen in Reserve“: Bei RIR 2 hörst du auf, wenn noch zwei saubere Wiederholungen gingen.</li>
+        <li>Muskelaufbau funktioniert in einem breiten Wiederholungsbereich (etwa 6–30), solange die Sätze nah ans Muskelversagen gehen.</li>`}
+        ${p.goal==="fett"?`<li>Fettabbau kommt vor allem aus einem Kaloriendefizit von etwa 300–500 kcal pro Tag. Das Krafttraining hält dabei die Muskulatur.</li>`:""}
+        <li><b>Steigerung:</b> Schaffst du in allen Sätzen das obere Ende des Wiederholungsbereichs mit der angegebenen Reserve, erhöhst du das Gewicht beim nächsten Mal um 2,5–5 %.</li>
+        ${p.level!=="anf"?`<li>Jede 5. Woche ist eine Deload-Woche mit halbem Volumen.</li>`:""}
+      </ul>
+      <p class="sources">Quellen:
+        <a href="https://doi.org/10.1007/s40279-016-0543-8" target="_blank" rel="noopener">Schoenfeld et al. 2016 (Frequenz)</a> ·
+        <a href="https://doi.org/10.1080/02640414.2016.1210197" target="_blank" rel="noopener">Schoenfeld et al. 2017 (Volumen)</a> ·
+        <a href="https://doi.org/10.1519/JSC.0000000000002200" target="_blank" rel="noopener">Schoenfeld et al. 2017 (Lastbereiche)</a> ·
+        <a href="https://doi.org/10.1249/mss.0b013e3180304570" target="_blank" rel="noopener">Helgerud et al. 2007 (4×4)</a> ·
+        <a href="https://doi.org/10.1123/ijspp.5.3.276" target="_blank" rel="noopener">Seiler 2010 (Intensitätsverteilung)</a></p>
+    </section>
+  </div>`;
+}
+
+function viewUebungen(){
+  const p=state.profile, fav=state.fav||[], block=state.block||[];
+  const f=norm(ui.exFilter||"");
+  const list=Object.entries(EX).filter(([id,x])=>(!f||norm(x.n+" "+x.m+" "+(x.en||"")).includes(f))
+    &&(ui.exEquip==="all"||EQ_RANK[x.e]<=EQ_RANK[ui.exEquip])
+    &&(!ui.exMus||(ui.exMus==="mob"?x.mob:ui.exMus==="cardio"?x.cardio:MUS[id]&&MUS[id][0].includes(ui.exMus)))
+    &&(!ui.exMark||(ui.exMark==="fav"?fav.includes(id):block.includes(id))))
+    .sort((a,b)=>(fav.includes(b[0])-fav.includes(a[0]))||(block.includes(a[0])-block.includes(b[0])));
+  return `<div class="filters">
+      <input id="exq" type="search" placeholder="Übung oder Muskel suchen" value="${esc(ui.exFilter)}" aria-label="Übung suchen">
+      <select id="exmus" aria-label="Muskelgruppe"><option value="">Alle Muskelgruppen</option>${Object.entries(MUS_N).map(([k,v])=>`<option value="${k}"${ui.exMus===k?" selected":""}>${v}</option>`).join("")}<option value="cardio"${ui.exMus==="cardio"?" selected":""}>Ausdauer</option><option value="mob"${ui.exMus==="mob"?" selected":""}>Mobilität</option></select>
+      <select id="exeq" aria-label="Ausrüstung">
+        <option value="all"${ui.exEquip==="all"?" selected":""}>Alle Ausrüstungen</option>
+        ${Object.entries(EQUIP).map(([k,v])=>`<option value="${k}"${ui.exEquip===k?" selected":""}>${v}</option>`).join("")}
+      </select>
+      <select id="exmark" aria-label="Markierung"><option value="">Alle Übungen</option><option value="fav"${ui.exMark==="fav"?" selected":""}>Nur Favoriten (${fav.length})</option><option value="block"${ui.exMark==="block"?" selected":""}>Nope! (${block.length})</option></select>
+    </div>
+    <p class="small muted" style="margin:0 0 12px">${list.length} Übungen. Favoriten bevorzugt der Plan bei Ergänzungsübungen. Übungen mit „Nope!“ ersetzt er durch eine Alternative für dieselben Muskeln.</p>
+    <div class="cards">${list.map(([id,x])=>{const isF=fav.includes(id), isB=block.includes(id), alt=isB?altFor(id,null):null;
+      return `<article class="panel ex-card${isB?" blocked":""}" id="ex-${id}">
+      <div class="row" style="justify-content:space-between;align-items:flex-start"><h3>${esc(x.n)}</h3><span class="pill">${x.e==="gym"?"Studio":x.e==="kh"?"Kurzhanteln":"Körpergewicht"}</span></div>
+      <div class="small muted">${esc(x.m)}</div>
+      <div class="row" style="gap:6px">
+        <button class="chip${isF?" on":""}" data-fav="${id}" aria-pressed="${isF}">${isF?"★ Favorit":"☆ Favorit"}</button>
+        <button class="chip${isB?" off-on":""}" data-block="${id}" aria-pressed="${isB}">⊘ Nope!</button>
+      </div>
+      ${isB?`<div class="small">${alt?`Im Plan ersetzt durch <button class="linkbtn" data-ex="${alt}">${esc(EX[alt].n)}</button>`:"Keine passende Alternative mit deiner Ausrüstung."}</div>`:""}
+      <ol>${x.s.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>
+      <div class="small"><b>Häufige Fehler:</b> ${x.f.map(esc).join(" · ")}</div>
+      ${x.tip?`<div class="small"><b>Tipp aus Foren:</b> ${esc(x.tip)}</div>`:""}
+      <a class="small" href="${yt(x.n)}" target="_blank" rel="noopener">Videos zur Ausführung ansehen ↗</a>
+    </article>`}).join("")}</div>
+    ${list.length?"":`<p class="muted">Keine Übung gefunden.</p>`}`;
+}
+
+function viewSupps(){
+  const p=state.profile;
+  return `<div class="stack">
+    <p class="note"><b>Keine medizinische Beratung.</b> Die Angaben fassen Übersichtsarbeiten und Positionspapiere für gesunde Erwachsene zusammen. Bei Erkrankungen, Medikamenten, Schwangerschaft oder unter 18 Jahren vorher ärztlich abklären. Wer an Wettkämpfen teilnimmt, nimmt nur Produkte von der <a href="https://www.koelnerliste.com" target="_blank" rel="noopener">Kölner Liste</a>.</p>
+    ${recHtml()}
+    ${productsHtml()}
+    <p class="muted small" style="margin:0">Im Kalender erscheinen Kreatin, Protein, Beta-Alanin und Omega-3 jeden Tag, Koffein nur an Trainingstagen und hochdosiertes Vitamin D im Rhythmus des Herstellers. Dosierungen sind für dein Körpergewicht von ${p.weight} kg berechnet. Mit „In meinen Plan“ erscheint ein Supplement als Abhakliste im Kalender.</p>
+    <div class="cards">${SUPPS.map(s=>`<article class="panel supp">
+      <div class="row" style="justify-content:space-between"><h3>${esc(s.n)}</h3><span class="grade g-${s.g}" title="${GRADE_TXT[s.g]}">${s.g}</span></div>
+      <div class="small muted">${GRADE_TXT[s.g]}</div>
+      <dl><dt>Dosis</dt><dd>${esc(s.dose(p))}</dd><dt>Wann</dt><dd>${esc(s.time)}</dd><dt>Wirkung</dt><dd>${esc(s.eff)}</dd><dt>Risiken</dt><dd>${esc(s.risk)}</dd></dl>
+      <div class="sources">${s.src.map(([t,u])=>`<a href="${u}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</div>
+      ${s.g==="D"?"":`<label class="checkline"><input type="checkbox" data-mysupp="${s.id}" ${state.mySupps.includes(s.id)?"checked":""}> In meinen Plan</label>`}
+    </article>`).join("")}</div>
+  </div>`;
+}
+
+function hrZones(p){
+  const max=Math.round(208-0.7*p.age), rest=p.restHr, hrr=max-rest;
+  const bands=[[.5,.6,"Zone 1","Regeneration"],[.6,.7,"Zone 2","Grundlagenausdauer"],[.7,.8,"Zone 3","Tempo"],[.8,.9,"Zone 4","Schwelle"],[.9,1,"Zone 5","VO₂max"]];
+  return {max,z:bands.map(([a,b,n,d])=>({n,d,lo:Math.round(rest+a*hrr),hi:Math.round(rest+b*hrr)}))};
+}
+const ZCOL=["var(--muted)","var(--green)","var(--yellow)","var(--red)","var(--accent)"];
+let liveHr=null, btStatus="";
+function viewWear(){
+  const p=state.profile, Z=hrZones(p);
+  const hasBt=!!(navigator.bluetooth);
+  return `<div class="stack">
+    ${NATIVE?nativeHtml():""}
+    <div class="grid2">
+      <section class="panel stack">
+        <h2>Herzfrequenzzonen</h2>
+        <p class="small muted" style="margin:0">Maximale Herzfrequenz geschätzt nach Tanaka (208 − 0,7 × Alter) = <b class="mono">${Z.max}</b> bpm, Zonen nach Karvonen mit Ruhepuls ${p.restHr}. Ein Laktat- oder Leistungstest ist genauer.</p>
+        <div class="tablewrap"><table><thead><tr><th>Zone</th><th>Bereich</th><th>Zweck</th></tr></thead><tbody>
+          ${Z.z.map((z,i)=>`<tr><td><span class="row" style="gap:6px"><i class="dot" style="background:${ZCOL[i]}"></i>${z.n}</span></td><td class="mono">${z.lo}–${z.hi} bpm</td><td>${z.d}</td></tr>`).join("")}
+        </tbody></table></div>
+      </section>
+      <section class="panel stack">
+        <h2>Brustgurt live</h2>
+        <p class="small muted" style="margin:0">Verbindet einen Bluetooth-Herzfrequenzsensor (z. B. Polar H10, Garmin HRM, Wahoo TICKR) direkt mit der App.</p>
+        <div class="bpm mono" id="bpm">${liveHr?liveHr:"–"}</div>
+        <div class="small" id="bpmzone">${liveHr?zoneOf(liveHr,Z):"Kein Sensor verbunden"}</div>
+        <div><button class="btn" id="btconnect">Sensor verbinden</button></div>
+        <p class="small muted" id="btstatus" style="margin:0">${esc(btStatus||(hasBt?"":"In dieser Ansicht ist Bluetooth nicht verfügbar. In der eigenständigen Web-App funktioniert es in Chrome und Edge auf Android, Windows und macOS, nicht in Safari auf dem iPhone."))}</p>
+      </section>
+    </div>
+    <section class="panel stack">
+      <h2>Aktivität importieren</h2>
+      <p class="small muted" style="margin:0">Exportiere eine Einheit als TCX- oder GPX-Datei (Garmin Connect, Strava, Polar Flow, Wahoo, Suunto) und lade sie hier hoch. Die App wertet Dauer, Puls und Zeit in den Zonen aus und trägt sie in den Kalender ein.</p>
+      <div><input type="file" id="actfile" accept=".tcx,.gpx,application/xml,text/xml" aria-label="TCX- oder GPX-Datei wählen"></div>
+      <div id="actmsg" class="small"></div>
+      ${state.acts.length?`<div class="tablewrap"><table><thead><tr><th>Datum</th><th>Dauer</th><th>Ø / max</th><th>Zonen</th><th>Quelle</th></tr></thead><tbody>
+        ${state.acts.slice().reverse().map(a=>`<tr><td class="mono">${a.date}</td><td class="mono">${a.dur} min</td><td class="mono">${a.avg||"–"} / ${a.max||"–"}</td>
+        <td style="min-width:120px">${a.zones?`<div class="zonebar">${a.zones.map((v,i)=>`<span style="width:${v}%;background:${ZCOL[i]}"></span>`).join("")}</div>`:"–"}</td><td>${esc(a.src)}</td></tr>`).join("")}
+      </tbody></table></div>`:""}
+    </section>
+    <section class="panel stack">
+      <h2>Was eine native App zusätzlich braucht</h2>
+      <div class="tablewrap"><table><thead><tr><th>Quelle</th><th>Web-App</th><th>Native App / Server</th></tr></thead><tbody>
+        <tr><td>Apple Health / Apple Watch</td><td>Nur Datei-Export</td><td>HealthKit, nur in einer iOS-App</td></tr>
+        <tr><td>Android, Samsung, Pixel Watch</td><td>Nur Datei-Export</td><td>Health Connect, nur in einer Android-App</td></tr>
+        <tr><td>Garmin</td><td>TCX/GPX-Import</td><td>Garmin Health API (Partnerprogramm, Server)</td></tr>
+        <tr><td>Fitbit, Polar, Strava, Oura, Whoop</td><td>TCX/GPX-Import</td><td>OAuth-Web-APIs mit eigenem Server</td></tr>
+        <tr><td>Bluetooth-Brustgurt</td><td>Live per Web Bluetooth (Chrome/Edge)</td><td>Überall, auch iPhone</td></tr>
+      </tbody></table></div>
+    </section>
+  </div>`;
+}
+function zoneOf(hr,Z){let i=Z.z.findIndex(z=>hr>=z.lo&&hr<=z.hi); if(i<0) i=hr<Z.z[0].lo?-1:4; return i<0?"Unter Zone 1":`${Z.z[i].n} · ${Z.z[i].d}`}
+
+function viewProfil(){
+  const p=state.profile;
+  return `<form class="panel stack" id="pform">
+    <h2>Ziele &amp; Profil</h2>
+    <div class="form">
+      <label class="f" for="goal">Hauptziel<select id="goal">${Object.entries(GOALS).map(([k,g])=>`<option value="${k}"${p.goal===k?" selected":""}>${g.n}</option>`).join("")}</select></label>
+      <label class="f" for="level">Trainingserfahrung<select id="level">${Object.entries(LEVELS).map(([k,v])=>`<option value="${k}"${p.level===k?" selected":""}>${v}</option>`).join("")}</select></label>
+      <label class="f" for="equip">Ausrüstung<select id="equip">${Object.entries(EQUIP).map(([k,v])=>`<option value="${k}"${p.equip===k?" selected":""}>${v}</option>`).join("")}</select></label>
+      <label class="f" for="len">Zeit pro Einheit<select id="len">${[45,60,75,90].map(v=>`<option value="${v}"${p.len===v?" selected":""}>${v} Minuten</option>`).join("")}</select></label>
+      <label class="f" for="bar">Langhantelstange<select id="bar">${[[20,"20 kg (Standard)"],[15,"15 kg (Damenstange)"],[10,"10 kg (Technikstange)"]].map(([v,t])=>`<option value="${v}"${(p.bar||20)===v?" selected":""}>${t}</option>`).join("")}</select></label>
+      <label class="f" for="weight">Körpergewicht (kg)<input id="weight" type="number" min="35" max="250" step="0.5" value="${p.weight}"></label>
+      <label class="f" for="sex">Geschlecht (für Kalorienbedarf)<select id="sex"><option value="m"${p.sex==="m"?" selected":""}>männlich</option><option value="w"${p.sex==="w"?" selected":""}>weiblich</option></select></label>
+      <label class="f" for="height">Größe (cm)<input id="height" type="number" min="120" max="230" value="${p.height}"></label>
+      <label class="f" for="age">Alter<input id="age" type="number" min="14" max="100" value="${p.age}"></label>
+      <label class="f" for="restHr">Ruhepuls (bpm)<input id="restHr" type="number" min="30" max="110" value="${p.restHr}"></label>
+      <label class="f" for="start">Planbeginn<input id="start" type="date" value="${p.start}"></label>
+    </div>
+    <div class="form">
+      <label class="f" for="spKraft">Spotify-Playlist fürs Krafttraining (Link)<input id="spKraft" type="url" placeholder="https://open.spotify.com/playlist/…" value="${esc(p.spKraft||"")}"></label>
+      <label class="f" for="spCardio">Spotify-Playlist für Ausdauer (Link)<input id="spCardio" type="url" placeholder="https://open.spotify.com/playlist/…" value="${esc(p.spCardio||"")}"></label>
+    </div>
+    <p class="small muted" style="margin:-6px 0 0">In Spotify bei einer Playlist auf „Teilen“ und „Link kopieren“ tippen und hier einfügen.</p>
+    <fieldset style="border:0;padding:0;margin:0"><legend class="small" style="font-weight:600;margin-bottom:6px">Trainingstage</legend>
+      <div class="wdpick">${WD.map((w,i)=>`<label><input type="checkbox" id="wd${i}" value="${i}" ${p.weekdays.includes(i)?"checked":""}>${w}</label>`).join("")}</div>
+    </fieldset>
+    <div class="row"><button class="btn" type="submit">Plan neu berechnen</button><span id="pmsg" class="small muted"></span></div>
+  </form>`;
+}
+
+/* ---------- Scheibenrechner, Aufwärmsätze, Muskelvolumen ---------- */
+const BB=new Set(["squat","bench","row","rdl","deadlift","ohp","inclinebb","closebench","frontsquat","sldl","goodmorning","sumo","pushpress","powerclean"]);
+const UNI=new Set(["splitsquat","dbrow","slrdl","lunge","cablelateral","cablecurl","kickback","stepup","cablekick","sidebend","kbsnatch","pistol","shrimp","cossack","clamshell","copenhagen","tgu","kbpress"]);
+const repsOf=s=>s.l!=null?(s.l||0)+(s.rr||0):(s.r||0);
+const setVol=s=>(s.w||0)*repsOf(s);
+const setTxt=s=>`${fmt(s.w,1)}×${s.l!=null?s.l+"/"+s.rr:s.r}`;
+const PLATES=[25,20,15,10,5,2.5,1.25];
+const fmtP=n=>Number(n).toLocaleString("de-DE");
+function plateSplit(w,bar){let side=(w-bar)/2; const out=[]; for(const p of PLATES){while(side>=p-1e-9){out.push(p); side-=p}} return {out,rest:Math.round(side*2*100)/100}}
+function platesHtml(w){
+  const bar=state.profile.bar||20;
+  if(!(w>0)) return "";
+  if(w<bar) return `<div class="small muted">Leichter als die leere Stange (${bar} kg).</div>`;
+  const r=plateSplit(w,bar);
+  return `<div class="plates" aria-hidden="true"><span class="sleeve"></span>${r.out.map(p=>`<span class="plate p${String(p).replace(".","_")}" style="height:${20+p*1.7}px">${fmtP(p)}</span>`).join("")}<span class="sleeve end"></span></div>
+    <div class="small">Pro Seite: <b class="mono">${r.out.length?r.out.map(p=>fmtP(p)).join(" + ")+" kg":"keine Scheiben"}</b> <span class="muted">(Stange ${bar} kg)</span>${r.rest?` <span class="muted">· ${fmtP(r.rest)} kg nicht ladbar</span>`:""}</div>`;
+}
+function warmups(w,id){
+  const bb=BB.has(id), bar=state.profile.bar||20, step=bb?2.5:2;
+  if(!(w>(bb?bar+10:8))) return [];
+  const scheme=state.profile.goal==="kraft"?[[.4,5],[.6,3],[.8,2],[.9,1]]:[[.5,8],[.7,4],[.85,2]];
+  let list=scheme.map(([f,r])=>({w:Math.round(w*f/step)*step,r}));
+  if(bb) list=[{w:bar,r:10},...list.filter(x=>x.w>bar)];
+  return list.filter((x,i,a)=>x.w<w&&(i===0||x.w>a[i-1].w));
+}
+function warmHtml(w,id){
+  const ws=warmups(w,id); if(!ws.length) return "";
+  const bb=BB.has(id), bar=state.profile.bar||20;
+  return `<details class="warm" open><summary><b>Aufwärmsätze</b> <span class="small muted">zählen nicht zum Volumen</span></summary>
+    <ul>${ws.map((x,i)=>`<li><label class="checkline"><input type="checkbox" id="wu${i}"> <span class="mono">${fmt(x.w,1)} kg × ${x.r}</span>${bb?` <span class="small muted">${x.w<=bar?"leere Stange":"pro Seite "+plateSplit(x.w,bar).out.map(p=>fmtP(p)).join(" + ")}</span>`:""}</label></li>`).join("")}</ul></details>`;
+}
+function repeatSource(it,date,logged){
+  if(logged.length) return logged[logged.length-1];
+  const l=lastSets(it.id,date); if(!l) return null;
+  const arr=l[1].sets[it.id]; return arr[Math.min(logged.length,arr.length-1)];
+}
+const MUS_N={brust:"Brust",ruecken:"Rücken",schultern:"Schultern",bizeps:"Bizeps",trizeps:"Trizeps",quads:"Quadrizeps",beinbeuger:"Beinbeuger",gesaess:"Gesäß",waden:"Waden",rumpf:"Rumpf",unterarme:"Unterarme"};
+const MUS={squat:[["quads","gesaess"],["rumpf"]],goblet:[["quads","gesaess"],[]],splitsquat:[["quads","gesaess"],[]],lunge:[["quads","gesaess"],[]],
+  bench:[["brust"],["trizeps","schultern"]],dbbench:[["brust"],["trizeps","schultern"]],pushup:[["brust"],["trizeps","schultern","rumpf"]],
+  row:[["ruecken"],["bizeps"]],dbrow:[["ruecken"],["bizeps"]],invrow:[["ruecken"],["bizeps"]],latpull:[["ruecken"],["bizeps"]],pullup:[["ruecken"],["bizeps"]],
+  rdl:[["beinbeuger","gesaess"],["rumpf"]],dbrdl:[["beinbeuger","gesaess"],["rumpf"]],slrdl:[["beinbeuger","gesaess"],[]],deadlift:[["gesaess","beinbeuger","ruecken"],["quads"]],
+  ohp:[["schultern"],["trizeps"]],dbohp:[["schultern"],["trizeps"]],pikepush:[["schultern"],["trizeps"]],lateral:[["schultern"],[]],
+  legcurl:[["beinbeuger"],[]],nordic:[["beinbeuger"],[]],hipthrust:[["gesaess"],["beinbeuger"]],calf:[["waden"],[]],
+  curl:[["bizeps"],[]],triceps:[["trizeps"],[]],dips:[["trizeps","brust"],["schultern"]],plank:[["rumpf"],[]],deadbug:[["rumpf"],[]]};
+Object.assign(MUS,{"inclinedb": [["brust"], ["schultern", "trizeps"]], "inclinebb": [["brust"], ["schultern", "trizeps"]], "dbfly": [["brust"], ["schultern"]], "cablefly": [["brust"], ["schultern"]], "chestpress": [["brust"], ["trizeps", "schultern"]], "pecdeck": [["brust"], ["schultern"]], "chinup": [["ruecken", "bizeps"], []], "cablerow": [["ruecken"], ["bizeps"]], "tbarrow": [["ruecken"], ["bizeps"]], "chestrow": [["ruecken"], ["bizeps"]], "straightpull": [["ruecken"], []], "dbpullover": [["ruecken"], ["brust"]], "shrug": [["ruecken"], ["unterarme"]], "backext": [["gesaess", "beinbeuger"], ["rumpf"]], "machinepress": [["schultern"], ["trizeps"]], "reversefly": [["schultern"], ["ruecken"]], "facepull": [["schultern"], ["ruecken"]], "cablelateral": [["schultern"], []], "uprow": [["schultern"], ["ruecken"]], "bandpull": [["schultern"], ["ruecken"]], "frontraise": [["schultern"], []], "hammer": [["bizeps"], ["unterarme"]], "bbcurl": [["bizeps"], ["unterarme"]], "inclinecurl": [["bizeps"], []], "preacher": [["bizeps"], []], "cablecurl": [["bizeps"], []], "ohext": [["trizeps"], []], "skull": [["trizeps"], []], "closebench": [["trizeps", "brust"], ["schultern"]], "kickback": [["trizeps"], []], "diamond": [["trizeps"], ["brust"]], "wristcurl": [["unterarme"], []], "reversecurl": [["unterarme"], ["bizeps"]], "farmer": [["unterarme", "rumpf"], ["ruecken"]], "legpress": [["quads", "gesaess"], []], "legext": [["quads"], []], "hack": [["quads", "gesaess"], []], "frontsquat": [["quads"], ["gesaess", "rumpf"]], "stepup": [["quads", "gesaess"], []], "smithsquat": [["quads", "gesaess"], []], "sissy": [["quads"], []], "seatedcurl": [["beinbeuger"], []], "sldl": [["beinbeuger", "gesaess"], ["rumpf"]], "goodmorning": [["beinbeuger", "gesaess"], ["rumpf"]], "sumo": [["gesaess", "quads", "beinbeuger"], ["ruecken"]], "hipabd": [["gesaess"], []], "glutebridge": [["gesaess"], ["beinbeuger"]], "cablekick": [["gesaess"], []], "pullthrough": [["gesaess"], ["beinbeuger"]], "seatedcalf": [["waden"], []], "legpresscalf": [["waden"], []], "hlr": [["rumpf"], []], "cablecrunch": [["rumpf"], []], "crunch": [["rumpf"], []], "abwheel": [["rumpf"], []], "pallof": [["rumpf"], []], "sidebend": [["rumpf"], []], "sideplank": [["rumpf"], []], "pushpress": [["schultern"], ["trizeps", "quads"]], "kbswing": [["gesaess", "beinbeuger"], ["rumpf"]], "powerclean": [["gesaess", "quads", "ruecken"], ["beinbeuger"]], "kbsnatch": [["gesaess", "schultern"], ["beinbeuger", "rumpf"]], "inclinepush": [["brust"], ["trizeps", "schultern"]], "declinepush": [["brust"], ["schultern", "trizeps"]], "ppush": [["brust", "schultern"], ["trizeps", "rumpf"]], "archhang": [["ruecken"], []], "deadhang": [[], ["ruecken", "unterarme"]], "tuckfl": [["ruecken", "rumpf"], ["bizeps"]], "superman": [["gesaess"], ["ruecken", "beinbeuger"]], "underrow": [["ruecken", "bizeps"], []], "hspu": [["schultern"], ["trizeps"]], "bandface": [["schultern"], ["ruecken"]], "supporthold": [["trizeps"], ["schultern", "brust"]], "benchdip": [["trizeps"], ["brust", "schultern"]], "bandpushdown": [["trizeps"], []], "bandcurl": [["bizeps"], []], "bwsquat": [["quads", "gesaess"], []], "pistol": [["quads", "gesaess"], ["rumpf"]], "shrimp": [["quads", "gesaess"], []], "cossack": [["quads", "gesaess"], []], "tibraise": [["waden"], []], "clamshell": [["gesaess"], []], "copenhagen": [["rumpf"], ["gesaess"]], "hollow": [["rumpf"], []], "lsit": [["rumpf"], ["trizeps"]], "birddog": [["rumpf"], ["gesaess"]], "tgu": [["schultern", "rumpf"], ["gesaess"]], "kbpress": [["schultern"], ["trizeps", "gesaess"]]});
+function addMus(map,id,n){const m=MUS[id]; if(!m) return; m[0].forEach(k=>map[k]=(map[k]||0)+n); m[1].forEach(k=>map[k]=(map[k]||0)+n*.5)}
+function muscleWeek(){
+  const wk=mondayOf(TODAY), done={}, plan={};
+  for(let i=0;i<7;i++){
+    const k=iso(new Date(wk.getFullYear(),wk.getMonth(),wk.getDate()+i));
+    const s=sessionFor(k); if(s) s.items.forEach(it=>{if(it.role!=="cardio") addMus(plan,it.id,it.sets)});
+    const d=state.done[k]; if(d&&d.sets) for(const [id,arr] of Object.entries(d.sets)) addMus(done,id,arr.filter(x=>repsOf(x)>0).length);
+  }
+  return {done,plan};
+}
+function muscleHtml(){
+  const {done,plan}=muscleWeek();
+  const max=Math.max(24,...Object.values(done),...Object.values(plan));
+  const pc=v=>`${Math.min(100,v/max*100)}%`;
+  const low=Object.keys(MUS_N).filter(k=>k!=="rumpf"&&k!=="unterarme"&&(plan[k]||0)<10);
+  return `<div class="mlegend small muted"><span><i class="lg-bar"></i>erledigt</span><span><i class="lg-plan"></i>geplant</span><span><i class="lg-band"></i>Richtwert 10–20 Sätze</span></div>
+  <div class="mrows">${Object.entries(MUS_N).map(([k,n])=>{const d=done[k]||0,p=plan[k]||0; return `<div class="mrow" title="${n}: ${fmt(d,1)} von ${fmt(p,1)} geplanten Sätzen">
+    <span>${n}</span>
+    <span class="mtrack"><span class="mband" style="left:${pc(10)};width:calc(${pc(20)} - ${pc(10)})"></span><span class="mbar" style="width:${pc(d)}"></span>${p?`<span class="mplan" style="left:${pc(p)}"></span>`:""}</span>
+    <span class="mono">${fmtP(d)} / ${fmtP(p)}</span></div>`}).join("")}</div>
+  <p class="small muted" style="margin:0">Sätze pro Woche (Mo–So). Hauptmuskeln zählen voll, mitarbeitende Muskeln halb, zum Beispiel Rudern 0,5 Satz für den Bizeps.${low.length&&state.profile.goal==="hyper"?(state.profile.level==="anf"?" Als Einsteiger reichen anfangs auch weniger als 10 Sätze, das Volumen steigt mit der Erfahrung.":` Unter 10 geplanten Sätzen: ${low.map(k=>MUS_N[k]).join(", ")}.`):""}</p>`;
+}
+
+/* ---------- Plan bearbeiten ---------- */
+const REPS=["3–5","5–8","6–10","8–12","10–15","15–20","30–60 s","8–12 je Seite"];
+function materialize(key){
+  if(state.custom[key]) return state.custom[key];
+  return state.custom[key]=buildSession(key,state.profile,false).items.map(it=>it.role==="cardio"?{id:it.id,role:"cardio",dur:it.txt}:{id:it.id,role:it.role,sets:it.sets,reps:it.reps});
+}
+function exOptions(cur,cardio){
+  const p=state.profile, prim=MUS[cur]?MUS[cur][0]:[];
+  const ok=Object.entries(EX).filter(([id,x])=>!!x.cardio===!!cardio&&EQ_RANK[x.e]<=EQ_RANK[p.equip]);
+  const same=ok.filter(([id])=>MUS[id]&&MUS[id][0].some(m=>prim.includes(m)));
+  const rest=ok.filter(e=>!same.includes(e));
+  const fav=state.fav||[], bl=state.block||[];
+  const o=([id,x])=>`<option value="${id}"${id===cur?" selected":""}>${fav.includes(id)?"★ ":""}${esc(x.n)}${bl.includes(id)?" (Nope!)":""}</option>`;
+  const bf=(a,b)=>fav.includes(b[0])-fav.includes(a[0]); same.sort(bf); rest.sort(bf); ok.sort(bf);
+  return same.length?`<optgroup label="Gleiche Muskelgruppe">${same.map(o).join("")}</optgroup><optgroup label="Andere">${rest.map(o).join("")}</optgroup>`:ok.map(o).join("");
+}
+function editCardHtml(k){
+  const s=buildSession(k,state.profile,false), custom=!!state.custom[k];
+  return `<div class="panel stack" style="background:var(--bg)">
+    <div class="row" style="justify-content:space-between"><h3 class="row" style="gap:8px"><i class="dot c-${s.c}"></i>${esc(s.name)}</h3>
+      ${custom?`<button class="btn ghost small" data-pe="reset" data-k="${k}">Automatisch</button>`:""}</div>
+    <ul class="edlist">${s.items.map((it,i)=>`<li>
+      ${it.role==="cardio"?`<span><b>${esc(EX[it.id].n)}</b><br><span class="small muted">${esc(it.txt)}</span></span>`
+        :`<select data-pe="swap" data-k="${k}" data-i="${i}" aria-label="Übung tauschen">${exOptions(it.id,false)}</select>`}
+      <div class="edctl">
+        ${it.role==="cardio"?"":`<span class="stepper"><button data-pe="sminus" data-k="${k}" data-i="${i}" aria-label="Ein Satz weniger">−</button><span class="mono">${it.sets}</span><button data-pe="splus" data-k="${k}" data-i="${i}" aria-label="Ein Satz mehr">+</button></span>
+        <select data-pe="reps" data-k="${k}" data-i="${i}" aria-label="Wiederholungen">${[...new Set([it.reps,...REPS])].map(r=>`<option${r===it.reps?" selected":""}>${esc(r)}</option>`).join("")}</select>`}
+        <button class="icon" data-pe="up" data-k="${k}" data-i="${i}" aria-label="Nach oben" ${i===0?"disabled":""}>↑</button>
+        <button class="icon" data-pe="down" data-k="${k}" data-i="${i}" aria-label="Nach unten" ${i===s.items.length-1?"disabled":""}>↓</button>
+        <button class="icon" data-pe="del" data-k="${k}" data-i="${i}" aria-label="Entfernen">✕</button>
+      </div></li>`).join("")}</ul>
+    <select data-pe="add" data-k="${k}" aria-label="Übung hinzufügen"><option value="">+ Übung hinzufügen …</option>${exOptions("",false)}<optgroup label="Ausdauer">${exOptions("",true)}</optgroup></select>
+    ${custom?`<p class="small muted" style="margin:0">Von dir angepasst. Änderungen an Ziel oder Erfahrung wirken hier erst nach „Automatisch“.</p>`:""}
+  </div>`;
+}
+function planEdit(op,k,i,val){
+  const L=materialize(k);
+  if(op==="reset"){delete state.custom[k]}
+  else if(op==="up"&&i>0){[L[i-1],L[i]]=[L[i],L[i-1]]}
+  else if(op==="down"&&i<L.length-1){[L[i+1],L[i]]=[L[i],L[i+1]]}
+  else if(op==="del"){L.splice(i,1)}
+  else if(op==="sminus"){L[i].sets=Math.max(1,(L[i].sets||3)-1)}
+  else if(op==="splus"){L[i].sets=Math.min(10,(L[i].sets||3)+1)}
+  else if(op==="reps"){L[i].reps=val}
+  else if(op==="swap"&&EX[val]){L[i].id=val; if(EX[val].r) L[i].reps=EX[val].r}
+  else if(op==="add"&&EX[val]){L.push(EX[val].cardio?{id:val,role:"cardio",dur:"20–30 min"}:{id:val,role:["plank","deadbug"].includes(val)?"core":"acc",sets:3,reps:EX[val].r||"10–15"})}
+  save(); render();
+}
+
+/* ---------- Supplement-Produkte nach Marke ---------- */
+const PRODUCTS=[{"id": "esn-crea", "brand": "ESN", "name": "Ultrapure Creatine Monohydrate", "alias": "kreatin pulver creatin", "cat": "kreatin", "serving": "1 Messlöffel (3,5 g Pulver)", "amount": 3, "unit": "g", "perDay": 1, "extra": "3,5 g Kreatin-Monohydrat ergeben 3 g Kreatin. Auch an trainingsfreien Tagen nehmen.", "src": "https://www.shop-apotheke.at/fitness/upmYGLZ4F/esn-ultrapure-creatine-monohydrate.htm"}, {"id": "esn-creacaps", "brand": "ESN", "name": "Ultrapure Creatine Caps", "alias": "kreatin kapseln creatin giga caps", "cat": "kreatin", "serving": "3 Kapseln", "amount": 3, "unit": "g", "perDay": 1, "extra": "3,4 g Kreatin-Monohydrat ergeben 3 g Kreatin.", "src": "https://esn.com/products/esn-creatine-giga-caps-300-kaps"}, {"id": "esn-whey", "brand": "ESN", "name": "Designer Whey", "alias": "protein eiweiss", "cat": "protein", "serving": "30 g Pulver", "amount": 23.4, "unit": "g", "perDay": null, "kcal": 115, "extra": "Wert für Vanilla Milk, andere Sorten leicht abweichend. Hersteller: 1–3 Portionen pro Tag.", "src": "https://www.shop-apotheke.com/fitness/upmH2EPFL/esn-designer-whey-protein-pulver-vanilla-milk.htm"}, {"id": "esn-iso", "brand": "ESN", "name": "Isoclear Whey Isolate", "alias": "protein clear isolat eiweiss", "cat": "protein", "serving": "30 g Pulver", "amount": 25, "unit": "g", "perDay": null, "kcal": 105, "extra": "Hersteller: bis zu 3 Portionen pro Tag.", "src": "https://www.shop-apotheke.com/fitness/upmD79KHT/esn-isoclear-whey-isolate.htm"}, {"id": "esn-crank", "brand": "ESN", "name": "Crank Pre-Workout Booster", "alias": "booster preworkout trainingsbooster", "cat": "koffein", "serving": "19 g Pulver in 500 ml Wasser", "amount": 200, "unit": "mg", "perDay": 1, "extra": "Nur an Trainingstagen. Enthält laut Hersteller weder Kreatin noch Beta-Alanin.", "src": "https://www.shop-apotheke.com/fitness/upmTPXC39/esn-crank-booster-cola.htm"}, {"id": "esn-caf", "brand": "ESN", "name": "Caffeine Caps", "alias": "koffein kapseln", "cat": "koffein", "serving": "1 Kapsel", "amount": 200, "unit": "mg", "perDay": 1, "extra": "Hersteller: höchstens 1 Kapsel pro Tag.", "src": "https://esn.com/products/esn-caffeine-caps-120-kaps"}, {"id": "esn-flex", "brand": "ESN", "name": "Flexpresso Protein Coffee", "alias": "kaffee protein koffein", "cat": "koffein", "serving": "30 g Pulver", "amount": 80, "unit": "mg", "perDay": null, "extra": "Liefert zusätzlich bis zu 23 g Protein. Die Sorte Decaf ist koffeinfrei.", "src": "https://esn.com/products/esn-flexpresso-protein-coffee"}, {"id": "esn-beta", "brand": "ESN", "name": "Betacharge Beta-Alanine", "alias": "beta alanin", "cat": "betaalanin", "serving": "1 Messlöffel (3,75 g Pulver)", "amount": 3, "unit": "g", "perDay": null, "sure": false, "extra": "Angaben auf den Händlerseiten widersprechen sich. In der Schweiz empfiehlt ESN höchstens 1 Portion pro Tag.", "src": "https://esn.com/products/betacharge-beta-alanine"}, {"id": "esn-d3", "every": 3, "brand": "ESN", "name": "Vitamin D3 Kapseln", "alias": "vitamin d d3", "cat": "vitd", "serving": "1 Kapsel jeden 3. Tag", "amount": 140, "unit": "µg", "perDay": null, "extra": "Hochdosiert: im Schnitt etwa 47 µg (1867 IE) pro Tag.", "src": "https://www.shop-apotheke.com/fitness/upmL4FR2H/esn-vitamin-d3-vitamin-d-hochdosiert.htm"}, {"id": "esn-d3k2", "every": 3, "brand": "ESN", "name": "Vitamin D3 + K2", "alias": "vitamin d d3 k2 depot", "cat": "vitd", "serving": "1 Kapsel jeden 3. Tag", "amount": 140, "unit": "µg", "perDay": null, "extra": "Plus 200 µg Vitamin K2 pro Kapsel. Im Schnitt etwa 47 µg D3 pro Tag.", "src": "https://www.shop-apotheke.com/fitness/upmPXK27R/esn-vitamin-d3-k2.htm"}, {"id": "esn-o3", "brand": "ESN", "name": "Super Omega-3", "alias": "omega 3 fischöl epa dha", "cat": "omega3", "serving": "3 Kapseln", "amount": 2100, "unit": "mg", "perDay": 1, "extra": "1200 mg EPA und 900 mg DHA pro Portion.", "src": "https://www.shop-apotheke.com/arzneimittel/upmCFX972/esn-omega-3.htm"}, {"id": "pf-crea", "brand": "PowerFood One", "name": "High Grade Creatine", "alias": "powerfood kreatin creatin pulver", "cat": "kreatin", "serving": "3 g Pulver", "amount": 3, "unit": "g", "perDay": 1, "extra": "100 % Kreatin-Monohydrat, täglich 3 g in 150 ml Flüssigkeit.", "src": "https://www.powerfood.ch/powerfood-high-grade-creatine-500g-dose/5262-150"}, {"id": "pf-creacaps", "brand": "PowerFood One", "name": "High Grade Creatine Caps", "alias": "powerfood kreatin kapseln", "cat": "kreatin", "serving": "3 Kapseln", "amount": 3, "unit": "g", "perDay": 1, "sure": false, "extra": "Shop nennt 1000 mg pro Kapsel, die Zutatenliste 86 % Kreatin. Das widerspricht sich.", "src": "https://www.powerfood.ch/powerfood-high-grade-creatine-caps-300-caps/6674-22"}, {"id": "pf-creaeaa", "brand": "PowerFood One", "name": "Creatine + EAA", "alias": "powerfood kreatin eaa", "cat": "kreatin", "serving": "19,5 g Pulver", "amount": 3.4, "unit": "g", "perDay": 1, "sure": false, "extra": "Dazu etwa 9,8 g EAA. Werte aus den Prozentangaben berechnet.", "src": "https://www.powerfood.ch/powerfood-creatine-eaa-300g-dose/9046-22"}, {"id": "pf-boom", "brand": "PowerFood One", "name": "Boom Whey", "alias": "powerfood protein eiweiss whey", "cat": "protein", "serving": "30 g Pulver", "amount": 22.4, "unit": "g", "perDay": null, "kcal": 116, "extra": "Hersteller: 1–3 Portionen pro Tag.", "src": "https://www.powerfood.ch/powerfood-boom-whey-1000g/6455-22"}, {"id": "pf-clear", "brand": "PowerFood One", "name": "Clear Iso Whey", "alias": "powerfood protein isolat clear", "cat": "protein", "serving": "30 g Pulver", "amount": 23, "unit": "g", "perDay": null, "kcal": 103, "sure": false, "extra": "Unklar, ob die Tabelle pro Portion oder pro 100 g gilt.", "src": "https://www.powerfood.ch/powerfood-clear-iso-whey-1000g-beutel/8106-23"}, {"id": "pf-vegan", "brand": "PowerFood One", "name": "Vegan Protein", "alias": "powerfood protein vegan pflanzlich", "cat": "protein", "serving": "1 Messlöffel (30 g)", "amount": 21, "unit": "g", "perDay": null, "kcal": 113, "extra": "", "src": "https://www.powerfood.ch/powerfood-vegan-protein-1000g-beutel/7449-23"}, {"id": "pf-icecoffee", "brand": "PowerFood One", "name": "Protein Ice Coffee", "alias": "powerfood protein kaffee", "cat": "protein", "serving": "30 g Pulver", "amount": 21, "unit": "g", "perDay": null, "kcal": 115, "extra": "Enthält zusätzlich 80 mg Koffein pro Portion.", "src": "https://www.powerfood.ch/powerfood-protein-ice-coffee-900g-dose/8625-22"}, {"id": "pf-matcha", "brand": "PowerFood One", "name": "Matcha Latte Whey", "alias": "powerfood protein matcha", "cat": "protein", "serving": "30 g Pulver", "amount": 22, "unit": "g", "perDay": null, "kcal": 115, "extra": "Enthält Matcha, Koffeinmenge nicht angegeben.", "src": "https://www.powerfood.ch/powerfood-matcha-latte-whey-450g-dose/8893-22"}, {"id": "pf-mass", "brand": "PowerFood One", "name": "Mass Builder", "alias": "powerfood gainer masse", "cat": "protein", "serving": "100 g Pulver", "amount": 20, "unit": "g", "perDay": null, "kcal": 388, "extra": "Weight Gainer mit 69 g Kohlenhydraten pro Portion.", "src": "https://www.powerfood.ch/powerfood-mass-builder-2500g-dose/8059-22"}, {"id": "pf-shot", "brand": "PowerFood One", "name": "Pre-Workout Shot", "alias": "powerfood booster shot koffein", "cat": "koffein", "serving": "1 Shot (60 ml)", "amount": 200, "unit": "mg", "perDay": 1, "extra": "Mit Arginin und Citrullin, ohne Kreatin und Beta-Alanin.", "src": "https://www.powerfood.ch/powerfood-pre-workout-shot-60ml/8199-22"}, {"id": "pf-caf", "brand": "PowerFood One", "name": "High Grade Caffeine Caps", "alias": "powerfood koffein kapseln", "cat": "koffein", "serving": "1 Kapsel", "amount": 200, "unit": "mg", "perDay": 1, "extra": "Vor oder während dem Sport.", "src": "https://www.powerfood.ch/powerfood-one-high-grade-caffeine-caps-120-caps-a-200mg/8010-22"}, {"id": "pf-beta", "brand": "PowerFood One", "name": "High Grade Beta Alanine", "alias": "powerfood beta alanin tabletten", "cat": "betaalanin", "serving": "1 Tablette", "amount": 0.8, "unit": "g", "perDay": 4, "extra": "Hersteller: 4 Tabletten pro Tag (3,2 g), höchstens 8–10 Wochen am Stück.", "src": "https://www.powerfood.ch/powerfood-high-grade-beta-alanine-120-tabs/8011-22"}, {"id": "pf-o3", "brand": "PowerFood One", "name": "Omega 3", "alias": "powerfood omega fischöl", "cat": "omega3", "serving": "1 Kapsel", "amount": 300, "unit": "mg", "perDay": 1, "sure": false, "extra": "EPA+DHA aus 18 % EPA und 12 % DHA geschätzt.", "src": "https://www.powerfood.ch/powerfood-omega-3-120-caps/5652-22"}, {"id": "pf-eaa", "brand": "PowerFood One", "name": "EAA", "alias": "powerfood eaa aminosäuren", "cat": "eaa", "serving": "12 g Pulver", "amount": 8.9, "unit": "g", "perDay": 1, "sure": false, "extra": "EAA-Menge aus den Prozentangaben berechnet.", "src": "https://www.powerfood.ch/powerfood-eaa-500g-dose/5462-24"}, {"id": "pf-bcaa", "brand": "PowerFood One", "name": "Rocket BCAA", "alias": "powerfood bcaa aminosäuren", "cat": "eaa", "serving": "12 g Pulver", "amount": 4, "unit": "g", "perDay": 1, "sure": false, "extra": "4 g BCAA pro Portion. Laut Tabelle zusätzlich etwas Koffein.", "src": "https://www.powerfood.ch/powerfood-rocket-bcaa-500g-dose/4800-24"}, {"id": "on-whey", "brand": "Optimum Nutrition", "name": "100% Whey Gold Standard", "alias": "on protein eiweiss whey", "cat": "protein", "serving": "1 gehäufter Messlöffel (31 g)", "amount": 24, "unit": "g", "perDay": null, "kcal": 116, "extra": "Werte vom EU-Etikett (Double Chocolate). Hersteller: 1–3 Portionen pro Tag.", "src": "https://www.ocado.com/products/optimum-nutrition-gold-standard-100-whey-protein-powder-double-chocolate/688060011"}, {"id": "on-iso", "brand": "Optimum Nutrition", "name": "Gold Standard Isolate", "alias": "on protein isolat", "cat": "protein", "serving": "1 gehäufter Messlöffel (30 g)", "amount": 25, "unit": "g", "perDay": null, "extra": "", "src": "https://www.powerfood.ch/optimum-nutrition-gold-standard-isolate-930-dose/6118-24"}, {"id": "on-casein", "brand": "Optimum Nutrition", "name": "100% Casein Protein", "alias": "on protein casein kasein nacht", "cat": "protein", "serving": "ca. 35 g Pulver", "amount": 24, "unit": "g", "perDay": null, "extra": "Langsam verdaulich, gedacht für vor dem Schlafen.", "src": "https://www.powerfood.ch/optimum-nutrition-100-casein-protein-1818g-dose/357-23"}, {"id": "on-crea", "brand": "Optimum Nutrition", "name": "Micronised Creatine Powder", "alias": "on kreatin creatin", "cat": "kreatin", "serving": "3 g Pulver", "amount": 3, "unit": "g", "perDay": 1, "extra": "", "src": "https://www.powerfood.ch/optimum-nutrition-micronised-creatine-powder-187g-dose/8629-22"}, {"id": "ol-whey", "brand": "Olimp", "name": "Whey Protein Complex 100%", "alias": "olimp protein eiweiss whey", "cat": "protein", "serving": "35 g Pulver", "amount": 26, "unit": "g", "perDay": null, "kcal": 134, "extra": "Hersteller: 1–3 Portionen pro Tag.", "src": "https://shop-tonic.acsone.eu/olimp-sport-nutrition-whey-protein-complex"}, {"id": "ol-crea", "brand": "Olimp", "name": "Creatin Monohydrate", "alias": "olimp kreatin creatin", "cat": "kreatin", "serving": "3 g Pulver", "amount": 3, "unit": "g", "perDay": 1, "extra": "", "src": "https://www.powerfood.ch/olimp-creatin-monohydrate-550g-dose/410-75"}, {"id": "ol-o3", "brand": "Olimp", "name": "Gold Omega 3 Sport Edition", "alias": "olimp omega fischöl", "cat": "omega3", "serving": "1 Kapsel", "amount": 550, "unit": "mg", "perDay": 1, "extra": "330 mg EPA und 220 mg DHA pro Kapsel.", "src": "https://www.mygp.com/store/product/olimp-nutrition-gold-omega-3-sport-edition-omega-3-120-capsules"}, {"id": "ol-shot", "brand": "Olimp", "name": "Extreme Speed Shot", "alias": "olimp koffein shot booster", "cat": "koffein", "serving": "1 Shot (25 ml)", "amount": 200, "unit": "mg", "perDay": 1, "extra": "Mit Taurin, Guarana und Tyrosin.", "src": "https://www.powerfood.ch/olimp-extreme-speed-shot-25ml-glas/8269-22"}, {"id": "ol-bcaa", "brand": "Olimp", "name": "BCAA Xplode Powder", "alias": "olimp bcaa aminosäuren", "cat": "eaa", "serving": "5 g Pulver", "amount": 3, "unit": "g", "perDay": 1, "extra": "BCAA im Verhältnis 2:1:1.", "src": "https://www.powerfood.ch/olimp-bcaa-xplode-powder-500g-dose/8265-22"}, {"id": "ba-p90", "brand": "Body Attack", "name": "Power Protein 90", "alias": "body attack protein eiweiss", "cat": "protein", "serving": "30 g Pulver (1½ Messlöffel)", "amount": 24, "unit": "g", "perDay": null, "sure": false, "extra": "Pulver allein, aus 81 g/100 g berechnet. Mit fettarmer Milch etwa 34 g Protein.", "src": "https://www.powerfood.ch/body-attack-new-power-protein-90-1000g-dose/1909-22"}, {"id": "ba-crea", "brand": "Body Attack", "name": "100% Pure Creatine Monohydrate", "alias": "body attack kreatin creatin pulver", "cat": "kreatin", "serving": "3 g Pulver", "amount": 3, "unit": "g", "perDay": 1, "extra": "", "src": "https://www.powerfood.ch/body-attack-100-pure-creatine-monohydrate-powder-300g-dose/8431-22"}, {"id": "ba-o3", "brand": "Body Attack", "name": "Omega 3 Gold", "alias": "body attack omega fischöl", "cat": "omega3", "serving": "1 Kapsel", "amount": 550, "unit": "mg", "perDay": 1, "extra": "330 mg EPA und 220 mg DHA pro Kapsel.", "src": "https://api.gebrauchs.info/3c03a146c43f7b19024219ff2ac9bd21i"}, {"id": "ba-eaa", "brand": "Body Attack", "name": "Extreme Instant EAA", "alias": "body attack eaa aminosäuren", "cat": "eaa", "serving": "1 Messlöffel (15 g)", "amount": 10.7, "unit": "g", "perDay": 1, "sure": false, "extra": "EAA-Menge aus den Zutatenanteilen berechnet.", "src": "https://www.powerfood.ch/body-attack-extreme-instant-eaa-500g-dose/5838-22"}, {"id": "ba-shot", "brand": "Body Attack", "name": "Attack Shot", "alias": "body attack koffein shot booster", "cat": "koffein", "serving": "1 Shot (60 ml)", "amount": 200, "unit": "mg", "perDay": 1, "sure": false, "extra": "Unklar, ob die 200 mg pro Shot gelten. Mit Taurin und Citrullin.", "src": "https://www.powerfood.ch/body-attack-attack-shot-60ml/8387-22"}, {"id": "pb-gel", "brand": "PowerBar", "name": "PowerGel Original Black Currant", "alias": "gel koffein ausdauer", "cat": "koffein", "serving": "1 Gel (41 g)", "amount": 50, "unit": "mg", "perDay": null, "extra": "Green Apple ebenfalls 50 mg, Espresso 53 mg. Andere Sorten sind koffeinfrei.", "src": "https://www.bike24.com/p2311888.html"}, {"id": "pb-gel30", "brand": "PowerBar", "name": "Fuel Gel 30 Lemon Caffeine", "alias": "gel koffein black line", "cat": "koffein", "serving": "1 Gel (50 ml)", "amount": 100, "unit": "mg", "perDay": null, "extra": "Wert von einer Händlerseite.", "src": "https://bikable.com/accessories/energy-bars-and-energy-powder/powerbar-fuel-gel-30-lemon-100-mg-caffeine"}, {"id": "pb-whey", "brand": "PowerBar", "name": "Clean Whey 100% Whey Isolate", "alias": "protein eiweiss isolat", "cat": "protein", "serving": "25 g Pulver in 160 ml Wasser", "amount": 20, "unit": "g", "perDay": null, "extra": "Hersteller: 1–2 Portionen pro Tag nach dem Training.", "src": "https://www.powerbar.com/en-de/products/clean-whey-100-whey-isolate"}];
+const CAT_N={kreatin:"Kreatin",protein:"Protein",koffein:"Koffein",betaalanin:"Beta-Alanin",vitd:"Vitamin D",omega3:"Omega-3",eaa:"EAA/BCAA"};
+const CAT_SUPP={kreatin:"kreatin",protein:"protein",koffein:"koffein",betaalanin:"betaalanin",vitd:"vitd",omega3:"omega3"};
+function allProducts(){return PRODUCTS.concat((state.customProducts||[]).map(x=>({...x,custom:true})))}
+const prodById=id=>allProducts().find(x=>x.id===id);
+const norm=t=>String(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+function matchProducts(q){
+  const words=norm(q).split(" ").filter(w=>w.length>1); if(!words.length) return [];
+  return allProducts().map(pr=>{const hay=norm(pr.brand+" "+pr.name+" "+CAT_N[pr.cat]+" "+(pr.alias||""));
+    const hit=words.filter(w=>hay.includes(w)).length; return {pr,score:hit/words.length}})
+    .filter(x=>x.score>=.5).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.pr);
+}
+function amtTxt(pr){return `${fmtP(pr.amount)} ${pr.unit}${pr.unit==="µg"&&pr.cat==="vitd"?` (${fmtP(pr.amount*40)} IE)`:""}`}
+function dosing(pr){
+  const p=state.profile, a=pr.amount; if(!(a>0)) return "";
+  const per=(lo,hi,unit)=>{const l=lo/a,h=hi/a; const f=n=>fmtP(Math.round(n*2)/2); return `Für ${fmtP(lo)}–${fmtP(hi)} ${unit} pro Tag: ${f(l)===f(h)?f(l):f(l)+"–"+f(h)} Portion${h>1?"en":""}.`};
+  if(pr.cat==="kreatin") return per(3,5,"g Kreatin");
+  if(pr.cat==="betaalanin") return per(3.2,6.4,"g Beta-Alanin");
+  if(pr.cat==="omega3") return per(1000,2000,"mg EPA+DHA");
+  if(pr.cat==="koffein"){const lo=Math.round(p.weight*3),hi=Math.round(p.weight*6); return `${per(lo,hi,"mg Koffein vor dem Training")} Insgesamt nicht über 400 mg pro Tag aus allen Quellen (Kaffee, Energy-Drinks).`}
+  if(pr.cat==="protein"){const T=targets(p); return `Eine Portion deckt ${Math.round(a/T.prot*100)} % deines Tagesziels von ${T.prot} g Protein.`}
+  if(pr.cat==="eaa") return "Bei ausreichender Proteinzufuhr ist kein Zusatznutzen belegt (siehe BCAA/EAA unten). Erscheint deshalb nicht in der Abhakliste.";
+  if(pr.cat==="vitd") return `Nur bei nachgewiesenem Mangel. Obergrenze für Erwachsene: 100 µg (4000 IE) pro Tag aus allen Quellen.`;
+  return "";
+}
+function productCard(pr,mine){
+  return `<article class="panel stack prod">
+    <div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="small muted">${esc(pr.brand)}${pr.custom?" · eigenes Produkt":""}</div><h3>${esc(pr.name)}</h3></div><span class="pill">${CAT_N[pr.cat]}</span></div>
+    <dl class="small" style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;margin:0">
+      <dt class="muted">Portion</dt><dd style="margin:0">${esc(pr.serving||"–")}</dd>
+      <dt class="muted">Wirkstoff</dt><dd style="margin:0"><b class="mono">${amtTxt(pr)}</b> pro Portion</dd>
+      ${pr.perDay?`<dt class="muted">Hersteller</dt><dd style="margin:0">${fmtP(pr.perDay)} Portion${pr.perDay>1?"en":""} pro Tag</dd>`:""}
+    </dl>
+    <div class="small">${esc(dosing(pr))}</div>
+    ${pr.extra?`<div class="small muted">${esc(pr.extra)}</div>`:""}
+    <div class="row">
+      ${mine?`<button class="btn ghost small" data-prodrm="${pr.id}">Entfernen</button>${pr.cat==="protein"?`<button class="btn ghost small" data-prodfood="${pr.id}">Portion ins Ernährungstagebuch</button>`:""}`
+        :`<button class="btn small" data-prodadd="${pr.id}">Zu meinen Produkten</button>`}
+      ${pr.src?`<a class="small" href="${esc(pr.src)}" target="_blank" rel="noopener">Quelle ↗</a>`:""}
+      ${pr.sure===false?`<span class="small muted">Angabe unsicher, bitte mit dem Etikett abgleichen</span>`:""}
+    </div>
+  </article>`;
+}
+function productsHtml(){
+  const mine=(state.myProducts||[]).map(prodById).filter(Boolean);
+  const brands=[...new Set(allProducts().map(x=>x.brand))];
+  const q=ui.prodQ||"", hits=q?matchProducts(q):(ui.prodBrand?allProducts().filter(x=>x.brand===ui.prodBrand):[]);
+  return `<section class="panel stack">
+    <h2>Meine Produkte</h2>
+    <p class="small muted" style="margin:0">Tippe ein, was auf deiner Dose steht, zum Beispiel „ESN Creatine“. Die App erkennt das Produkt und rechnet aus, wie viele Portionen deiner Zieldosis entsprechen.</p>
+    <input id="prodq" type="search" placeholder="Marke oder Produkt, z. B. ESN Designer Whey" value="${esc(q)}" aria-label="Produkt suchen" style="padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+    <div class="row">${brands.map(b=>`<button class="chip${ui.prodBrand===b&&!q?" on":""}" data-brand="${esc(b)}">${esc(b)}</button>`).join("")}</div>
+    ${q||ui.prodBrand?`<div class="cards" id="prodhits">${hits.length?hits.map(pr=>productCard(pr,(state.myProducts||[]).includes(pr.id))).join(""):`<p class="small muted" style="margin:0">Kein Produkt gefunden. Lege es unten als eigenes Produkt an.</p>`}</div>`:""}
+    ${mine.length?`<h3>Ausgewählt</h3><div class="cards">${mine.map(pr=>productCard(pr,true)).join("")}</div>`:""}
+    <details><summary class="small" style="cursor:pointer;font-weight:600">Eigenes Produkt anlegen</summary>
+      <form id="prodform" class="form" style="margin-top:10px">
+        <label class="f" for="cpb">Marke<input id="cpb" maxlength="40" required></label>
+        <label class="f" for="cpn">Produkt<input id="cpn" maxlength="60" required></label>
+        <label class="f" for="cpc">Art<select id="cpc">${Object.entries(CAT_N).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select></label>
+        <label class="f" for="cps">Portion laut Etikett<input id="cps" maxlength="40" placeholder="z. B. 1 Messlöffel (5 g)"></label>
+        <label class="f" for="cpa">Wirkstoff pro Portion<input id="cpa" type="number" step="any" min="0" required></label>
+        <label class="f" for="cpu">Einheit<select id="cpu"><option>g</option><option>mg</option><option>µg</option></select></label>
+        <div style="align-self:end"><button class="btn" type="submit">Anlegen</button></div>
+      </form>
+    </details>
+  </section>`;
+}
+function suppDue(id,dateIso){
+  if(id==="koffein") return !!sessionFor(dateIso)||!!(state.done[dateIso]);
+  const prods=(state.myProducts||[]).map(prodById).filter(pr=>pr&&CAT_SUPP[pr.cat]===id&&pr.every);
+  if(prods.length){const n=Math.round(parseIso(dateIso).getTime()/DAY); return prods.some(pr=>n%pr.every===0)}
+  return true;
+}
+function suppLineProducts(cat){
+  return (state.myProducts||[]).map(prodById).filter(pr=>pr&&pr.cat===cat).map(pr=>`${pr.brand} ${pr.name}: ${pr.perDay>1?fmtP(pr.perDay)+" × ":""}${pr.serving||amtTxt(pr)}`).join(" · ");
+}
+
+/* ---------- Supplement-Empfehlung aus Training und Ernährung ---------- */
+const SQ_DEF={fish:"selten",diet:"misch",coffee:2,vitd:"unbekannt",time:"abends"};
+function planStats(){
+  const st={kraft:0,int:0,z2:0,days:0};
+  for(let i=0;i<14;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)); const s=sessionFor(k); if(!s) continue; st.days++;
+    for(const it of s.items){if(it.id==="intervals") st.int++; else if(it.id==="z2") st.z2++;}
+    if(s.items.some(it=>it.role!=="cardio")) st.kraft++;}
+  return st;
+}
+function foodStats(){
+  let n=0,k=0,p=0;
+  for(let i=0;i<7;i++){const d=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()-i)); const l=state.food[d]; if(!l||!l.length) continue; n++; k+=l.reduce((a,x)=>a+x.k,0); p+=l.reduce((a,x)=>a+x.p,0)}
+  return n?{n,kcal:Math.round(k/n),prot:Math.round(p/n)}:{n:0};
+}
+function pickProduct(cat){
+  const mine=(state.myProducts||[]).map(prodById).filter(pr=>pr&&pr.cat===cat);
+  if(mine.length) return mine[0];
+  return allProducts().find(pr=>pr.cat===cat&&pr.brand==="ESN"&&pr.sure!==false)||allProducts().find(pr=>pr.cat===cat);
+}
+function recs(){
+  const p=state.profile, q=Object.assign({},SQ_DEF,state.sq||{}), T=targets(p), ps=planStats(), fs=foodStats();
+  const R=[], add=(id,level,why,extra)=>R.push({id,level,why,extra});
+  const veg=q.diet!=="misch", month=TODAY.getMonth(), winter=month>=9||month<=2;
+  // Kreatin
+  if(ps.kraft>0&&p.goal!=="ausd") add("kreatin","emp",[`${ps.kraft} Krafteinheiten in den nächsten 2 Wochen. Kreatin steigert Kraft und Muskelzuwachs nachweislich.`].concat(veg?["Wer wenig oder kein Fleisch isst, hat kleinere Kreatinspeicher und profitiert meist stärker."]:[]));
+  else if(ps.kraft>0) add("kreatin","opt",["Hilft bei Intervallen und Krafteinheiten. Die 1–2 kg Wassereinlagerung können beim Laufen stören."]);
+  else add("kreatin","nein",["Dein Plan enthält kein Krafttraining."]);
+  // Protein
+  if(fs.n>=3){const gap=T.prot-fs.prot, pr=pickProduct("protein"), serv=pr?Math.ceil(gap/pr.amount):0;
+    if(gap>20) add("protein","emp",[`Du kommst laut Ernährungstagebuch im Schnitt auf ${fs.prot} g Protein pro Tag, dein Ziel sind ${T.prot} g. Es fehlen etwa ${gap} g.`],pr?`${pr.brand} ${pr.name}: ${serv} Portion${serv>1?"en":""} (${esc(pr.serving)}) pro Tag schließen die Lücke.`:"");
+    else if(gap>0) add("protein","opt",[`Im Schnitt ${fs.prot} g von ${T.prot} g. Die kleine Lücke schaffst du auch mit Quark, Skyr oder Eiern.`]);
+    else add("protein","nein",[`Du erreichst dein Ziel von ${T.prot} g schon mit dem Essen (im Schnitt ${fs.prot} g).`]);
+  } else add("protein","opt",[`Dein Ziel sind ${T.prot} g pro Tag. Trage an mindestens 3 Tagen dein Essen ein, dann rechnet die App aus, ob du Pulver brauchst.`]);
+  // Koffein
+  const cafMg=q.coffee*80, lo=Math.round(p.weight*3);
+  if(q.time==="abends") add("koffein","nein",["Du trainierst abends. Koffein verschlechtert dann den Schlaf, und das kostet mehr Erholung, als es Leistung bringt."]);
+  else if(ps.int>0||p.goal==="kraft") add("koffein","opt",[`Bringt bei harten Einheiten messbar mehr Leistung (ab ${lo} mg).`].concat(cafMg>=lo?[`Mit ${q.coffee} Tassen Kaffee kommst du schon auf etwa ${cafMg} mg. Eine Tasse direkt vor dem Training reicht meist.`]:[]));
+  else add("koffein","opt",["Wirkt, ist aber kein Muss. Ein Kaffee vor dem Training tut es auch."].concat(cafMg>=lo?[`Du trinkst bereits etwa ${cafMg} mg Koffein pro Tag.`]:[]));
+  // Beta-Alanin, Nitrat
+  if(ps.int>0) add("betaalanin","opt",[`${ps.int} Intervalleinheiten in 2 Wochen. Beta-Alanin hilft bei Belastungen von 1–4 Minuten.`]);
+  else add("betaalanin","nein",["Hilft vor allem bei Intervallen von 1–4 Minuten, die dein Plan nicht enthält."]);
+  if(ps.int+ps.z2>0) add("nitrat","opt",[`${ps.int+ps.z2} Ausdauereinheiten in 2 Wochen. Rote-Bete-Saft verbessert die Ausdauer etwas.`]);
+  else add("nitrat","nein",["Wirkt vor allem bei Ausdauer, die dein Plan kaum enthält."]);
+  // Vitamin D
+  if(q.vitd==="mangel") add("vitd","emp",["Ein Bluttest hat einen Mangel gezeigt. Dosis nach Absprache mit deiner Ärztin oder deinem Arzt."]);
+  else if(q.vitd==="ok") add("vitd","nein",["Dein Blutwert ist in Ordnung."]);
+  else add("vitd",winter?"opt":"nein",[winter?"Von Oktober bis März bildet die Haut in der Schweiz kaum Vitamin D. Lass zuerst den Blutwert messen, bevor du hochdosiert nimmst.":"Im Sommer reicht meist die Sonne. Bei Zweifeln den Blutwert messen lassen."]);
+  // Omega-3
+  if(q.fish==="selten"||q.diet==="vegan") add("omega3","opt",[q.diet==="vegan"?"Ohne Fisch fehlen EPA und DHA. Für Veganer gibt es Algenöl.":"Du isst selten fetten Fisch. Für die Gesundheit sinnvoll, für die Leistung kaum belegt."]);
+  else add("omega3","nein",["Du isst regelmäßig Fisch."]);
+  add("bcaa","nein",["Bei ausreichend Protein kein Zusatznutzen."]);
+  add("testo","nein",["Keine Wirkung belegt, oft verunreinigt."]);
+  const notes=[];
+  if(q.diet==="vegan") notes.push("Vegan: Vitamin B12 ist Pflicht, das gibt es in pflanzlicher Nahrung nicht. Am besten den Wert beim Arzt prüfen lassen.");
+  if(fs.n>=3&&p.goal==="hyper"&&fs.kcal<T.kcal-300) notes.push(`Du isst im Schnitt ${fmt(fs.kcal)} kcal, dein Ziel für Muskelaufbau sind ${fmt(T.kcal)} kcal. Mehr Essen bringt hier mehr als jedes Supplement.`);
+  if(fs.n>=3&&p.goal==="fett"&&fs.kcal>T.kcal+300) notes.push(`Du isst im Schnitt ${fmt(fs.kcal)} kcal, für Fettabbau sind ${fmt(T.kcal)} kcal geplant. Kein Supplement ersetzt das Defizit.`);
+  return {R,notes,fs,ps,q};
+}
+function recHtml(){
+  const {R,notes,fs,ps,q}=recs();
+  const name=id=>SUPPS.find(s=>s.id===id).n;
+  const sel=(id,label,opts)=>`<label class="f" for="${id}">${label}<select id="${id}" data-sq="${id.slice(3)}">${opts.map(([v,t])=>`<option value="${v}"${String(q[id.slice(3)])===String(v)?" selected":""}>${t}</option>`).join("")}</select></label>`;
+  const group=(lvl,title)=>{const l=R.filter(r=>r.level===lvl); if(!l.length) return ""; return `<div class="stack" style="gap:8px"><h3>${title}</h3>${l.map(r=>{
+    const pr=lvl!=="nein"&&r.id!=="nitrat"?pickProduct(CAT_SUPP[r.id]?r.id:"")||null:null;
+    return `<div class="rec rec-${lvl}"><b>${esc(name(r.id))}</b> <span class="grade g-${SUPPS.find(s=>s.id===r.id).g}">${SUPPS.find(s=>s.id===r.id).g}</span>
+      <div class="small">${r.why.map(esc).join(" ")}</div>
+      ${r.extra?`<div class="small"><b>${esc(r.extra)}</b></div>`:pr&&r.id!=="protein"?`<div class="small muted">Passendes Produkt: ${esc(pr.brand)} ${esc(pr.name)}, ${esc(pr.serving)}</div>`:""}</div>`}).join("")}</div>`};
+  return `<section class="panel stack">
+    <h2>Deine Empfehlung</h2>
+    <p class="small muted" style="margin:0">Berechnet aus deinem Plan der nächsten 2 Wochen (${ps.kraft} Kraft-, ${ps.int} Intervall-, ${ps.z2} Zone-2-Einheiten)${fs.n?` und deinem Ernährungstagebuch der letzten 7 Tage (${fs.n} Tage eingetragen, im Schnitt ${fmt(fs.kcal)} kcal und ${fs.prot} g Protein)`:", noch ohne Ernährungsdaten"}.</p>
+    <div class="form">
+      ${sel("sq-diet","Ernährungsweise",[["misch","Mit Fleisch und Fisch"],["vegi","Vegetarisch"],["vegan","Vegan"]])}
+      ${sel("sq-fish","Fetter Fisch (Lachs, Makrele)",[["selten","Selten"],["oft","Mind. 2× pro Woche"]])}
+      ${sel("sq-coffee","Kaffee pro Tag",[[0,"Keinen"],[1,"1 Tasse"],[2,"2 Tassen"],[3,"3 Tassen"],[5,"4 oder mehr"]])}
+      ${sel("sq-time","Trainingszeit",[["morgens","Morgens"],["mittags","Mittags"],["abends","Abends"]])}
+      ${sel("sq-vitd","Vitamin-D-Blutwert",[["unbekannt","Nicht gemessen"],["ok","Gemessen, in Ordnung"],["mangel","Gemessen, Mangel"]])}
+    </div>
+    ${group("emp","Empfohlen")}${group("opt","Optional")}${group("nein","Nicht nötig")}
+    ${notes.length?`<div class="note">${notes.map(esc).join("<br>")}</div>`:""}
+    <div class="row"><button class="btn" data-applyrec="1">Empfohlene in meinen Kalender übernehmen</button><span class="small muted" id="recmsg"></span></div>
+  </section>`;
+}
+
+/* ---------- Trainingsmodus (Vorbild Peloton: geführte Einheit mit Timer) ---------- */
+const upper=r=>{const m=String(r).match(/(\d+)\D*$/);return m?Number(m[1]):10};
+const lower=r=>{const m=String(r).match(/\d+/);return m?Number(m[0]):8};
+const restSec=r=>{const m=String(r).match(/(\d+)/);if(!m) return 90;return /min/.test(r)?Number(m[1])*60:Number(m[1])};
+const e1rm=(w,r)=>r>0&&r<=12&&w>0?w*(1+r/30):0;
+const fmt=(n,d=0)=>Number(n).toLocaleString("de-DE",{maximumFractionDigits:d,minimumFractionDigits:d});
+function history(){return Object.keys(state.done).sort().map(d=>[d,state.done[d]])}
+function lastSets(id,before){
+  const h=history().filter(([d,x])=>d<before&&x.sets&&x.sets[id]&&x.sets[id].length);
+  return h.length?h[h.length-1]:null;
+}
+function suggestion(it,date){
+  const l=lastSets(it.id,date);
+  if(!l) return {w:"",note:"Erstes Mal: wähle ein Gewicht, mit dem du die Wiederholungen mit der angegebenen Reserve schaffst."};
+  const sets=l[1].sets[it.id], w=Math.max(...sets.map(s=>s.w)), top=upper(it.reps);
+  const allTop=sets.every(s=>s.r>=top);
+  if(allTop&&w>0){const nw=Math.round(w*1.025*2)/2; return {w:nw===w?w+2.5:nw,note:`Letztes Mal (${l[0]}) alle Sätze mit ${top}+ Wiederholungen geschafft: Gewicht steigern.`}}
+  return {w,note:`Letztes Mal (${l[0]}): ${sets.map(setTxt).join(", ")}. Gleiches Gewicht, mehr Wiederholungen anpeilen.`};
+}
+let audioCtx=null, timerInt=null;
+function beep(){try{if(!audioCtx) return; const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.frequency.value=880; g.gain.value=.15; o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+.35);}catch(e){} try{navigator.vibrate&&navigator.vibrate(300)}catch(e){}}
+function tick(){
+  const r=ui.run; const el=document.getElementById("timer");
+  if(!r||!r.restUntil){clearInterval(timerInt);timerInt=null;return}
+  const left=Math.max(0,Math.ceil((r.restUntil-Date.now())/1000));
+  if(el) el.textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
+  if(left===0){r.restUntil=null; beep(); clearInterval(timerInt); timerInt=null; if(ui.tab==="training") render()}
+}
+function startRest(sec){ui.run.restUntil=Date.now()+sec*1000; if(!timerInt) timerInt=setInterval(tick,250)}
+function nextTrainingDate(){
+  if(sessionFor(ui.sel)&&!state.done[ui.sel]) return ui.sel;
+  for(let i=0;i<28;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)); if(sessionFor(k)&&!state.done[k]) return k}
+  return null;
+}
+function spotifyLink(cardio){
+  const u=(cardio?state.profile.spCardio:state.profile.spKraft)||"";
+  const ok=/^https:\/\/open\.spotify\.com\//.test(u);
+  const href=ok?u:`https://open.spotify.com/search/${encodeURIComponent(cardio?"running 150 bpm":"gym workout")}`;
+  return `<a class="spot" href="${esc(href)}" target="_blank" rel="noopener">♫ ${ok?"Deine Playlist in Spotify öffnen":"Passende Playlists in Spotify suchen"} ↗</a>`;
+}
+function viewTraining(){
+  if(ui.summary){const S=ui.summary; return `<section class="panel stack">
+    <div class="muted small">${S.date.split("-").reverse().join(".")}</div><h2>Einheit geschafft</h2>
+    <div class="tiles">${tile("Sätze",S.sets)}${tile("Volumen",fmt(S.vol)+" kg")}${tile("Dauer",S.min+" min")}${tile("Bestleistungen",S.prs.length)}</div>
+    ${S.prs.length?`<div><h3>Neue Bestleistungen</h3><ul class="small" style="margin:6px 0 0;padding-left:20px">${S.prs.map(p=>`<li>${esc(EX[p.id].n)}: ${fmt(p.w,1)} kg × ${p.r} (geschätztes 1RM ${fmt(p.e,1)} kg)</li>`).join("")}</ul></div>`:""}
+    ${S.badges.length?`<div class="row">${S.badges.map(b=>`<span class="badge">${esc(b)}</span>`).join("")}</div>`:""}
+    <div class="row"><button class="btn" data-goto="fortschritt">Zum Fortschritt</button><button class="btn ghost" data-closesum="1">Schließen</button></div>
+  </section>`}
+  const r=ui.run;
+  if(!r){
+    const d=nextTrainingDate(); if(!d) return `<p class="muted">Keine offene Einheit in den nächsten vier Wochen. Lege Trainingstage unter <button class="linkbtn" data-goto="profil">Ziele &amp; Profil</button> fest.</p>`;
+    const s=sessionFor(d), dd=parseIso(d);
+    const est=s.items.reduce((a,it)=>a+(it.role==="cardio"?20:it.sets*(1+restSec(it.rest)/60)),0);
+    return `<section class="panel stack">
+      <div class="muted small">${WD[isoWd(dd)]}, ${dd.getDate()}. ${MONTHS[dd.getMonth()]} · ca. ${Math.round((est+10)/5)*5} min</div>
+      <h2>${esc(s.name)}</h2>${sessionHtml(s)}
+      <p class="small muted" style="margin:0">Der Trainingsmodus führt dich Satz für Satz durch die Einheit, schlägt Gewichte vor und startet nach jedem Satz den Pausentimer.</p>
+      <div class="row"><button class="btn" data-start="${d}">Training starten</button>${spotifyLink(s.c==="green")}</div>
+    </section>`;
+  }
+  const s=sessionFor(r.date); const it=s.items[r.i];
+  const totalSets=s.items.reduce((a,x)=>a+(x.role==="cardio"?1:x.sets),0);
+  const doneSets=Object.values(r.logs).reduce((a,x)=>a+x.length,0);
+  const pct=Math.min(100,Math.round(doneSets/totalSets*100));
+  const logged=r.logs[it.id]||[];
+  let body="";
+  if(r.restUntil){
+    body=`<div class="stack" style="align-items:center;text-align:center">
+      <div class="muted small">Pause</div><div class="bigtimer mono" id="timer">–</div>
+      <div class="row" style="justify-content:center"><button class="btn ghost" data-rest="30">+30 s</button><button class="btn" data-rest="skip">Weiter</button></div>
+      <div class="small muted">Als Nächstes: ${esc(EX[it.id].n)}${it.role!=="cardio"?`, Satz ${logged.length+1} von ${it.sets}`:""}</div></div>`;
+  }else if(it.role==="cardio"){
+    body=`<p style="margin:0">${esc(it.txt)}</p>
+      <label class="f" for="cardmin" style="max-width:200px">Dauer (min)<input id="cardmin" type="number" min="1" max="300" value="${lower(it.txt)||20}"></label>
+      <div><button class="btn" data-cardio="1">Erledigt</button></div>`;
+  }else{
+    const sug=suggestion(it,r.date);
+    const prevW=logged.length?logged[logged.length-1].w:sug.w;
+    const uni=UNI.has(it.id), src=repeatSource(it,r.date,logged), dr=it.role==="core"?"":lower(it.reps);
+    body=`<div class="mono" style="font-size:1.05rem">Satz ${logged.length+1} von ${it.sets} · Ziel ${esc(it.reps)} Wdh.${uni?" je Seite":""}${it.rir?` · RIR ${esc(it.rir)}`:""}</div>
+      <p class="small muted" style="margin:0">${esc(sug.note)}</p>
+      ${src?`<div><button class="btn big" data-repeat="1">Wie ${logged.length?"Satz davor":"letztes Mal"}: ${setTxt(src)} speichern</button></div>`:""}
+      <div class="row">
+        <label class="f" for="setw">Gewicht (kg)<input id="setw" type="number" inputmode="decimal" min="0" step="0.5" value="${prevW}" style="width:110px"></label>
+        ${uni?`<label class="f" for="setl">Links<input id="setl" type="number" inputmode="numeric" min="0" max="100" value="${dr}" style="width:90px"></label>
+        <label class="f" for="setrr">Rechts<input id="setrr" type="number" inputmode="numeric" min="0" max="100" value="${dr}" style="width:90px"></label>`
+        :`<label class="f" for="setr">Wiederholungen<input id="setr" type="number" inputmode="numeric" min="0" max="100" value="${dr}" style="width:120px" placeholder="${it.role==="core"?"Sek./Wdh.":""}"></label>`}
+      </div>
+      ${BB.has(it.id)?`<div id="plates" class="stack" style="gap:4px">${platesHtml(Number(prevW))}</div>`:""}
+      <div><button class="btn${src?" ghost":""}" data-logset="1">Satz speichern</button></div>
+      ${it.role==="main"&&!logged.length?`<div id="warm">${warmHtml(Number(prevW),it.id)}</div>`:""}
+      ${logged.length?`<div class="small">Gespeichert: <span class="mono">${logged.map(setTxt).join(" · ")}</span></div>`:""}`;
+  }
+  return `<section class="panel stack">
+    <div class="row" style="justify-content:space-between"><span class="muted small">${esc(s.name)} · Übung ${r.i+1} von ${s.items.length}</span><span class="mono small">${pct} %</span></div>
+    <div class="progress"><span style="width:${pct}%"></span></div>
+    <h2><button class="linkbtn" data-ex="${it.id}" style="font:inherit;text-transform:inherit">${esc(EX[it.id].n)}</button></h2>
+    ${r.i===0&&!doneSets?spotifyLink(s.c==="green"):""}
+    ${body}
+    <div class="row" style="border-top:1px solid var(--line);padding-top:12px">
+      <button class="btn ghost" data-skipex="1">Übung überspringen</button>
+      ${it.role!=="cardio"&&!logged.length?`<button class="btn ghost" data-blockrun="${it.id}">Nope! Alternative zeigen</button>`:""}
+      <label class="f" for="rpe2" style="flex-direction:row;align-items:center;gap:8px">Anstrengung<select id="rpe2">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
+      <button class="btn ghost" data-finish="1">Training beenden</button>
+    </div>
+  </section>`;
+}
+function advance(){
+  const r=ui.run, s=sessionFor(r.date), it=s.items[r.i];
+  const n=(r.logs[it.id]||[]).length;
+  if(it.role==="cardio"||n>=it.sets){r.i++; if(r.i>=s.items.length){finishRun(); return true}}
+  return false;
+}
+function finishRun(){
+  const r=ui.run; if(!r) return;
+  const rpeEl=document.getElementById("rpe2");
+  const prevBest=bestE1rm(r.date), before=badgeList();
+  state.done[r.date]={rpe:rpeEl?Number(rpeEl.value):null,at:new Date().toISOString(),sets:r.logs,min:Math.max(1,Math.round((Date.now()-r.t0)/60000))};
+  const prs=[]; let vol=0, sets=0;
+  for(const [id,arr] of Object.entries(r.logs)){
+    for(const x of arr){sets++; vol+=setVol(x)}
+    const best=arr.reduce((b,x)=>{const e=e1rm(x.w,x.r);return e>b.e?{e,w:x.w,r:x.r}:b},{e:0});
+    if(best.e>0&&best.e>(prevBest[id]||0)&&prevBest[id]) prs.push({id,...best});
+  }
+  save(); const after=badgeList();
+  ui.summary={date:r.date,sets,vol,min:state.done[r.date].min,prs,badges:after.filter(b=>b.got&&!before.find(x=>x.n===b.n).got).map(b=>b.n)};
+  ui.run=null; clearInterval(timerInt); timerInt=null;
+}
+function bestE1rm(before){const b={}; for(const [d,x] of history()){if(before&&d>=before) continue; for(const [id,arr] of Object.entries(x.sets||{})) for(const s of arr){const e=e1rm(s.w,s.r); if(e>(b[id]||0)) b[id]=e}} return b}
+
+/* ---------- Fortschritt (Vorbild Strava: Serien, Bestleistungen, Wochenbilanz) ---------- */
+function tile(l,v,sub){return `<div class="tile"><div class="tl">${l}</div><div class="tv mono">${v}</div>${sub?`<div class="small muted">${sub}</div>`:""}</div>`}
+function weekKey(dIso){return iso(mondayOf(parseIso(dIso)))}
+function weekStreak(){
+  const weeks=new Set(Object.keys(state.done).map(weekKey).concat(state.acts.map(a=>weekKey(a.date))));
+  let w=mondayOf(TODAY), n=0;
+  if(!weeks.has(iso(w))) w=new Date(w.getFullYear(),w.getMonth(),w.getDate()-7);
+  while(weeks.has(iso(w))){n++; w=new Date(w.getFullYear(),w.getMonth(),w.getDate()-7)}
+  return n;
+}
+function badgeList(){
+  const n=Object.keys(state.done).length, st=weekStreak(), anyPr=Object.keys(bestE1rm()).length>0;
+  const vol=history().reduce((a,[d,x])=>a+Object.values(x.sets||{}).flat().reduce((b,s)=>b+setVol(s),0),0);
+  return [
+    {n:"Erste Einheit",got:n>=1},{n:"10 Einheiten",got:n>=10},{n:"25 Einheiten",got:n>=25},{n:"50 Einheiten",got:n>=50},{n:"100 Einheiten",got:n>=100},
+    {n:"4 Wochen in Folge",got:st>=4},{n:"12 Wochen in Folge",got:st>=12},{n:"Erste Gewichte protokolliert",got:anyPr},{n:"100 Tonnen bewegt",got:vol>=100000}
+  ];
+}
+function barChart(data,unit){
+  // data: [{label, value}] – eine Reihe, daher keine Legende; Titel benennt sie
+  const W=560,H=210,pl=60,pb=26,pt=10, max=Math.max(1,...data.map(d=>d.value));
+  const step=Math.pow(10,Math.floor(Math.log10(max))); const top=Math.ceil(max/step)*step;
+  const bw=(W-pl-8)/data.length, y=v=>pt+(H-pt-pb)*(1-v/top);
+  const ticks=[0,top/2,top];
+  return `<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Säulendiagramm">
+    ${ticks.map(t=>`<line x1="${pl}" x2="${W-4}" y1="${y(t)}" y2="${y(t)}" class="grid"/><text x="${pl-6}" y="${y(t)+4}" text-anchor="end" class="axis">${fmt(t)}</text>`).join("")}
+    ${data.map((d,i)=>{const x=pl+i*bw+bw*.2, w=bw*.6, h=Math.max(0,H-pb-y(d.value)), r=Math.min(4,w/2,h);
+      return `<g class="bar"><rect x="${pl+i*bw}" y="${pt}" width="${bw}" height="${H-pt-pb}" fill="transparent"/>
+      <path d="M${x},${H-pb} v${-(h-r)} q0,${-r} ${r},${-r} h${w-2*r} q${r},0 ${r},${r} v${h-r} z" class="mark"/>
+      <text x="${x+w/2}" y="${H-8}" text-anchor="middle" class="axis">${d.label}</text>
+      <title>${d.label}: ${fmt(d.value)} ${unit}</title></g>`}).join("")}
+  </svg></div>`;
+}
+function lineChart(pts,unit){
+  if(pts.length<2) return `<p class="small muted" style="margin:0">Ab zwei Einträgen erscheint hier der Verlauf.</p>`;
+  const W=560,H=190,pl=60,pb=24,pt=12, vs=pts.map(p=>p.v), lo=Math.floor(Math.min(...vs)-1), hi=Math.ceil(Math.max(...vs)+1);
+  const t0=parseIso(pts[0].d).getTime(), t1=parseIso(pts[pts.length-1].d).getTime()||t0+1;
+  const x=d=>pl+(W-pl-12)*((parseIso(d).getTime()-t0)/Math.max(1,t1-t0)), y=v=>pt+(H-pt-pb)*(1-(v-lo)/(hi-lo));
+  const path=pts.map((p,i)=>`${i?"L":"M"}${x(p.d).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const last=pts[pts.length-1];
+  return `<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf Körpergewicht">
+    ${[lo,(lo+hi)/2,hi].map(t=>`<line x1="${pl}" x2="${W-4}" y1="${y(t)}" y2="${y(t)}" class="grid"/><text x="${pl-6}" y="${y(t)+4}" text-anchor="end" class="axis">${fmt(t,1)}</text>`).join("")}
+    <text x="${pl}" y="${H-6}" class="axis">${pts[0].d.slice(5).split("-").reverse().join(".")}</text>
+    <text x="${W-12}" y="${H-6}" text-anchor="end" class="axis">${last.d.slice(5).split("-").reverse().join(".")}</text>
+    <path d="${path}" class="line"/>
+    ${pts.map(p=>`<g class="pt"><circle cx="${x(p.d)}" cy="${y(p.v)}" r="10" fill="transparent"/><circle cx="${x(p.d)}" cy="${y(p.v)}" r="${p===last?5:3}" class="dotm"/><title>${p.d}: ${fmt(p.v,1)} ${unit}</title></g>`).join("")}
+  </svg></div>`;
+}
+function viewFortschritt(){
+  const p=state.profile, h=history();
+  const wk=mondayOf(TODAY); let planned=0, doneW=0;
+  for(let i=0;i<7;i++){const k=iso(new Date(wk.getFullYear(),wk.getMonth(),wk.getDate()+i)); if(sessionFor(k)) planned++; if(state.done[k]) doneW++}
+  const weeks=[]; for(let i=7;i>=0;i--){const m=new Date(wk.getFullYear(),wk.getMonth(),wk.getDate()-7*i); weeks.push({k:iso(m),label:`${m.getDate()}.${m.getMonth()+1}.`,value:0})}
+  for(const [d,x] of h){const w=weeks.find(z=>z.k===weekKey(d)); if(w) w.value+=Object.values(x.sets||{}).flat().reduce((a,s)=>a+setVol(s),0)}
+  const prs={}; for(const [d,x] of h) for(const [id,arr] of Object.entries(x.sets||{})) for(const s of arr){const e=e1rm(s.w,s.r); if(e>(prs[id]?.e||0)) prs[id]={e,w:s.w,r:s.r,d}}
+  const bw=state.bw.slice().sort((a,b)=>a.d<b.d?-1:1);
+  const bwDelta=bw.length>1?bw[bw.length-1].v-bw[0].v:null;
+  return `<div class="stack">
+    <div class="tiles">
+      ${tile("Diese Woche",`${doneW}/${planned}`,"Einheiten erledigt")}
+      ${tile("Wochen-Serie",weekStreak(),"Wochen in Folge aktiv")}
+      ${tile("Einheiten gesamt",h.length)}
+      ${tile("Volumen 4 Wochen",fmt(weeks.slice(-4).reduce((a,w)=>a+w.value,0)/1000,1)+" t","Gewicht × Wiederholungen")}
+    </div>
+    <section class="panel stack"><h3>Sätze pro Muskelgruppe diese Woche</h3>${muscleHtml()}</section>
+    <section class="panel stack"><h3>Trainingsvolumen pro Woche (kg)</h3>${barChart(weeks,"kg")}
+      ${h.length?"":`<p class="small muted" style="margin:0">Noch keine Sätze protokolliert. Starte eine Einheit im Reiter <button class="linkbtn" data-goto="training">Training</button>.</p>`}</section>
+    <div class="grid2">
+      <section class="panel stack"><h3>Bestleistungen</h3>
+        ${Object.keys(prs).length?`<div class="tablewrap"><table><thead><tr><th>Übung</th><th>Bester Satz</th><th>1RM geschätzt</th></tr></thead><tbody>
+        ${Object.entries(prs).sort((a,b)=>b[1].e-a[1].e).map(([id,x])=>`<tr><td>${esc(EX[id].n)}</td><td class="mono">${fmt(x.w,1)} × ${x.r}</td><td class="mono">${fmt(x.e,1)} kg</td></tr>`).join("")}
+        </tbody></table></div><p class="small muted" style="margin:0">1RM geschätzt nach Epley aus Sätzen bis 12 Wiederholungen.</p>`:`<p class="small muted" style="margin:0">Erscheinen, sobald du Sätze mit Gewicht speicherst.</p>`}
+      </section>
+      <section class="panel stack"><h3>Abzeichen</h3>
+        <div class="row">${badgeList().map(b=>`<span class="badge${b.got?"":" off"}">${b.got?"✓ ":""}${esc(b.n)}</span>`).join("")}</div>
+      </section>
+    </div>
+    <section class="panel stack"><h3>Körpergewicht (kg)</h3>
+      <form class="row" id="bwform">
+        <label class="f" for="bwv">Gewicht<input id="bwv" type="number" step="0.1" min="30" max="300" value="${bw.length?bw[bw.length-1].v:p.weight}" style="width:120px"></label>
+        <label class="f" for="bwd">Datum<input id="bwd" type="date" value="${todayIso}"></label>
+        <button class="btn" type="submit" style="align-self:flex-end">Eintragen</button>
+        ${bwDelta!==null?`<span class="small muted" style="align-self:flex-end">${bwDelta>0?"+":""}${fmt(bwDelta,1)} kg seit ${bw[0].d}</span>`:""}
+      </form>
+      ${lineChart(bw.map(x=>({d:x.d,v:x.v})),"kg")}
+    </section>
+  </div>`;
+}
+
+/* ---------- Ernährung (Vorbild MyFitnessPal: Kalorien- und Proteinziel, Tagebuch) ---------- */
+const FOODS=[["Magerquark 250 g",168,30],["Skyr 150 g",95,16],["Hähnchenbrust 150 g",165,35],["Lachs 125 g",260,25],["2 Eier",155,13],["Haferflocken 60 g",225,8],["Reis gekocht 200 g",260,5],["Linsen gekocht 200 g",230,18],["Tofu 150 g",180,20],["Banane",105,1],["Whey-Shake 30 g",120,24],["Vollkornbrot 2 Scheiben",220,8]];
+function targets(p){
+  const bmr=10*p.weight+6.25*p.height-5*p.age+(p.sex==="w"?-161:5);
+  const d=p.weekdays.length, f=d<=2?1.375:d<=5?1.55:1.725;
+  const tdee=bmr*f, adj={fett:-400,hyper:250}[p.goal]||0;
+  const kcal=Math.round((tdee+adj)/10)*10, prot=Math.round(p.weight*(p.goal==="fett"?2.0:1.8));
+  const fat=Math.round(kcal*.27/9), carbs=Math.max(0,Math.round((kcal-prot*4-fat*9)/4));
+  return {bmr:Math.round(bmr),tdee:Math.round(tdee),adj,f,kcal,prot,fat,carbs};
+}
+function meter(label,val,goal,unit){
+  const pct=Math.min(100,Math.round(val/goal*100));
+  return `<div class="stack" style="gap:4px"><div class="row" style="justify-content:space-between"><b>${label}</b><span class="mono">${fmt(val)} / ${fmt(goal)} ${unit}</span></div>
+    <div class="progress"><span style="width:${pct}%"></span></div><div class="small muted">${goal-val>=0?`Noch ${fmt(goal-val)} ${unit}`:`${fmt(val-goal)} ${unit} über dem Ziel`}</div></div>`;
+}
+function viewErnaehrung(){
+  const p=state.profile, T=targets(p), day=ui.foodDay, list=state.food[day]||[], dd=parseIso(day);
+  const kcal=list.reduce((a,x)=>a+x.k,0), prot=list.reduce((a,x)=>a+x.p,0);
+  return `<div class="stack">
+    <div class="grid2">
+      <section class="panel stack">
+        <div class="cal-head"><button class="btn ghost" data-fday="-1" aria-label="Voriger Tag">‹</button><h2>${day===todayIso?"Heute":`${WD[isoWd(dd)]}, ${dd.getDate()}.${dd.getMonth()+1}.`}</h2><button class="btn ghost" data-fday="1" aria-label="Nächster Tag">›</button></div>
+        ${meter("Kalorien",kcal,T.kcal,"kcal")}
+        ${meter("Protein",prot,T.prot,"g")}
+        ${list.length?`<ul class="exlist">${list.map((x,i)=>`<li><span>${esc(x.n)}</span><span class="presc">${x.k} kcal · ${x.p} g <button class="linkbtn" data-fdel="${i}" aria-label="${esc(x.n)} entfernen">✕</button></span></li>`).join("")}</ul>`:`<p class="small muted" style="margin:0">Noch nichts eingetragen. Tippe unten auf ein Lebensmittel oder trage eigene Werte ein.</p>`}
+      </section>
+      <section class="panel stack">
+        <h3>Dein Tagesziel</h3>
+        <div class="tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))">${tile("Kalorien",fmt(T.kcal))}${tile("Protein",T.prot+" g")}${tile("Fett",T.fat+" g")}${tile("Kohlenhydrate",T.carbs+" g")}</div>
+        <p class="small muted" style="margin:0">Grundumsatz ${fmt(T.bmr)} kcal (Mifflin-St Jeor) × Aktivität ${fmt(T.f,3)} = ${fmt(T.tdee)} kcal${T.adj?`, ${T.adj>0?"+":"−"}${Math.abs(T.adj)} kcal für dein Ziel ${esc(GOALS[p.goal].n)}`:""}. Alles Schätzwerte: Wenn sich dein Gewicht über 2–3 Wochen anders entwickelt als geplant, passe die Kalorien um 100–200 kcal an.</p>
+        <p class="sources" style="margin:0"><a href="https://doi.org/10.1093/ajcn/51.2.241" target="_blank" rel="noopener">Mifflin et al., 1990</a></p>
+      </section>
+    </div>
+    <section class="panel stack">
+      <h3>Schnell eintragen</h3>
+      <div class="row">${FOODS.map((f,i)=>`<button class="chip" data-food="${i}">${esc(f[0])} <span class="muted mono">${f[1]}</span></button>`).join("")}</div>
+      <form class="row" id="foodform">
+        <label class="f" for="fn" style="flex:1 1 180px">Lebensmittel<input id="fn" type="text" maxlength="60" placeholder="z. B. Pasta Bolognese"></label>
+        <label class="f" for="fk">kcal<input id="fk" type="number" min="0" max="5000" style="width:100px"></label>
+        <label class="f" for="fp">Protein (g)<input id="fp" type="number" min="0" max="400" style="width:100px"></label>
+        <button class="btn" type="submit" style="align-self:flex-end">Hinzufügen</button>
+      </form>
+      <p class="small muted" style="margin:0">Nährwerte der Schnellauswahl sind gerundete Durchschnittswerte. Ein Barcode-Scanner wie bei MyFitnessPal braucht die Kamera und kommt mit der nativen App.</p>
+    </section>
+  </div>`;
+}
+
+const VIEWS={kalender:viewKalender,training:viewTraining,fortschritt:viewFortschritt,ernaehrung:viewErnaehrung,plan:viewPlan,uebungen:viewUebungen,supps:viewSupps,wear:viewWear,profil:viewProfil};
+function render(){
+  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===ui.tab?"true":"false"));
+  const v=document.getElementById("view");
+  v.innerHTML=VIEWS[ui.tab]();
+  if(ui.tab==="training"&&ui.run&&ui.run.restUntil){tick(); if(!timerInt) timerInt=setInterval(tick,250)}
+  if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el) el.scrollIntoView({block:"start"}); ui.openEx=null;}
+}
+function go(tab){ui.tab=tab; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
+
+/* ---------- Ereignisse ---------- */
+document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
+document.getElementById("view").addEventListener("click",e=>{
+  if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health]"); if(!t) return;
+  if(t.dataset.health){if(NATIVE) NATIVE.requestHealth(); t.textContent="Wird geladen …"; return}
+  if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
+  if(t.dataset.prodadd){const pr=prodById(t.dataset.prodadd); if(!state.myProducts.includes(pr.id)) state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}
+  if(t.dataset.prodrm){state.myProducts=state.myProducts.filter(x=>x!==t.dataset.prodrm); save(); render(); return}
+  if(t.dataset.prodfood){const pr=prodById(t.dataset.prodfood); (state.food[todayIso]||(state.food[todayIso]=[])).push({n:`${pr.brand} ${pr.name}`.slice(0,60),k:pr.kcal||Math.round(pr.amount*4.6),p:Math.round(pr.amount)}); save(); t.textContent="Eingetragen ✓"; return}
+  if(t.dataset.applyrec){const {R}=recs(); const emp=R.filter(r=>r.level==="emp").map(r=>r.id); for(const id of emp) if(!state.mySupps.includes(id)) state.mySupps.push(id); save(); render(); const m=document.getElementById("recmsg"); if(m) m.textContent=emp.length?`${emp.length} übernommen.`:"Keine Empfehlung zum Übernehmen."; return}
+  if(t.dataset.fav){const id=t.dataset.fav; state.fav=state.fav||[]; const i=state.fav.indexOf(id); if(i<0){state.fav.push(id); state.block=(state.block||[]).filter(x=>x!==id)} else state.fav.splice(i,1); save(); render(); return}
+  if(t.dataset.block||t.dataset.blockrun){const id=t.dataset.block||t.dataset.blockrun; state.block=state.block||[]; const i=state.block.indexOf(id); if(i<0){state.block.push(id); state.fav=(state.fav||[]).filter(x=>x!==id)} else state.block.splice(i,1); save(); render(); return}
+  if(t.dataset.editplan){ui.editPlan=!ui.editPlan; render(); return}
+  if(t.dataset.pe){planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i)); return}
+  if(t.dataset.start){ui.summary=null; ui.run={date:t.dataset.start,i:0,logs:{},restUntil:null,t0:Date.now()}; ui.sel=t.dataset.start; go("training"); return}
+  if(t.dataset.rest){if(t.dataset.rest==="skip"){ui.run.restUntil=null; render()} else {ui.run.restUntil+=30000} return}
+  if(t.dataset.logset||t.dataset.repeat){const it=sessionFor(ui.run.date).items[ui.run.i]; const logs=ui.run.logs[it.id]||(ui.run.logs[it.id]=[]);
+    if(t.dataset.repeat){const src=repeatSource(it,ui.run.date,logs); logs.push(src.l!=null?{w:src.w,r:src.r,l:src.l,rr:src.rr}:{w:src.w,r:src.r})}
+    else{const v=id=>{const el=document.getElementById(id); return el?Number(el.value)||0:0}; const w=v("setw");
+      if(UNI.has(it.id)){const l=v("setl"),rr=v("setrr"); logs.push({w,r:Math.min(l,rr),l,rr})} else logs.push({w,r:v("setr")})} if(!advance()) startRest(restSec(it.rest)); render(); return}
+  if(t.dataset.cardio){const it=sessionFor(ui.run.date).items[ui.run.i]; (ui.run.logs[it.id]||(ui.run.logs[it.id]=[])).push({w:0,r:0,min:Number(document.getElementById("cardmin").value)||0}); advance(); render(); return}
+  if(t.dataset.skipex){ui.run.restUntil=null; ui.run.i++; if(ui.run.i>=sessionFor(ui.run.date).items.length) finishRun(); render(); return}
+  if(t.dataset.finish){finishRun(); render(); return}
+  if(t.dataset.closesum){ui.summary=null; render(); return}
+  if(t.dataset.fday){const d=parseIso(ui.foodDay); d.setDate(d.getDate()+Number(t.dataset.fday)); ui.foodDay=iso(d); render(); return}
+  if(t.dataset.fdel){(state.food[ui.foodDay]||[]).splice(Number(t.dataset.fdel),1); save(); render(); return}
+  if(t.dataset.food){const f=FOODS[Number(t.dataset.food)]; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:f[0],k:f[1],p:f[2]}); save(); render(); return}
+  if(t.dataset.day){ui.sel=t.dataset.day; render()}
+  else if(t.dataset.mon){ui.month=new Date(ui.month.getFullYear(),ui.month.getMonth()+Number(t.dataset.mon),1); render()}
+  else if(t.dataset.done){const r=document.getElementById("rpe"); state.done[t.dataset.done]={rpe:r?Number(r.value):null,at:new Date().toISOString()}; save(); render()}
+  else if(t.dataset.undone){delete state.done[t.dataset.undone]; save(); render()}
+  else if(t.dataset.ex){ui.openEx=t.dataset.ex; ui.exFilter=""; ui.exEquip="all"; go("uebungen"); const el=document.getElementById("ex-"+t.dataset.ex); if(el) el.scrollIntoView({block:"start"})}
+  else if(t.dataset.goto){go(t.dataset.goto)}
+  else if(t.id==="btconnect"){connectBt()}
+});
+document.getElementById("view").addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.supp){const arr=state.supps[ui.sel]||(state.supps[ui.sel]=[]); const i=arr.indexOf(t.dataset.supp); if(t.checked&&i<0) arr.push(t.dataset.supp); if(!t.checked&&i>=0) arr.splice(i,1); save()}
+  else if(t.dataset.mysupp){const i=state.mySupps.indexOf(t.dataset.mysupp); if(t.checked&&i<0) state.mySupps.push(t.dataset.mysupp); if(!t.checked&&i>=0) state.mySupps.splice(i,1); save()}
+  else if(t.dataset.pe&&t.tagName==="SELECT"){if(t.value) planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i),t.value)}
+  else if(t.id==="planSplit"){state.profile.split=t.value; save(); render()}
+  else if(t.dataset.sq){state.sq=Object.assign({},SQ_DEF,state.sq||{}); state.sq[t.dataset.sq]=t.dataset.sq==="coffee"?Number(t.value):t.value; save(); render()}
+  else if(t.id==="exmus"){ui.exMus=t.value; render()}
+  else if(t.id==="exmark"){ui.exMark=t.value; render()}
+  else if(t.id==="exeq"){ui.exEquip=t.value; render()}
+  else if(t.id==="actfile"&&t.files[0]){importActivity(t.files[0])}
+});
+document.getElementById("view").addEventListener("input",e=>{
+  if(e.target.id==="setw"&&ui.run){const it=sessionFor(ui.run.date).items[ui.run.i], w=Number(e.target.value); const pl=document.getElementById("plates"), wa=document.getElementById("warm");
+    if(pl) pl.innerHTML=platesHtml(w); if(wa) wa.innerHTML=warmHtml(w,it.id); return}
+  if(e.target.id==="prodq"){ui.prodQ=e.target.value; ui.prodBrand=""; const pos=e.target.selectionStart; render(); const q=document.getElementById("prodq"); q.focus(); q.setSelectionRange(pos,pos); return}
+  if(e.target.id==="exq"){ui.exFilter=e.target.value; const pos=e.target.selectionStart; render(); const q=document.getElementById("exq"); q.focus(); q.setSelectionRange(pos,pos)}
+});
+document.getElementById("view").addEventListener("submit",e=>{
+  if(e.target.id==="prodform"){e.preventDefault(); const g=id=>document.getElementById(id).value.trim(); const a=Number(g("cpa"));
+    if(!g("cpb")||!g("cpn")||!(a>0)) return;
+    const pr={id:"c"+Date.now().toString(36),brand:g("cpb").slice(0,40),name:g("cpn").slice(0,60),cat:g("cpc"),serving:g("cps").slice(0,40),amount:a,unit:g("cpu")};
+    state.customProducts.push(pr); state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}
+  if(e.target.id==="bwform"){e.preventDefault(); const v=Number(document.getElementById("bwv").value), d=document.getElementById("bwd").value||todayIso;
+    if(v>=30&&v<=300){state.bw=state.bw.filter(x=>x.d!==d); state.bw.push({d,v}); state.profile.weight=v; save(); render()} return}
+  if(e.target.id==="foodform"){e.preventDefault(); const n=document.getElementById("fn").value.trim()||"Eintrag", k=Math.max(0,Math.round(Number(document.getElementById("fk").value)||0)), p=Math.max(0,Math.round(Number(document.getElementById("fp").value)||0));
+    if(!k&&!p) return; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:n.slice(0,60),k,p}); save(); render(); return}
+  if(e.target.id!=="pform") return; e.preventDefault();
+  const g=id=>document.getElementById(id).value;
+  const wds=[0,1,2,3,4,5,6].filter(i=>document.getElementById("wd"+i).checked);
+  const msg=document.getElementById("pmsg");
+  if(!wds.length){msg.textContent="Wähle mindestens einen Trainingstag."; return}
+  const num=(v,lo,hi,d)=>{const n=Number(v); return isFinite(n)&&n>=lo&&n<=hi?n:d};
+  state.profile={goal:g("goal"),level:g("level"),equip:g("equip"),len:Number(g("len")),
+    bar:Number(g("bar"))||20,weight:num(g("weight"),35,250,75),height:num(g("height"),120,230,178),sex:g("sex"),age:num(g("age"),14,100,30),restHr:num(g("restHr"),30,110,60),
+    start:g("start")||iso(mondayOf(TODAY)),weekdays:wds,example:false,split:state.profile.split||"auto",spKraft:g("spKraft").trim().slice(0,300),spCardio:g("spCardio").trim().slice(0,300)};
+  save(); ui.sel=todayIso; go("plan");
+});
+
+/* ---------- Bluetooth-Herzfrequenz ---------- */
+async function connectBt(){
+  const st=document.getElementById("btstatus");
+  if(!navigator.bluetooth){btStatus="Bluetooth ist hier nicht verfügbar. Öffne die App eigenständig in Chrome oder Edge."; st.textContent=btStatus; return}
+  try{
+    st.textContent="Suche Sensor …";
+    const dev=await navigator.bluetooth.requestDevice({filters:[{services:["heart_rate"]}]});
+    const srv=await dev.gatt.connect();
+    const ch=await (await srv.getPrimaryService("heart_rate")).getCharacteristic("heart_rate_measurement");
+    await ch.startNotifications();
+    btStatus=`Verbunden mit ${dev.name||"Sensor"}`; st.textContent=btStatus;
+    ch.addEventListener("characteristicvaluechanged",ev=>{
+      const v=ev.target.value, flags=v.getUint8(0);
+      liveHr=(flags&1)?v.getUint16(1,true):v.getUint8(1);
+      const b=document.getElementById("bpm"), z=document.getElementById("bpmzone");
+      if(b) b.textContent=liveHr; if(z) z.textContent=zoneOf(liveHr,hrZones(state.profile));
+    });
+    dev.addEventListener("gattserverdisconnected",()=>{btStatus="Verbindung getrennt"; liveHr=null; if(ui.tab==="wear") render()});
+  }catch(err){btStatus=err&&err.name==="NotFoundError"?"Kein Sensor ausgewählt.":"Verbindung nicht möglich: "+(err&&err.message||err)+". In dieser Ansicht blockiert der Browser Bluetooth möglicherweise."; st.textContent=btStatus}
+}
+
+/* ---------- TCX/GPX-Import ---------- */
+function importActivity(file){
+  const msg=document.getElementById("actmsg");
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const doc=new DOMParser().parseFromString(rd.result,"application/xml");
+      if(doc.getElementsByTagName("parsererror").length) throw new Error("Die Datei ist kein gültiges XML.");
+      const isTcx=/\.tcx$/i.test(file.name)||doc.getElementsByTagNameNS("*","Trackpoint").length>0;
+      let pts=[];
+      if(isTcx){
+        for(const tp of doc.getElementsByTagNameNS("*","Trackpoint")){
+          const t=tp.getElementsByTagNameNS("*","Time")[0]; const hb=tp.getElementsByTagNameNS("*","HeartRateBpm")[0];
+          const hr=hb?Number(hb.getElementsByTagNameNS("*","Value")[0]?.textContent):null;
+          if(t) pts.push({t:Date.parse(t.textContent),hr});
+        }
+      }else{
+        for(const tp of doc.getElementsByTagNameNS("*","trkpt")){
+          const t=tp.getElementsByTagNameNS("*","time")[0]; const hr=tp.getElementsByTagNameNS("*","hr")[0];
+          if(t) pts.push({t:Date.parse(t.textContent),hr:hr?Number(hr.textContent):null});
+        }
+      }
+      pts=pts.filter(p=>isFinite(p.t));
+      if(pts.length<2) throw new Error("Keine Zeitpunkte in der Datei gefunden.");
+      const dur=Math.round((pts[pts.length-1].t-pts[0].t)/60000);
+      const hrs=pts.map(p=>p.hr).filter(h=>h>30&&h<240);
+      const Z=hrZones(state.profile);
+      let zones=null, avg=null, max=null;
+      if(hrs.length){
+        avg=Math.round(hrs.reduce((a,b)=>a+b,0)/hrs.length); max=Math.max(...hrs);
+        const c=[0,0,0,0,0]; hrs.forEach(h=>{let i=Z.z.findIndex(z=>h<=z.hi); if(i<0) i=4; c[i]++});
+        zones=c.map(n=>Math.round(n/hrs.length*100));
+      }
+      const date=iso(new Date(pts[0].t));
+      state.acts.push({date,dur,avg,max,zones,src:file.name.slice(0,60)});
+      save(); render();
+      document.getElementById("actmsg").textContent=`Importiert: ${date}, ${dur} min${avg?`, Ø ${avg} bpm`:" (ohne Puls)"}.`;
+    }catch(err){msg.textContent="Import fehlgeschlagen: "+err.message}
+  };
+  rd.onerror=()=>{msg.textContent="Die Datei konnte nicht gelesen werden."};
+  rd.readAsText(file);
+}
+
+render();
+pushWatch();
+</script>
+
+</body></html>
