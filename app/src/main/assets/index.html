@@ -1304,7 +1304,9 @@ window.onBarcode=function(x){
   if(!x||typeof x!=="object"){ui.scan=null; render(); return}
   if(x.cancelled){ui.scan=null; render(); return}
   const ean=String(x.ean||"").replace(/\D/g,"").slice(0,14);
-  if(x.error){ui.scan={ean,error:String(x.error)}; render(); return}
+  const known=ean&&state.scans&&state.scans[ean];
+  if(known&&(known.own||x.error)){ui.scan=Object.assign({},known); if(ui.tab!=="ernaehrung") ui.tab="ernaehrung"; render(); return}
+  if(x.error){ui.scan={ean,error:String(x.error)}; if(ui.tab!=="ernaehrung") ui.tab="ernaehrung"; render(); return}
   const num=v=>{const n=Number(v); return isFinite(n)&&n>=0?n:null};
   const p={ean,name:String(x.name||"").slice(0,80),brand:String(x.brand||"").slice(0,60),kcal:num(x.kcal),prot:num(x.prot),carb:num(x.carb),fat:num(x.fat),serving:num(x.serving),qty:String(x.qty||"").slice(0,30)};
   state.scans=state.scans||{}; state.scans[ean]=p; save();
@@ -1313,7 +1315,17 @@ window.onBarcode=function(x){
 function scanHtml(){
   const s=ui.scan; if(!s) return "";
   if(s.loading) return `<p class="small muted" style="margin:0">Kamera wird geöffnet …</p>`;
-  if(s.error) return `<p style="margin:0">${esc(s.error)}${s.ean?` <span class="mono muted">${esc(s.ean)}</span>`:""}</p>`;
+  if(s.error) return `<div class="stack" style="gap:8px">
+    <p style="margin:0">${esc(s.error)}${s.ean?` <span class="mono muted">${esc(s.ean)}</span>`:""}</p>
+    ${s.ean?`<p class="small muted" style="margin:0">Trag die Werte von der Packung ein. Die App merkt sich das Produkt und erkennt es beim nächsten Scan.</p>
+    <form class="row" id="ownform">
+      <label class="f" for="on" style="flex:1 1 180px">Produkt<input id="on" type="text" maxlength="60" required placeholder="z. B. Coop Magerquark"></label>
+      <label class="f" for="ok">kcal pro 100 g<input id="ok" type="number" min="0" max="900" step="any" required style="width:100px"></label>
+      <label class="f" for="op">Protein pro 100 g<input id="op" type="number" min="0" max="100" step="any" required style="width:100px"></label>
+      <label class="f" for="og">Menge (g)<input id="og" type="number" min="1" max="3000" value="100" style="width:100px"></label>
+      <button class="btn" type="submit" style="align-self:flex-end">Merken und eintragen</button>
+    </form>`:""}
+  </div>`;
   const g=s.serving||100, k=s.kcal!=null?Math.round(s.kcal*g/100):null, pr=s.prot!=null?Math.round(s.prot*g/100):null, sp=scanSupp(s);
   return `<div class="stack" style="gap:8px">
     <div><b>${esc(s.name||"Unbekanntes Produkt")}</b>${s.brand?` <span class="muted">· ${esc(s.brand)}</span>`:""}${s.qty?` <span class="muted mono">${esc(s.qty)}</span>`:""}</div>
@@ -1325,7 +1337,7 @@ function scanHtml(){
       <span class="small muted" id="scanprev" style="align-self:flex-end">${k!=null?k+" kcal":""}${pr!=null?" · "+pr+" g Protein":""}</span>
     </form>`}
     ${sp?`<p class="small" style="margin:0">Das ist ein Supplement aus deinem Katalog: <b>${esc(sp.brand)} ${esc(sp.name)}</b>. ${state.myProducts.includes(sp.id)?"Es ist schon bei deinen Produkten.":`<button class="linkbtn" data-prodadd="${esc(sp.id)}">Zu meinen Produkten</button>`}</p>`:""}
-    <p class="sources" style="margin:0">Nährwerte von <a href="https://world.openfoodfacts.org/product/${esc(s.ean)}" target="_blank" rel="noopener">Open Food Facts</a>, bitte mit der Packung abgleichen.</p>
+    ${s.own?`<p class="small muted" style="margin:0">Von dir gespeichert. <button class="linkbtn" data-scanforget="${esc(s.ean)}">Vergessen</button></p>`:`<p class="sources" style="margin:0">Nährwerte von <a href="https://world.openfoodfacts.org/product/${esc(s.ean)}" target="_blank" rel="noopener">Open Food Facts</a>, bitte mit der Packung abgleichen.</p>`}
   </div>`;
 }
 const VIEWS={kalender:viewKalender,training:viewTraining,fortschritt:viewFortschritt,ernaehrung:viewErnaehrung,plan:viewPlan,uebungen:viewUebungen,supps:viewSupps,wear:viewWear,profil:viewProfil};
@@ -1342,7 +1354,8 @@ function go(tab){ui.tab=tab; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget]"); if(!t) return;
+  if(t.dataset.scanforget){if(state.scans) delete state.scans[t.dataset.scanforget]; ui.scan=null; save(); render(); return}
   if(t.dataset.scan){ui.scan={loading:true}; render(); NATIVE.scanBarcode(); return}
   if(t.dataset.health){if(NATIVE) NATIVE.requestHealth(); t.textContent="Wird geladen …"; return}
   if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
@@ -1401,6 +1414,11 @@ document.getElementById("view").addEventListener("submit",e=>{
     state.customProducts.push(pr); state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}
   if(e.target.id==="bwform"){e.preventDefault(); const v=Number(document.getElementById("bwv").value), d=document.getElementById("bwd").value||todayIso;
     if(v>=30&&v<=300){state.bw=state.bw.filter(x=>x.d!==d); state.bw.push({d,v}); state.profile.weight=v; save(); render()} return}
+  if(e.target.id==="ownform"){e.preventDefault(); const s=ui.scan, v=id=>Math.max(0,Number(document.getElementById(id).value)||0), g=Math.max(1,v("og")||100);
+    const p={ean:s.ean,name:document.getElementById("on").value.trim().slice(0,60)||"Eigenes Produkt",brand:"",kcal:v("ok"),prot:v("op"),carb:null,fat:null,serving:g,qty:"",own:true};
+    state.scans=state.scans||{}; state.scans[s.ean]=p;
+    (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${p.name}, ${g} g`.slice(0,60),k:Math.round(p.kcal*g/100),p:Math.round(p.prot*g/100)});
+    ui.scan=null; save(); render(); return}
   if(e.target.id==="scanform"){e.preventDefault(); const s=ui.scan, g=Math.max(1,Number(document.getElementById("sg").value)||100); (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${s.name||"Gescannt"}${s.brand?" ("+s.brand+")":""}, ${g} g`.slice(0,60),k:Math.round((s.kcal||0)*g/100),p:Math.round((s.prot||0)*g/100)}); ui.scan=null; save(); render(); return}
   if(e.target.id==="foodform"){e.preventDefault(); const n=document.getElementById("fn").value.trim()||"Eintrag", k=Math.max(0,Math.round(Number(document.getElementById("fk").value)||0)), p=Math.max(0,Math.round(Number(document.getElementById("fp").value)||0));
     if(!k&&!p) return; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:n.slice(0,60),k,p}); save(); render(); return}
