@@ -626,10 +626,11 @@ const isoWd=d=>(d.getDay()+6)%7; // 0=Mo
 function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-isoWd(x));return x}
 const TODAY=new Date(); const todayIso=iso(TODAY);
 
-function defaults(){return{
+function defaults(){return{remind:REMIND_DEF(),
   profile:{goal:"hyper",level:"anf",weekdays:[0,2,4],len:60,equip:"gym",split:"auto",bar:20,weight:75,height:178,sex:"m",age:30,restHr:60,start:iso(mondayOf(TODAY)),example:true},
   done:{},supps:{},mySupps:["kreatin","protein"],acts:[],bw:[],food:{},custom:{},myProducts:[],customProducts:[],fav:[],block:[],notes:{},customEx:{}}}
-function normalize(x){const d=defaults(); const o=Object.assign(d,x); o.profile=Object.assign(defaults().profile,x.profile||{}); return o}
+function normalize(x){const d=defaults(); const o=Object.assign(d,x); o.profile=Object.assign(defaults().profile,x.profile||{}); o.remind=Object.assign(REMIND_DEF(),x.remind||{}); return o}
+function REMIND_DEF(){return {train:{on:false,t:"08:00"},supp:{on:false,t:"20:00"}}}
 let state=defaults();
 const LS_KEY="trainingskompass.v1";
 try{const raw=localStorage.getItem(LS_KEY); if(raw) state=normalize(JSON.parse(raw));}catch(e){}
@@ -639,7 +640,7 @@ try{const t=localStorage.getItem(LS_KEY+".tab"); if(t) ui.tab=t;}catch(e){}
 let dbRef=null, saveTimer=null;
 function save(){
   try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}
-  pushWatch();
+  pushWatch(); pushHome();
   if(!dbRef) return;
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async()=>{
@@ -662,6 +663,26 @@ function watchPayload(){
   return {v:1,maxHr:Math.round(208-0.7*p.age),restHr:p.restHr,sessions:out};
 }
 let lastWatch="";
+/* Widget und Erinnerungen der Android-App: die nächsten 14 Tage, fällige Supplements und Uhrzeiten */
+function homePayload(){
+  const days=[], supps={}, R=state.remind||REMIND_DEF();
+  for(let i=0;i<14;i++){
+    const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)), s=sessionFor(k), dn=state.done[k];
+    if(s||dn) days.push({date:k,name:s?s.name:"Training",n:s?s.items.length:Object.keys(dn.sets||{}).length,done:!!dn});
+    const due=state.mySupps.filter(id=>suppDue(id,k)&&!(state.supps[k]||[]).includes(id)).map(id=>{const sp=SUPPS.find(x=>x.id===id); return sp?sp.n.replace(/\s*\(.*?\)/g,""):""}).filter(Boolean);
+    if(due.length) supps[k]=due;
+  }
+  return {v:1,days,supps,remind:R};
+}
+let lastHome="";
+function pushHome(){if(!NATIVE||!NATIVE.setHome) return; try{const j=JSON.stringify(homePayload()); if(j===lastHome) return; lastHome=j; NATIVE.setHome(j)}catch(e){}}
+window.onNativeStart=function(d){
+  if(!/^\d{4}-\d\d-\d\d$/.test(d)) return;
+  if(ui.run&&ui.run.date===d){go("training"); return}
+  if(!ui.run&&sessionFor(d)&&!state.done[d]){startRun(d); return}
+  ui.sel=d; go("kalender");
+};
+window.onNotifyPermission=function(ok){ui.remMsg=ok?"":"Ohne Erlaubnis für Benachrichtigungen kann dich die App nicht erinnern. Du kannst sie in den Android-Einstellungen bei 4peak erlauben."; if(ui.tab==="profil") render()};
 function pushWatch(){if(!NATIVE) return; try{const j=JSON.stringify(watchPayload()); if(j===lastWatch) return; lastWatch=j; NATIVE.sendToWatch(j)}catch(e){}}
 window.onWatchSessions=function(arr){
   let n=0;
@@ -1097,7 +1118,19 @@ function viewProfil(){
     </fieldset>
     <div class="row"><button class="btn" type="submit">Plan neu berechnen</button><span id="pmsg" class="small muted"></span></div>
   </form>
+  ${remindHtml()}
   ${backupHtml()}`;
+}
+function startRun(d){ui.summary=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
+function remindHtml(){
+  if(!(NATIVE&&NATIVE.setHome)) return "";
+  const R=state.remind, row=(k,label)=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><label class="checkline" style="margin:0;min-width:0"><input type="checkbox" data-remind="${k}" ${R[k].on?"checked":""}> ${label}</label><input type="time" data-remindt="${k}" value="${esc(R[k].t)}" style="width:auto;flex:none" ${R[k].on?"":"disabled"}></div>`;
+  return `<section class="panel stack" id="remind" style="margin-top:14px"><h2>Erinnerungen</h2>
+    ${row("train","An Trainingstagen")}
+    ${row("supp","Supplements")}
+    ${ui.remMsg?`<p class="small" style="margin:0">${esc(ui.remMsg)}</p>`:""}
+    <p class="small muted" style="margin:0">Die App erinnert dich nur, wenn heute ein Training geplant und noch nicht erledigt ist oder ein Supplement noch nicht abgehakt ist. Das Widget mit deinem heutigen Training findest du so: Startbildschirm lange gedrückt halten, Widgets, 4peak.</p>
+  </section>`;
 }
 function backupHtml(){
   const lb=state.lastBackup, R=ui.restore, web=!(NATIVE&&NATIVE.openBackup);
@@ -1936,7 +1969,7 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.block||t.dataset.blockrun){const id=t.dataset.block||t.dataset.blockrun; state.block=state.block||[]; const i=state.block.indexOf(id); if(i<0){state.block.push(id); state.fav=(state.fav||[]).filter(x=>x!==id)} else state.block.splice(i,1); save(); render(); return}
   if(t.dataset.editplan){ui.editPlan=!ui.editPlan; render(); return}
   if(t.dataset.pe){planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i)); return}
-  if(t.dataset.start){ui.summary=null; ui.run={date:t.dataset.start,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false},restUntil:null,t0:Date.now()}; ui.sel=t.dataset.start; go("training"); return}
+  if(t.dataset.start){startRun(t.dataset.start); return}
   if(t.dataset.rest){if(t.dataset.rest==="skip"){ui.run.restUntil=null; keepScroll(render)} else {ui.run.restUntil+=30000; tick()} return}
   if(t.dataset.media){if(NATIVE&&NATIVE.media) NATIVE.media(t.dataset.media); return}
   if(t.dataset.editdone){const d=t.dataset.editdone; if(ui.run&&!ui.run.edit) return; ui.summary=null; ui.delDone=null; ui.run={date:d,edit:true,logs:{},rows:{},warm:{acc:0,start:null,done:true},restUntil:null,t0:Date.now()}; go("training"); return}
@@ -1984,6 +2017,8 @@ document.getElementById("view").addEventListener("change",e=>{
     // Supplements mit Kalorien (Protein, EAA) automatisch ins Ernährungstagebuch, beim Abwählen wieder entfernen
     const e=suppEnergy(sid), F=state.food[ui.sel]||(state.food[ui.sel]=[]), j=F.findIndex(x=>x.supp===sid);
     if(e&&t.checked&&j<0) F.push({n:e.n,k:e.k,p:e.p,supp:sid}); if(!t.checked&&j>=0) F.splice(j,1); save()}
+  else if(t.dataset.remind){const k=t.dataset.remind; state.remind[k].on=t.checked; ui.remMsg=""; if(t.checked&&NATIVE&&NATIVE.askNotify) NATIVE.askNotify(); save(); render()}
+  else if(t.dataset.remindt){const k=t.dataset.remindt; if(/^\d\d:\d\d$/.test(t.value)){state.remind[k].t=t.value; save()}}
   else if(t.dataset.mysupp){const i=state.mySupps.indexOf(t.dataset.mysupp); if(t.checked&&i<0) state.mySupps.push(t.dataset.mysupp); if(!t.checked&&i>=0) state.mySupps.splice(i,1); save()}
   else if(t.dataset.pe&&t.tagName==="SELECT"){if(t.value) planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i),t.value)}
   else if(t.id==="planSplit"){state.profile.split=t.value; save(); render()}
@@ -2189,6 +2224,7 @@ applyTheme();
 applyCustomEx();
 render();
 pushWatch();
+pushHome();
 </script>
 
 </body></html>

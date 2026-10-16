@@ -66,6 +66,26 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             else web.evaluateJavascript("window.onNativeHrStatus && window.onNativeHrStatus(${JSONObject.quote("Ohne Bluetooth-Freigabe kann die App den Gurt nicht finden.")},false)", null)
         }
 
+    private val notifyPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+            web.evaluateJavascript("window.onNotifyPermission && window.onNotifyPermission($ok)", null)
+        }
+
+    /** Datum aus Widget oder Erinnerung: Die Seite startet dann das Training dieses Tages. */
+    private var pendingStart: String? = null
+
+    private fun deliverStart() {
+        val d = pendingStart ?: return
+        if (!pageReady) return
+        pendingStart = null
+        web.evaluateJavascript("window.onNativeStart && window.onNativeStart(${JSONObject.quote(d)})", null)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(Reminders.EXTRA_START)?.let { pendingStart = it; deliverStart() }
+    }
+
     private val healthPermissions =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
             lifecycleScope.launch { deliverHealth() }
@@ -96,6 +116,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) pendingStart = intent.getStringExtra(Reminders.EXTRA_START)
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -116,6 +137,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 override fun onPageFinished(view: WebView, url: String) {
                     pageReady = true
                     pullWatchLogs()
+                    deliverStart()
                 }
             }
         }
@@ -251,6 +273,26 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     isAppearanceLightStatusBars = !dark
                     isAppearanceLightNavigationBars = !dark
                 }
+            }
+        }
+
+        /** Heutiges Training und Erinnerungen für Widget und Benachrichtigungen. */
+        @JavascriptInterface
+        fun setHome(json: String) {
+            val ctx = applicationContext
+            HomeStore.save(ctx, json)
+            TodayWidget.updateAll(ctx)
+            Reminders.reschedule(ctx)
+        }
+
+        /** Fragt ab Android 13 nach der Erlaubnis für Benachrichtigungen. */
+        @JavascriptInterface
+        fun askNotify() {
+            runOnUiThread {
+                if (Build.VERSION.SDK_INT < 33 ||
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                ) web.evaluateJavascript("window.onNotifyPermission && window.onNotifyPermission(true)", null)
+                else notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
