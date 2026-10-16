@@ -12,7 +12,7 @@ Jeder Push auf `main` baut beide Apps automatisch (Reiter **Actions** → letzte
 1. **Handy:** `trainingskompass-handy.apk` auf das Handy laden und öffnen. Android fragt einmal, ob du Apps aus dieser Quelle erlauben willst.
 2. **Uhr:** `trainingskompass-uhr.apk` muss vom Handy auf die Uhr übertragen werden, zum Beispiel mit der App „Wear Installer 2“ aus dem Play Store. Dafür auf der Uhr unter *Einstellungen → Entwickleroptionen* das *ADB-Debugging* und das *Debugging über WLAN* einschalten.
 
-Beide Apps müssen aus demselben Build-Lauf stammen, weil sie dieselbe Signatur brauchen, um miteinander zu reden.
+Alle Builds sind mit demselben Schlüssel (`keystore/debug.keystore`) signiert. Neue Versionen installieren sich deshalb über die alten, und Handy- und Uhr-App erkennen sich gegenseitig.
 
 ## Aufbau
 
