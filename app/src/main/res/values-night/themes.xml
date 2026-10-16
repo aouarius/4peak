@@ -1,0 +1,6 @@
+<resources>
+    <!-- Dunkles App-Theme, damit die WebView prefers-color-scheme: dark meldet -->
+    <style name="Theme.Trainingskompass" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+</resources>

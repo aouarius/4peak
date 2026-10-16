@@ -2,6 +2,7 @@ package ch.trainingskompass
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -10,6 +11,7 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
@@ -175,6 +177,20 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 dataMap.putLong("t", System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()
             dataClient.putDataItem(request)
+        }
+
+        /** Die Seite meldet ihr Design, damit Statusleiste und Ränder dazu passen. */
+        @JavascriptInterface
+        fun setTheme(background: String, dark: Boolean) {
+            val color = runCatching { Color.parseColor(background) }.getOrNull() ?: return
+            runOnUiThread {
+                window.decorView.setBackgroundColor(color)
+                web.setBackgroundColor(color)
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
         }
 
         @JavascriptInterface
