@@ -850,7 +850,7 @@ function viewKalender(){
       </div>`:""}
       ${acts.map(a=>`<div class="small"><b>Wearable-Aktivität:</b> ${a.dur} min, Ø ${a.avg||"–"} bpm, max ${a.max||"–"} bpm <span class="muted">(${esc(a.src)})</span></div>`).join("")}
       ${state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
-        ${state.mySupps.filter(id=>suppDue(id,sel)).map(id=>{const sp=SUPPS.find(x=>x.id===id); if(!sp) return ""; return `<label class="checkline"><input type="checkbox" data-supp="${id}" ${supsToday.includes(id)?"checked":""}> ${esc(sp.n)} <span class="muted small">${esc(suppLineProducts(id)||sp.dose(p))}</span></label>`}).join("")}
+        ${state.mySupps.filter(id=>suppDue(id,sel)).map(id=>{const sp=SUPPS.find(x=>x.id===id); if(!sp) return ""; return `<label class="checkline"><input type="checkbox" data-supp="${id}" ${supsToday.includes(id)?"checked":""}> ${esc(sp.n)} <span class="muted small">${esc(suppLineProducts(id)||sp.dose(p))}${(e=>e?` · ${e.k} kcal, ${e.p} g Protein`:"")(suppEnergy(id))}</span></label>`}).join("")}
       </div>`:""}
     </section>
   </div>`;
@@ -1347,6 +1347,11 @@ function suppDue(id,dateIso){
   if(prods.length){const n=Math.round(parseIso(dateIso).getTime()/DAY); return prods.some(pr=>n%pr.every===0)}
   return true;
 }
+function suppEnergy(sid){
+  const pr=pickProduct(sid); if(!pr||!["protein","eaa"].includes(pr.cat)) return null;
+  const per=pr.perDay>1?pr.perDay:1, k=Math.round((pr.kcal||pr.amount*4.6)*per), g=Math.round((pr.unit==="g"?pr.amount:0)*per);
+  return k>=10?{n:`${pr.brand} ${pr.name}`.slice(0,60),k,p:g}:null;
+}
 function suppLineProducts(cat){
   return (state.myProducts||[]).map(prodById).filter(pr=>pr&&pr.cat===cat).map(pr=>`${pr.brand} ${pr.name}: ${pr.perDay>1?fmtP(pr.perDay)+" × ":""}${pr.serving||amtTxt(pr)}`).join(" · ");
 }
@@ -1786,7 +1791,7 @@ function viewErnaehrung(){
       <section class="panel stack">
         <div class="cal-head"><button class="btn ghost" data-fday="-1" aria-label="Voriger Tag">‹</button><h2>${day===todayIso?"Heute":`${WD[isoWd(dd)]}, ${dd.getDate()}.${dd.getMonth()+1}.`}</h2><button class="btn ghost" data-fday="1" aria-label="Nächster Tag">›</button></div>
         <div class="rings">${ringHtml("Kalorien",kcal,T.kcal,"kcal","var(--accent)")}${ringHtml("Protein",prot,T.prot,"g","var(--green)")}</div>
-        ${list.length?`<ul class="exlist">${list.map((x,i)=>`<li><span>${esc(x.n)}</span><span class="presc">${x.k} kcal · ${x.p} g <button class="linkbtn" data-fdel="${i}" aria-label="${esc(x.n)} entfernen">✕</button></span></li>`).join("")}</ul>`:`<p class="small muted" style="margin:0">Noch nichts eingetragen. Tippe unten auf ein Lebensmittel oder trage eigene Werte ein.</p>`}
+        ${list.length?`<ul class="exlist">${list.map((x,i)=>`<li><span>${x.supp?"💊 ":""}${esc(x.n)}</span><span class="presc">${x.k} kcal · ${x.p} g <button class="linkbtn" data-fdel="${i}" aria-label="${esc(x.n)} entfernen">✕</button></span></li>`).join("")}</ul>`:`<p class="small muted" style="margin:0">Noch nichts eingetragen. Tippe unten auf ein Lebensmittel oder trage eigene Werte ein.</p>`}
       </section>
       <section class="panel stack">
         <h3>Dein Tagesziel</h3>
@@ -1921,7 +1926,8 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
   if(t.dataset.prodadd){const pr=prodById(t.dataset.prodadd); if(!state.myProducts.includes(pr.id)) state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}
   if(t.dataset.prodrm){state.myProducts=state.myProducts.filter(x=>x!==t.dataset.prodrm); save(); render(); return}
-  if(t.dataset.prodfood){const pr=prodById(t.dataset.prodfood); (state.food[todayIso]||(state.food[todayIso]=[])).push({n:`${pr.brand} ${pr.name}`.slice(0,60),k:pr.kcal||Math.round(pr.amount*4.6),p:Math.round(pr.amount)}); save(); t.textContent="Eingetragen ✓"; return}
+  if(t.dataset.prodfood){const pr=prodById(t.dataset.prodfood), sid=CAT_SUPP[pr.cat]||pr.cat; (state.food[todayIso]||(state.food[todayIso]=[])).push({n:`${pr.brand} ${pr.name}`.slice(0,60),k:pr.kcal||Math.round(pr.amount*4.6),p:Math.round(pr.amount),supp:sid});
+    const sa=state.supps[todayIso]||(state.supps[todayIso]=[]); if(state.mySupps.includes(sid)&&!sa.includes(sid)) sa.push(sid); save(); t.textContent="Eingetragen ✓"; return}
   if(t.dataset.applyrec){const {R}=recs(); const emp=R.filter(r=>r.level==="emp").map(r=>r.id); for(const id of emp) if(!state.mySupps.includes(id)) state.mySupps.push(id); save(); render(); const m=document.getElementById("recmsg"); if(m) m.textContent=emp.length?`${emp.length} übernommen.`:"Keine Empfehlung zum Übernehmen."; return}
   if(t.dataset.fav){const id=t.dataset.fav; state.fav=state.fav||[]; const i=state.fav.indexOf(id); if(i<0){state.fav.push(id); state.block=(state.block||[]).filter(x=>x!==id)} else state.fav.splice(i,1); save(); render(); return}
   if(t.dataset.block||t.dataset.blockrun){const id=t.dataset.block||t.dataset.blockrun; state.block=state.block||[]; const i=state.block.indexOf(id); if(i<0){state.block.push(id); state.fav=(state.fav||[]).filter(x=>x!==id)} else state.block.splice(i,1); save(); render(); return}
@@ -1971,7 +1977,10 @@ document.getElementById("view").addEventListener("click",e=>{
 });
 document.getElementById("view").addEventListener("change",e=>{
   const t=e.target;
-  if(t.dataset.supp){const arr=state.supps[ui.sel]||(state.supps[ui.sel]=[]); const i=arr.indexOf(t.dataset.supp); if(t.checked&&i<0) arr.push(t.dataset.supp); if(!t.checked&&i>=0) arr.splice(i,1); save()}
+  if(t.dataset.supp){const sid=t.dataset.supp, arr=state.supps[ui.sel]||(state.supps[ui.sel]=[]); const i=arr.indexOf(sid); if(t.checked&&i<0) arr.push(sid); if(!t.checked&&i>=0) arr.splice(i,1);
+    // Supplements mit Kalorien (Protein, EAA) automatisch ins Ernährungstagebuch, beim Abwählen wieder entfernen
+    const e=suppEnergy(sid), F=state.food[ui.sel]||(state.food[ui.sel]=[]), j=F.findIndex(x=>x.supp===sid);
+    if(e&&t.checked&&j<0) F.push({n:e.n,k:e.k,p:e.p,supp:sid}); if(!t.checked&&j>=0) F.splice(j,1); save()}
   else if(t.dataset.mysupp){const i=state.mySupps.indexOf(t.dataset.mysupp); if(t.checked&&i<0) state.mySupps.push(t.dataset.mysupp); if(!t.checked&&i>=0) state.mySupps.splice(i,1); save()}
   else if(t.dataset.pe&&t.tagName==="SELECT"){if(t.value) planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i),t.value)}
   else if(t.id==="planSplit"){state.profile.split=t.value; save(); render()}
