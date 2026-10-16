@@ -12,6 +12,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -46,6 +47,28 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private val healthPermissions =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
             lifecycleScope.launch { deliverHealth() }
+        }
+
+    // Datensicherung: Die Seite liefert den Inhalt, Android fragt nach dem Speicherort.
+    private var pendingBackup: String? = null
+
+    private val createBackup =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            val json = pendingBackup
+            pendingBackup = null
+            val ok = uri != null && json != null && runCatching {
+                contentResolver.openOutputStream(uri, "wt")!!.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+            }.isSuccess
+            web.evaluateJavascript("window.onBackupSaved && window.onBackupSaved(${if (ok) "true" else if (uri == null) "null" else "false"})", null)
+        }
+
+    private val openBackupLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            val text = runCatching {
+                contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+            }.getOrNull()
+            web.evaluateJavascript("window.onBackupLoaded && window.onBackupLoaded(${JSONObject.quote(text ?: "")})", null)
         }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -202,6 +225,19 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     isAppearanceLightNavigationBars = !dark
                 }
             }
+        }
+
+        @JavascriptInterface
+        fun saveBackup(name: String, json: String) {
+            runOnUiThread {
+                pendingBackup = json
+                createBackup.launch(name)
+            }
+        }
+
+        @JavascriptInterface
+        fun openBackup() {
+            runOnUiThread { openBackupLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
         }
 
         @JavascriptInterface
