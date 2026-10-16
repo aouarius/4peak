@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -46,6 +48,9 @@ import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
+import androidx.wear.compose.material.Picker
+import androidx.wear.compose.material.PickerState
+import androidx.wear.compose.material.rememberPickerState
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
@@ -255,63 +260,99 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
     @Composable
     private fun ExerciseScreen(r: Run) {
         val it = r.item ?: return
-        ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { HeartRateLine() }
-            item {
+        if (it.cardio) {
+            CardioScreen(r, it)
+            return
+        }
+        // Drehräder wie bei Hevy: Gewicht und Wiederholungen wischen, unten zurück, speichern, weiter
+        key(r.index, r.setNo) {
+            val step = it.step
+            val wCount = (300.0 / step).roundToInt() + 1
+            val wState = rememberPickerState(wCount, (r.weight / step).roundToInt().coerceIn(0, wCount - 1), repeatItems = false)
+            val rState = rememberPickerState(61, r.reps.coerceIn(0, 60), repeatItems = false)
+            Column(
+                modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 24.dp, bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                HeartRateLine()
                 Text(
                     it.name,
-                    style = MaterialTheme.typography.title3,
-                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.caption1,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text("Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}", style = MaterialTheme.typography.caption3)
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PickerBox(if (it.bodyweight) "+ kg" else "kg", wState) { i -> formatKg(i * step) }
+                    PickerBox(if (it.unilateral) "Wdh./Seite" else "Wdh.", rState) { i -> i.toString() }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Button(
+                        onClick = { r.prev() },
+                        enabled = r.index > 0,
+                        colors = ButtonDefaults.secondaryButtonColors(),
+                        modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
+                    ) { Text("‹") }
+                    Button(
+                        onClick = {
+                            r.weight = wState.selectedOption * step
+                            r.reps = rState.selectedOption
+                            r.logSet()
+                        },
+                        modifier = Modifier.size(ButtonDefaults.DefaultButtonSize),
+                    ) { Text("✓", fontWeight = FontWeight.Bold) }
+                    Button(
+                        onClick = { r.next() },
+                        colors = ButtonDefaults.secondaryButtonColors(),
+                        modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
+                    ) { Text("›") }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun PickerBox(label: String, state: PickerState, text: (Int) -> String) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, style = MaterialTheme.typography.caption3)
+            Picker(
+                state = state,
+                contentDescription = label,
+                modifier = Modifier.size(width = 66.dp, height = 74.dp),
+            ) { i ->
+                Text(text(i), style = MaterialTheme.typography.title3, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+
+    @Composable
+    private fun CardioScreen(r: Run, it: Item) {
+        ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
+            item { HeartRateLine() }
+            item { Text(it.name, style = MaterialTheme.typography.title3, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
+            item { Text(it.text.ifEmpty { "Ausdauer" }, textAlign = TextAlign.Center, style = MaterialTheme.typography.body2) }
+            item {
+                Chip(
+                    onClick = { r.logCardio() },
+                    label = { Text("Erledigt") },
+                    colors = ChipDefaults.primaryChipColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            if (it.cardio) {
-                item { Text(it.text.ifEmpty { "Ausdauer" }, textAlign = TextAlign.Center, style = MaterialTheme.typography.body2) }
-                item {
-                    Chip(
-                        onClick = { r.logCardio() },
-                        label = { Text("Erledigt") },
-                        colors = ChipDefaults.primaryChipColors(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            } else {
-                item {
-                    Text(
-                        "Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}",
-                        style = MaterialTheme.typography.caption1,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-                item {
-                    ValueRow(
-                        label = if (it.bodyweight) "kg zusätzlich" else "kg",
-                        value = formatKg(r.weight),
-                        onMinus = { r.weight = (r.weight - it.step).coerceAtLeast(0.0) },
-                        onPlus = { r.weight += it.step },
-                    )
-                }
-                item {
-                    ValueRow(
-                        label = if (it.unilateral) "Wdh. je Seite" else "Wdh.",
-                        value = r.reps.toString(),
-                        onMinus = { if (r.reps > 0) r.reps-- },
-                        onPlus = { r.reps++ },
-                    )
-                }
-                item {
-                    Chip(
-                        onClick = { r.logSet() },
-                        label = { Text("Satz speichern") },
-                        colors = ChipDefaults.primaryChipColors(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
             }
             item {
                 CompactChip(
                     onClick = { r.next() },
-                    label = { Text("Übung überspringen") },
+                    label = { Text("Überspringen") },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
             }
@@ -322,30 +363,6 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
                     colors = ChipDefaults.secondaryChipColors(),
                 )
             }
-        }
-    }
-
-    @Composable
-    private fun ValueRow(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        ) {
-            Button(
-                onClick = onMinus,
-                colors = ButtonDefaults.secondaryButtonColors(),
-                modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
-            ) { Text("−") }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold)
-                Text(label, style = MaterialTheme.typography.caption3)
-            }
-            Button(
-                onClick = onPlus,
-                colors = ButtonDefaults.secondaryButtonColors(),
-                modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
-            ) { Text("+") }
         }
     }
 
@@ -382,6 +399,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
                 Spacer(Modifier.width(8.dp))
                 CompactChip(onClick = { r.restUntil = 0 }, label = { Text("Weiter") })
             }
+            CompactChip(
+                onClick = { r.end() },
+                label = { Text("Training beenden") },
+                colors = ChipDefaults.secondaryChipColors(),
+            )
         }
     }
 

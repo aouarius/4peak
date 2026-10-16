@@ -255,6 +255,35 @@ label.f select,label.f input,.filters input,.filters select{border-radius:10px;p
 .day.dropbad{outline:2px dashed var(--red);outline-offset:1px}
 #dragghost{position:fixed;z-index:60;pointer-events:none;background:var(--accent);color:var(--accent-ink);font:600 .8rem var(--f-body);padding:6px 10px;border-radius:8px;box-shadow:var(--shadow);transform:translate(-50%,-130%);white-space:nowrap}
 body.dragging{overscroll-behavior:none}
+.runhead{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow)}
+.runhead>div{display:flex;flex-direction:column;min-width:0}
+.runhead span{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.runhead b{font-size:.98rem;white-space:nowrap}
+.runhead .btn{margin-left:auto}
+.restbar{position:sticky;top:62px;z-index:19;display:flex;align-items:center;gap:10px;margin-top:8px;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:8px 12px}
+.restbar b{font-size:1.3rem;margin-right:auto}
+.restbar .chip{background:transparent;color:inherit;border-color:currentColor}
+.excard h3 .linkbtn{font:inherit;text-transform:inherit;text-align:left}
+.excard.ss{box-shadow:inset 3px 0 0 var(--accent),var(--shadow)}
+.restsel{font-size:.78rem;padding:4px 6px;border-radius:8px;color:var(--accent);max-width:46%}
+table.sets{width:100%;border-collapse:collapse;table-layout:fixed}
+table.sets th{font-size:.66rem;padding:2px 2px 4px;text-align:center}
+table.sets th:nth-child(2){text-align:left}
+table.sets td{padding:3px 2px;text-align:center;border-top:1px solid var(--line)}
+table.sets th:first-child,table.sets td:first-child{width:38px}
+table.sets th.ck,table.sets td.ck{width:44px}
+table.sets td.prev{text-align:left;font:500 .78rem var(--f-mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.sets td.prev .linkbtn{color:var(--muted);font:inherit}
+table.sets input{width:100%;min-width:0;text-align:center;font:600 .95rem var(--f-mono);padding:6px 2px;border-radius:8px;background:var(--sunk);border:1px solid transparent;color:var(--ink)}
+table.sets .lr{display:flex;gap:3px}
+table.sets tr.done td{background:color-mix(in srgb,var(--green) 16%,transparent)}
+table.sets tr.done input{background:transparent}
+table.sets tr.t-w .stbtn{color:var(--yellow)}table.sets tr.t-d .stbtn{color:var(--accent)}table.sets tr.t-f .stbtn{color:var(--red)}
+.stbtn{border:0;background:var(--sunk);border-radius:8px;width:30px;height:30px;font:700 .85rem var(--f-mono);color:var(--ink);cursor:pointer}
+.rchk{border:0;background:var(--sunk);color:var(--muted);border-radius:8px;width:36px;height:32px;font-weight:700;cursor:pointer}
+.rchk[aria-pressed="true"]{background:var(--green);color:#fff}
+.wutime{font:700 1.6rem var(--f-display)}
+.wucard h3{margin:0}
 </style>
 
 <div class="wrap">
@@ -1288,18 +1317,22 @@ function suggestion(it,date){
   if(!l) return {w:"",note:"Erstes Mal: wähle ein Gewicht, mit dem du die Wiederholungen mit der angegebenen Reserve schaffst."};
   const sets=work(l[1].sets[it.id]), w=Math.max(...sets.map(s=>s.w)), top=upper(it.reps);
   const allTop=sets.every(s=>s.r>=top);
-  if(allTop&&w>0){const nw=Math.round(w*1.025*2)/2; return {w:nw===w?w+2.5:nw,note:`Letztes Mal (${l[0]}) alle Sätze mit ${top}+ Wiederholungen geschafft: Gewicht steigern.`}}
+  if(allTop&&w>0){const inc=BB.has(it.id)?2.5:1, nw=Math.max(w+inc,Math.round(w*1.025/inc)*inc); return {w:nw,note:`Letztes Mal (${l[0]}) alle Sätze mit ${top}+ Wiederholungen geschafft: Gewicht steigern.`}}
   return {w,note:`Letztes Mal (${l[0]}): ${sets.map(setTxt).join(", ")}. Gleiches Gewicht, mehr Wiederholungen anpeilen.`};
 }
 let audioCtx=null, timerInt=null;
 function beep(){try{if(!audioCtx) return; const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.frequency.value=880; g.gain.value=.15; o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+.35);}catch(e){} try{navigator.vibrate&&navigator.vibrate(300)}catch(e){}}
 function tick(){
-  const r=ui.run; const el=document.getElementById("timer");
-  if(!r||!r.restUntil){clearInterval(timerInt);timerInt=null;return}
-  const left=Math.max(0,Math.ceil((r.restUntil-Date.now())/1000));
-  if(el) el.textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
-  if(left===0){r.restUntil=null; beep(); clearInterval(timerInt); timerInt=null; if(ui.tab==="training") render()}
+  const r=ui.run;
+  if(!r){clearInterval(timerInt);timerInt=null;return}
+  const d=document.getElementById("rt-dur"); if(d) d.textContent=durTxt((Date.now()-r.t0)/1000);
+  const wt=document.getElementById("wu-time"); if(wt&&r.warm) wt.textContent=durTxt(wuSec(r));
+  if(!r.restUntil) return;
+  const left=Math.max(0,Math.ceil((r.restUntil-Date.now())/1000)), el=document.getElementById("timer");
+  if(el) el.textContent=durTxt(left);
+  if(left===0){r.restUntil=null; beep(); if(ui.tab==="training") keepScroll(render)}
 }
+function keepScroll(fn){const y=window.scrollY; fn(); window.scrollTo(0,y)}
 function startRest(sec){ui.run.restUntil=Date.now()+sec*1000; if(!timerInt) timerInt=setInterval(tick,250)}
 function nextTrainingDate(){
   if(sessionFor(ui.sel)&&!state.done[ui.sel]) return ui.sel;
@@ -1332,57 +1365,108 @@ function viewTraining(){
       <div class="row"><button class="btn" data-start="${d}">Training starten</button>${spotifyLink(s.c==="green")}</div>
     </section>`;
   }
-  const s=sessionFor(r.date); const it=s.items[r.i];
-  const totalSets=s.items.reduce((a,x)=>a+(x.role==="cardio"?1:x.sets),0);
-  const doneSets=Object.values(r.logs).reduce((a,x)=>a+work(x).length,0);
-  const pct=Math.min(100,Math.round(doneSets/totalSets*100));
-  const logged=r.logs[it.id]||[], wl=work(logged), q=ssPartner(s,r.i);
-  let body="";
-  if(r.restUntil){
-    body=`<div class="stack" style="align-items:center;text-align:center">
-      <div class="muted small">Pause</div><div class="bigtimer mono" id="timer">–</div>
-      <div class="row" style="justify-content:center"><button class="btn ghost" data-rest="30">+30 s</button><button class="btn" data-rest="skip">Weiter</button></div>
-      <div class="small muted">Als Nächstes: ${esc(EX[it.id].n)}${it.role!=="cardio"?`, Satz ${wl.length+1} von ${it.sets}`:""}</div></div>`;
-  }else if(it.role==="cardio"){
-    body=`<p style="margin:0">${esc(it.txt)}</p>
-      <label class="f" for="cardmin" style="max-width:200px">Dauer (min)<input id="cardmin" type="number" min="1" max="300" value="${lower(it.txt)||20}"></label>
-      <div><button class="btn" data-cardio="1">Erledigt</button></div>`;
-  }else{
-    const sug=suggestion(it,r.date);
-    const prevW=logged.length?logged[logged.length-1].w:sug.w;
-    const uni=UNI.has(it.id), src=repeatSource(it,r.date,logged), dr=it.role==="core"?"":lower(it.reps);
-    const ty=r.type||"";
-    body=`<div class="mono" style="font-size:1.05rem">${ty==="w"?"Aufwärmsatz":`Satz ${wl.length+1} von ${it.sets}`} · Ziel ${esc(it.reps)} Wdh.${uni?" je Seite":""}${it.rir?` · RIR ${esc(it.rir)}`:""}</div>
-      <p class="small muted" style="margin:0">${esc(sug.note)}</p>
-      ${src&&ty!=="w"?`<div><button class="btn big" data-repeat="1">Wie ${wl.length?"Satz davor":"letztes Mal"}: ${setTxt({...src,t:ty||undefined})} speichern</button></div>`:""}
-      <div class="row">
-        <label class="f" for="setw">Gewicht (kg)<input id="setw" type="number" inputmode="decimal" min="0" step="0.5" value="${prevW}" style="width:110px"></label>
-        ${uni?`<label class="f" for="setl">Links<input id="setl" type="number" inputmode="numeric" min="0" max="100" value="${dr}" style="width:90px"></label>
-        <label class="f" for="setrr">Rechts<input id="setrr" type="number" inputmode="numeric" min="0" max="100" value="${dr}" style="width:90px"></label>`
-        :`<label class="f" for="setr">Wiederholungen<input id="setr" type="number" inputmode="numeric" min="0" max="100" value="${dr}" style="width:120px" placeholder="${it.role==="core"?"Sek./Wdh.":""}"></label>`}
-      </div>
-      ${BB.has(it.id)?`<div id="plates" class="stack" style="gap:4px">${platesHtml(Number(prevW))}</div>`:""}
-      <div class="row"><button class="btn${src&&ty!=="w"?" ghost":""}" data-logset="1">${ty==="w"?"Aufwärmsatz":ty==="d"?"Dropsatz":ty==="f"?"Satz bis Versagen":"Satz"} speichern</button>
-        <span class="seg" role="group" aria-label="Satztyp">${[["","Normal"],["w","Aufwärmen"],["d","Drop"],["f","Versagen"]].map(([k,n])=>`<button class="${ty===k?"on":""}" data-stype="${k}" aria-pressed="${ty===k}">${n}</button>`).join("")}</span></div>
-      ${it.role==="main"&&!logged.length?`<div id="warm">${warmHtml(Number(prevW),it.id)}</div>`:""}
-      ${logged.length?`<div class="small">Gespeichert: <span class="mono">${logged.map(setTxt).join(" · ")}</span></div>`:""}
-      ${ty==="w"?`<p class="small muted" style="margin:0">Aufwärmsätze zählen nicht zu Sätzen, Volumen und Bestleistungen.</p>`:""}`;
-  }
-  return `<section class="panel stack">
-    <div class="row" style="justify-content:space-between"><span class="muted small">${esc(s.name)} · Übung ${r.i+1} von ${s.items.length}</span><span class="mono small">${pct} %</span></div>
-    <div class="progress"><span style="width:${pct}%"></span></div>
-    <h2><button class="linkbtn" data-ex="${it.id}" style="font:inherit;text-transform:inherit">${esc(EX[it.id].n)}</button></h2>
-    ${q>=0?`<div class="small"><span class="pill">⛓ Supersatz</span> im Wechsel mit ${esc(EX[s.items[q].id].n)}${q>r.i?", Pause erst nach beiden Übungen":""}</div>`:""}
-    ${noteHtml(it.id)}
-    ${r.i===0&&!doneSets?spotifyLink(s.c==="green"):""}
-    ${body}
-    <div class="row" style="border-top:1px solid var(--line);padding-top:12px">
-      <button class="btn ghost" data-skipex="1">Übung überspringen</button>
-      ${it.role!=="cardio"&&!logged.length?`<button class="btn ghost" data-blockrun="${it.id}">Nope! Alternative zeigen</button>`:""}
-      <label class="f" for="rpe2" style="flex-direction:row;align-items:center;gap:8px">Anstrengung<select id="rpe2">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
-      <button class="btn ghost" data-finish="1">Training beenden</button>
+  const s=sessionFor(r.date); runInit(r,s);
+  const L=runLogs(r), all=Object.values(L).flat(), wk=all.filter(x=>x.t!=="w"&&x.min==null);
+  const vol=all.reduce((a,x)=>a+setVol(x),0);
+  const total=s.items.reduce((a,x)=>a+(x.role==="cardio"?0:x.sets),0);
+  const allDone=s.items.every((x,i)=>r.rows[i].sets.length&&r.rows[i].sets.every(y=>y.done));
+  return `<div class="runhead">
+      <div><span>Dauer</span><b class="mono" id="rt-dur">${durTxt((Date.now()-r.t0)/1000)}</b></div>
+      <div><span>Volumen</span><b class="mono">${fmt(vol)} kg</b></div>
+      <div><span>Sätze</span><b class="mono">${wk.length}/${total}</b></div>
+      ${liveHr?`<div><span>Puls</span><b class="mono">♥ ${liveHr}</b></div>`:""}
+      <button class="btn" data-finish="1">Beenden</button>
     </div>
+    ${r.restUntil?`<div class="restbar" role="status"><span>Pause</span><b class="mono" id="timer">${durTxt((r.restUntil-Date.now())/1000)}</b>
+      <button class="chip" data-rest="30">+30 s</button><button class="chip" data-rest="skip">Überspringen</button></div>`:""}
+    <div class="muted small" style="margin:10px 2px 6px">${esc(s.name)} · ${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.</div>
+    <div class="stack">
+      ${warmCardHtml(r)}
+      ${s.items.map((it,i)=>exCardHtml(r,s,it,i)).join("")}
+      ${allDone?`<div class="panel stack" style="text-align:center"><b>Alle Sätze erledigt 💪</b></div>`:""}
+      <section class="panel row" style="justify-content:space-between">
+        <label class="f" for="rpe2" style="flex-direction:row;align-items:center;gap:8px">Anstrengung<select id="rpe2">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
+        ${spotifyLink(s.c==="green")}
+        <button class="btn" data-finish="1">Training beenden</button>
+      </section>
+    </div>`;
+}
+/* ---------- Trainingsmodus als Satz-Tabelle (Vorbild Hevy) ---------- */
+const durTxt=sec=>{sec=Math.max(0,Math.round(sec)); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), x=sec%60; return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(x).padStart(2,"0")};
+const REST_OPTS=[0,30,60,90,120,150,180,240,300];
+const restLbl=v=>v?`Pause ${v<60?v+" s":v%60?Math.floor(v/60)+":"+String(v%60).padStart(2,"0")+" min":v/60+" min"}`:"Pause aus";
+function restFor(it){const v=(state.restPref||{})[it.id]; return v!=null?v:restSec(it.rest)}
+function runInit(r,s){
+  r.rows=r.rows||{}; r.warm=r.warm||{acc:0,start:null,done:false};
+  s.items.forEach((it,i)=>{
+    if(r.rows[i]&&r.rows[i].id===it.id) return;
+    if(it.role==="cardio"){r.rows[i]={id:it.id,sets:[{min:lower(it.txt)||20,done:false}]}; return}
+    const l=lastSets(it.id,r.date), prev=l?work(l[1].sets[it.id]):[], sug=suggestion(it,r.date), uni=UNI.has(it.id);
+    const sets=[]; for(let k=0;k<it.sets;k++){
+      const pv=prev[k]||prev[prev.length-1], w=sug.w!==""?Number(sug.w):(pv?pv.w:"");
+      const same=pv&&pv.w===w, rr=same?(pv.l!=null?Math.min(pv.l,pv.rr):pv.r):lower(it.reps);
+      sets.push(uni?{w,r:rr,l:same&&pv.l!=null?pv.l:rr,rr:same&&pv.rr!=null?pv.rr:rr,done:false}:{w,r:rr,done:false});
+    }
+    r.rows[i]={id:it.id,sets};
+  });
+}
+function runLogs(r){
+  const L={}; for(const [i,x] of Object.entries(r.rows||{})) for(const y of x.sets) if(y.done){
+    const o=y.min!=null?{w:0,r:0,min:Number(y.min)||0}:{w:Number(y.w)||0,r:Number(y.r)||0}; if(y.l!=null&&y.min==null){o.l=Number(y.l)||0; o.rr=Number(y.rr)||0; o.r=Math.min(o.l,o.rr)} if(y.t) o.t=y.t;
+    (L[x.id]||(L[x.id]=[])).push(o)}
+  return L;
+}
+function wuSec(r){const w=r.warm||{}; return (w.acc||0)+(w.start?(Date.now()-w.start)/1000:0)}
+function warmCardHtml(r){
+  const w=r.warm;
+  if(w.done) return `<section class="panel row wucard" style="justify-content:space-between"><b>Aufwärmen</b><span class="mono">${durTxt(wuSec(r))}</span><span class="pill"><i class="dot c-green"></i>erledigt</span><button class="linkbtn" data-wu="undo">Ändern</button></section>`;
+  return `<section class="panel stack wucard">
+    <div class="row" style="justify-content:space-between"><h3>Aufwärmen</h3><span class="mono wutime" id="wu-time">${durTxt(wuSec(r))}</span></div>
+    <p class="small muted" style="margin:0">5–10 Minuten locker auf Rudergerät, Velo oder Crosstrainer, danach Armkreisen, Beinpendel und Hampelmänner. Bereit bist du, wenn dir warm ist und du leicht schwitzt. Für die erste Übung kannst du unten Aufwärmsätze einfügen.</p>
+    <div class="row"><button class="btn ghost" data-wu="toggle">${w.start?"Pause":w.acc?"Weiter":"Start"}</button><button class="btn" data-wu="done">✓ Fertig</button><button class="linkbtn" data-wu="skip">Überspringen</button></div>
   </section>`;
+}
+function exCardHtml(r,s,it,i){
+  const R=r.rows[i], ex=EX[it.id], q=ssPartner(s,i), anyDone=R.sets.some(x=>x.done);
+  if(it.role==="cardio"){const y=R.sets[0]; return `<section class="panel stack excard" id="it-${i}">
+    <h3><button class="linkbtn" data-ex="${it.id}">${esc(ex.n)}</button></h3><div class="small muted">${esc(it.txt||"")}</div>
+    <table class="sets"><thead><tr><th>Dauer (min)</th><th class="ck">✓</th></tr></thead><tbody><tr class="${y.done?"done":""}">
+      <td><input data-rv="${i}:0:min" type="number" inputmode="numeric" min="1" max="300" value="${y.min}"></td>
+      <td class="ck"><button class="rchk" data-rdone="${i}:0" aria-pressed="${y.done}" aria-label="Erledigt">✓</button></td></tr></tbody></table></section>`}
+  const l=lastSets(it.id,r.date), prev=l?work(l[1].sets[it.id]):[], uni=UNI.has(it.id);
+  let wn=0;
+  const rows=R.sets.map((y,k)=>{const isW=y.t==="w"; if(!isW) wn++; const pv=isW?null:prev[wn-1];
+    return `<tr class="${y.done?"done":""}${y.t?" t-"+y.t:""}">
+      <td><button class="stbtn" data-rtype="${i}:${k}" aria-label="Satztyp ändern">${y.t==="w"?"A":y.t==="d"?"D":y.t==="f"?"V":wn}</button></td>
+      <td class="prev">${pv?`<button class="linkbtn" data-rprev="${i}:${k}" title="Übernehmen">${setTxt(pv)}</button>`:"–"}</td>
+      <td><input data-rv="${i}:${k}:w" type="number" inputmode="decimal" min="0" step="0.5" value="${y.w}" aria-label="Gewicht Satz ${k+1}"></td>
+      <td>${uni?`<span class="lr"><input data-rv="${i}:${k}:l" type="number" inputmode="numeric" min="0" value="${y.l}" aria-label="Links"><input data-rv="${i}:${k}:rr" type="number" inputmode="numeric" min="0" value="${y.rr}" aria-label="Rechts"></span>`
+        :`<input data-rv="${i}:${k}:r" type="number" inputmode="numeric" min="0" value="${y.r}" aria-label="Wiederholungen Satz ${k+1}">`}</td>
+      <td class="ck"><button class="rchk" data-rdone="${i}:${k}" aria-pressed="${y.done}" aria-label="Satz ${k+1} erledigt">✓</button></td></tr>`}).join("");
+  const nx=R.sets.find(x=>!x.done), opts=[...new Set([...REST_OPTS,restFor(it)])].sort((a,b)=>a-b);
+  return `<section class="panel stack excard${q>=0?" ss":""}" id="it-${i}">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><h3 style="flex:1;min-width:0"><button class="linkbtn" data-ex="${it.id}">${esc(ex.n)}</button></h3>
+      <select class="restsel" data-restpref="${it.id}" aria-label="Pause nach jedem Satz">${opts.map(v=>`<option value="${v}"${v===restFor(it)?" selected":""}>${restLbl(v)}</option>`).join("")}</select></div>
+    <div class="small muted">Ziel ${esc(it.reps)} Wdh.${uni?" je Seite":""}${it.rir?` · RIR ${esc(it.rir)}`:""}${q>=0?` · <b style="color:var(--accent)">⛓ Supersatz</b> mit ${esc(EX[s.items[q].id].n)}`:""}</div>
+    ${noteHtml(it.id)}
+    <table class="sets"><thead><tr><th>Satz</th><th>Vorher</th><th>kg</th><th>Wdh.${uni?" L/R":""}</th><th class="ck">✓</th></tr></thead><tbody>${rows}</tbody></table>
+    ${BB.has(it.id)&&nx&&Number(nx.w)>(state.profile.bar||20)?`<div class="small muted" id="pl-${i}">${plateTxt(nx.w)}</div>`:""}
+    <div class="row" style="gap:6px"><button class="chip" data-radd="${i}">+ Satz</button>${R.sets.length>1&&!R.sets[R.sets.length-1].done?`<button class="chip" data-rdel="${i}">− Satz</button>`:""}
+      ${it.role==="main"&&!anyDone&&!R.sets.some(x=>x.t==="w")&&warmups(Number(R.sets[0].w),it.id).length?`<button class="chip" data-rwarm="${i}">+ Aufwärmsätze</button>`:""}
+      ${!anyDone?`<button class="chip" data-blockrun="${it.id}">Nope! Alternative</button>`:""}</div>
+  </section>`;
+}
+function plateTxt(w){const bar=state.profile.bar||20, ps=plateSplit(Number(w),bar).out; return ps.length?`Scheiben pro Seite bei ${fmt(w,1)} kg: <b class="mono">${ps.map(fmtP).join(" + ")}</b>`:""}
+function rowCheck(i,k){
+  const r=ui.run, s=sessionFor(r.date), it=s.items[i], y=r.rows[i].sets[k];
+  y.done=!y.done; if(!y.done) return;
+  if(it.role==="cardio") return;
+  const q=ssPartner(s,i);
+  let rest=y.t==="d"?0:y.t==="w"?Math.min(60,restFor(it)):restFor(it);
+  if(q>i&&r.rows[q]&&r.rows[q].sets.some(x=>!x.done)&&y.t!=="w") rest=0;
+  if(rest>0) startRest(rest); else r.restUntil=null;
+  if(r.rows[i].sets.every(x=>x.done)) r.scrollTo=i+1;
+  else if(q>=0&&y.t!=="w"&&r.rows[q].sets.some(x=>!x.done)) r.scrollTo=q;
 }
 function itemLeft(r,s,i){
   const it=s.items[i]; if(!it||(r.skip||{})[i]) return 0;
@@ -1403,9 +1487,11 @@ function advance(type){
 }
 function finishRun(){
   const r=ui.run; if(!r) return;
+  if(r.rows) r.logs=runLogs(r);
   const rpeEl=document.getElementById("rpe2");
   const prevBest=bestE1rm(r.date), before=badgeList();
   state.done[r.date]={rpe:rpeEl?Number(rpeEl.value):null,at:new Date().toISOString(),sets:r.logs,min:Math.max(1,Math.round((Date.now()-r.t0)/60000))};
+  if(r.warm&&r.warm.done&&wuSec(r)>=30) state.done[r.date].warm=Math.round(wuSec(r));
   const prs=[]; let vol=0, sets=0;
   for(const [id,arr] of Object.entries(r.logs)){
     for(const x of arr){if(x.t!=="w") sets++; vol+=setVol(x)}
@@ -1639,7 +1725,8 @@ function render(){
   navSync();
   const v=document.getElementById("view");
   v.innerHTML=VIEWS[ui.tab]();
-  if(ui.tab==="training"&&ui.run&&ui.run.restUntil){tick(); if(!timerInt) timerInt=setInterval(tick,250)}
+  if(ui.tab==="training"&&ui.run){tick(); if(!timerInt) timerInt=setInterval(tick,250);
+    if(ui.run.scrollTo!=null){const el=document.getElementById("it-"+ui.run.scrollTo); ui.run.scrollTo=null; if(el) el.scrollIntoView({block:"start",behavior:"smooth"})}}
   if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el) el.scrollIntoView({block:"start"}); ui.openEx=null;}
 }
 function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
@@ -1648,7 +1735,7 @@ function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".ta
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -1671,8 +1758,20 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.block||t.dataset.blockrun){const id=t.dataset.block||t.dataset.blockrun; state.block=state.block||[]; const i=state.block.indexOf(id); if(i<0){state.block.push(id); state.fav=(state.fav||[]).filter(x=>x!==id)} else state.block.splice(i,1); save(); render(); return}
   if(t.dataset.editplan){ui.editPlan=!ui.editPlan; render(); return}
   if(t.dataset.pe){planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i)); return}
-  if(t.dataset.start){ui.summary=null; ui.run={date:t.dataset.start,i:0,logs:{},restUntil:null,t0:Date.now()}; ui.sel=t.dataset.start; go("training"); return}
-  if(t.dataset.rest){if(t.dataset.rest==="skip"){ui.run.restUntil=null; render()} else {ui.run.restUntil+=30000} return}
+  if(t.dataset.start){ui.summary=null; ui.run={date:t.dataset.start,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false},restUntil:null,t0:Date.now()}; ui.sel=t.dataset.start; go("training"); return}
+  if(t.dataset.rest){if(t.dataset.rest==="skip"){ui.run.restUntil=null; keepScroll(render)} else {ui.run.restUntil+=30000; tick()} return}
+  if(t.dataset.rdone){const [i,k]=t.dataset.rdone.split(":").map(Number); rowCheck(i,k); keepScroll(render); return}
+  if(t.dataset.rtype){const [i,k]=t.dataset.rtype.split(":").map(Number), y=ui.run.rows[i].sets[k], o=["","w","d","f"]; y.t=o[(o.indexOf(y.t||"")+1)%4]||undefined; if(!y.t) delete y.t; keepScroll(render); return}
+  if(t.dataset.rprev){const [i,k]=t.dataset.rprev.split(":").map(Number), r=ui.run, it=sessionFor(r.date).items[i], l=lastSets(it.id,r.date), y=r.rows[i].sets[k];
+    const wn=r.rows[i].sets.slice(0,k+1).filter(x=>x.t!=="w").length, pv=l&&work(l[1].sets[it.id])[wn-1]; if(pv){y.w=pv.w; y.r=pv.r; if(pv.l!=null){y.l=pv.l; y.rr=pv.rr}} keepScroll(render); return}
+  if(t.dataset.radd){const R=ui.run.rows[Number(t.dataset.radd)], last=R.sets.filter(x=>x.t!=="w").pop()||R.sets[R.sets.length-1], y={...last,done:false}; delete y.t; R.sets.push(y); keepScroll(render); return}
+  if(t.dataset.rdel){const R=ui.run.rows[Number(t.dataset.rdel)]; if(R.sets.length>1&&!R.sets[R.sets.length-1].done) R.sets.pop(); keepScroll(render); return}
+  if(t.dataset.rwarm){const i=Number(t.dataset.rwarm), R=ui.run.rows[i], it=sessionFor(ui.run.date).items[i]; const ws=warmups(Number(R.sets[0].w),it.id).map(x=>UNI.has(it.id)?{w:x.w,r:x.r,l:x.r,rr:x.r,t:"w",done:false}:{w:x.w,r:x.r,t:"w",done:false}); R.sets=ws.concat(R.sets); keepScroll(render); return}
+  if(t.dataset.wu){const w=ui.run.warm, a=t.dataset.wu;
+    if(a==="toggle"){if(w.start){w.acc+=(Date.now()-w.start)/1000; w.start=null} else w.start=Date.now()}
+    else if(a==="done"||a==="skip"){if(w.start){w.acc+=(Date.now()-w.start)/1000; w.start=null} w.done=true; if(a==="skip") w.acc=0; ui.run.scrollTo=0}
+    else if(a==="undo"){w.done=false}
+    keepScroll(render); return}
   if(t.dataset.logset||t.dataset.repeat){const it=sessionFor(ui.run.date).items[ui.run.i]; const logs=ui.run.logs[it.id]||(ui.run.logs[it.id]=[]);
     if(t.dataset.repeat){const src=repeatSource(it,ui.run.date,logs); if(!src) return; logs.push(src.l!=null?{w:src.w,r:src.r,l:src.l,rr:src.rr}:{w:src.w,r:src.r})}
     else{const v=id=>{const el=document.getElementById(id); return el?Number(el.value)||0:0}; const w=v("setw");
@@ -1708,10 +1807,13 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.id==="exmark"){ui.exMark=t.value; render()}
   else if(t.id==="exeq"){ui.exEquip=t.value; render()}
   else if(t.id==="actfile"&&t.files[0]){importActivity(t.files[0])}
+  else if(t.dataset.restpref){state.restPref=state.restPref||{}; state.restPref[t.dataset.restpref]=Number(t.value); save()}
   else if(t.dataset.note){const v=t.value.trim().slice(0,200); state.notes=state.notes||{}; if(v) state.notes[t.dataset.note]=v; else delete state.notes[t.dataset.note]; save()}
   else if(t.id==="bkfile"&&t.files[0]){const fr=new FileReader(); fr.onload=()=>backupParse(String(fr.result||"")); fr.readAsText(t.files[0]); t.value=""}
 });
 document.getElementById("view").addEventListener("input",e=>{
+  if(e.target.dataset.rv&&ui.run){const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
+    const pl=document.getElementById("pl-"+i); if(pl&&f==="w"&&ui.run.rows[i].sets.find(x=>!x.done)===y) pl.innerHTML=plateTxt(y.w); return}
   if(e.target.id==="sg"&&ui.scan){const g=Number(e.target.value)||0, s2=ui.scan, el=document.getElementById("scanprev"); if(el) el.textContent=(s2.kcal!=null?Math.round(s2.kcal*g/100)+" kcal":"")+(s2.prot!=null?" · "+Math.round(s2.prot*g/100)+" g Protein":""); return}
   if(e.target.id==="setw"&&ui.run){const it=sessionFor(ui.run.date).items[ui.run.i], w=Number(e.target.value); const pl=document.getElementById("plates"), wa=document.getElementById("warm");
     if(pl) pl.innerHTML=platesHtml(w); if(wa) wa.innerHTML=warmHtml(w,it.id); return}

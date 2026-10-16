@@ -129,6 +129,13 @@ class Run(val session: Session) {
         prepare()
     }
 
+    fun prev() {
+        if (index <= 0) return
+        restUntil = 0
+        index--
+        prepare()
+    }
+
     fun end() {
         restUntil = 0
         index = session.items.size
