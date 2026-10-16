@@ -18,6 +18,17 @@ android {
     }
 
     buildFeatures { compose = true }
+    // Fester Debug-Schlüssel im Repo: jede Version installiert sich über die vorige,
+    // und Handy- und Uhr-App haben dieselbe Signatur. Für den Play Store braucht es einen eigenen Schlüssel.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
