@@ -1,7 +1,12 @@
 package ch.trainingskompass
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.os.Build
+import android.view.KeyEvent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.ViewGroup
@@ -43,6 +48,23 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private var pageReady = false
     private val dataClient by lazy { Wearable.getDataClient(this) }
     private val health by lazy { HealthBridge(this) }
+    private val hr by lazy {
+        HrSensor(
+            this,
+            onHr = { bpm -> runOnUiThread { web.evaluateJavascript("window.onNativeHr && window.onNativeHr($bpm)", null) } },
+            onStatus = { text, ok -> runOnUiThread { web.evaluateJavascript("window.onNativeHrStatus && window.onNativeHrStatus(${JSONObject.quote(text)},$ok)", null) } },
+        )
+    }
+
+    private val btPermissions: Array<String>
+        get() = if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+
+    private val btPermissionRequest =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
+            if (res.values.all { it }) hr.connect()
+            else web.evaluateJavascript("window.onNativeHrStatus && window.onNativeHrStatus(${JSONObject.quote("Ohne Bluetooth-Freigabe kann die App den Gurt nicht finden.")},false)", null)
+        }
 
     private val healthPermissions =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
@@ -129,6 +151,11 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         super.onResume()
         dataClient.addListener(this)
         pullWatchLogs()
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) hr.disconnect()
+        super.onDestroy()
     }
 
     override fun onPause() {
@@ -225,6 +252,35 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     isAppearanceLightNavigationBars = !dark
                 }
             }
+        }
+
+        @JavascriptInterface
+        fun connectHr() {
+            runOnUiThread {
+                if (btPermissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) hr.connect()
+                else btPermissionRequest.launch(btPermissions)
+            }
+        }
+
+        @JavascriptInterface
+        fun disconnectHr() {
+            runOnUiThread {
+                hr.disconnect()
+                web.evaluateJavascript("window.onNativeHr && window.onNativeHr(0); window.onNativeHrStatus && window.onNativeHrStatus('Getrennt',false)", null)
+            }
+        }
+
+        /** Steuert die Musik-App, die gerade spielt (z. B. Spotify), wie die Tasten eines Kopfhörers. */
+        @JavascriptInterface
+        fun media(cmd: String) {
+            val code = when (cmd) {
+                "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+                "prev" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                else -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            }
+            val am = getSystemService(AudioManager::class.java) ?: return
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
         }
 
         @JavascriptInterface

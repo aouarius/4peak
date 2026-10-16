@@ -284,6 +284,11 @@ table.sets tr.t-w .stbtn{color:var(--yellow)}table.sets tr.t-d .stbtn{color:var(
 .rchk[aria-pressed="true"]{background:var(--green);color:#fff}
 .wutime{font:700 1.6rem var(--f-display)}
 .wucard h3{margin:0}
+.runsub{margin:10px 2px 6px;gap:8px;align-items:center}
+.music{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:99px;background:var(--surface);overflow:hidden}
+.music a,.music button{border:0;background:none;color:var(--ink);padding:6px 10px;font-size:.9rem;cursor:pointer;text-decoration:none;line-height:1}
+.music a{color:#1DB954;font-weight:700}
+.music button+button,.music a+button{border-left:1px solid var(--line)}
 </style>
 
 <div class="wrap">
@@ -892,7 +897,7 @@ const ZCOL=["var(--muted)","var(--green)","var(--yellow)","var(--red)","var(--ac
 let liveHr=null, btStatus="";
 function viewWear(){
   const p=state.profile, Z=hrZones(p);
-  const hasBt=!!(navigator.bluetooth);
+  const hasBt=HAS_BT();
   return `<div class="stack">
     ${NATIVE?nativeHtml():""}
     <div class="grid2">
@@ -905,10 +910,10 @@ function viewWear(){
       </section>
       <section class="panel stack">
         <h2>Brustgurt live</h2>
-        <p class="small muted" style="margin:0">Verbindet einen Bluetooth-Herzfrequenzsensor (z. B. Polar H10, Garmin HRM, Wahoo TICKR) direkt mit der App.</p>
+        <p class="small muted" style="margin:0">Verbindet einen Bluetooth-Brustgurt (z. B. Decathlon HRM, Polar H10, Garmin HRM, Wahoo TICKR) direkt mit der App. Der Puls erscheint dann auch im Training und wird mit der Einheit gespeichert.</p>
         <div class="bpm mono" id="bpm">${liveHr?liveHr:"–"}</div>
         <div class="small" id="bpmzone">${liveHr?zoneOf(liveHr,Z):"Kein Sensor verbunden"}</div>
-        <div><button class="btn" id="btconnect">Sensor verbinden</button></div>
+        <div><button class="btn${hrOn?" ghost":""}" id="btconnect">${hrOn?"Trennen":"Sensor verbinden"}</button></div>
         <p class="small muted" id="btstatus" style="margin:0">${esc(btStatus||(hasBt?"":"In dieser Ansicht ist Bluetooth nicht verfügbar. In der eigenständigen Web-App funktioniert es in Chrome und Edge auf Android, Windows und macOS, nicht in Safari auf dem iPhone."))}</p>
       </section>
     </div>
@@ -1376,12 +1381,13 @@ function viewTraining(){
       ${r.edit?`<div><span>Bearbeiten</span><b>${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.</b></div>`:`<div><span>Dauer</span><b class="mono" id="rt-dur">${durTxt((Date.now()-r.t0)/1000)}</b></div>`}
       <div><span>Volumen</span><b class="mono">${fmt(vol)} kg</b></div>
       <div><span>Sätze</span><b class="mono">${wk.length}/${total}</b></div>
-      ${liveHr&&!r.edit?`<div><span>Puls</span><b class="mono">♥ ${liveHr}</b></div>`:""}
+      ${!r.edit&&(hrOn||liveHr)?`<div><span>Puls</span><b class="mono" id="rt-hr">♥ ${liveHr||"–"}</b></div>`:""}
       ${r.edit?`<button class="btn" data-editsave="1" style="margin-left:auto">Speichern</button>`:`<button class="btn" data-finish="1">Beenden</button>`}
     </div>
     ${r.restUntil?`<div class="restbar" role="status"><span>Pause</span><b class="mono" id="timer">${durTxt((r.restUntil-Date.now())/1000)}</b>
       <button class="chip" data-rest="30">+30 s</button><button class="chip" data-rest="skip">Überspringen</button></div>`:""}
-    <div class="muted small" style="margin:10px 2px 6px">${esc(s.name)} · ${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.</div>
+    <div class="row runsub"><span class="muted small">${esc(s.name)} · ${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.</span>
+      ${r.edit?"":`<span class="row" style="gap:6px;margin-left:auto">${!hrOn&&HAS_BT()?`<button class="chip" id="btconnect">♥ Gurt verbinden</button>`:""}${musicHtml(s)}</span>`}</div>
     <div class="stack">
       ${r.edit?`<p class="small muted" style="margin:0 2px">Werte ändern, Häkchen setzen oder entfernen und dann speichern. Nur Sätze mit Häkchen werden gespeichert.</p>`:warmCardHtml(r)}
       ${s.items.map((it,i)=>exCardHtml(r,s,it,i)).join("")}
@@ -1389,7 +1395,7 @@ function viewTraining(){
       <section class="panel row" style="justify-content:space-between">
         <label class="f" for="rpe2" style="flex-direction:row;align-items:center;gap:8px">Anstrengung<select id="rpe2">${[5,6,7,8,9,10].map(v=>`<option${v===(r.edit&&state.done[r.date]&&state.done[r.date].rpe||8)?" selected":""}>${v}</option>`).join("")}</select></label>
         ${r.edit?`<button class="btn ghost" data-editcancel="1">Abbrechen</button><button class="btn ghost" data-undone="${r.date}">${ui.delDone===r.date?"Wirklich löschen?":"Training löschen"}</button><button class="btn" data-editsave="1">Speichern</button>`
-          :`${spotifyLink(s.c==="green")}<button class="btn" data-finish="1">Training beenden</button>`}
+          :`<button class="btn" data-finish="1">Training beenden</button>`}
       </section>
     </div>`;
 }
@@ -1408,7 +1414,7 @@ function runSession(r){
 }
 function doneHtml(d){
   const L=Object.entries(d.sets||{}); const vol=L.reduce((a,[id,x])=>a+x.reduce((b,y)=>b+setVol(y),0),0), n=L.reduce((a,[id,x])=>a+work(x).filter(y=>y.min==null).length,0);
-  return `<div class="small muted">${n} Sätze${vol?` · ${fmt(vol)} kg Volumen`:""}${d.min?` · ${d.min} min`:""}${d.src==="uhr"?" · von der Uhr":""}</div>
+  return `<div class="small muted">${n} Sätze${vol?` · ${fmt(vol)} kg Volumen`:""}${d.min?` · ${d.min} min`:""}${d.hr&&d.hr.avg?` · ♥ Ø ${d.hr.avg} / max ${d.hr.max}`:""}${d.src==="uhr"?" · von der Uhr":""}</div>
   <ul class="exlist">${L.map(([id,x])=>`<li><button class="linkbtn" data-ex="${id}">${esc(EX[id]?EX[id].n:"Übung")}</button>
     <span class="presc">${x[0]&&x[0].min!=null?x[0].min+" min":""}</span><span class="meta mono">${x[0]&&x[0].min!=null?"":x.map(setTxt).join(" · ")}</span></li>`).join("")}</ul>`;
 }
@@ -1479,6 +1485,12 @@ function exCardHtml(r,s,it,i){
       ${!anyDone&&!r.edit?`<button class="chip" data-blockrun="${it.id}">Nope! Alternative</button>`:""}</div>
   </section>`;
 }
+function musicHtml(s){
+  const u=(s.c==="green"?state.profile.spCardio:state.profile.spKraft)||"", ok=/^https:\/\/open\.spotify\.com\//.test(u);
+  const href=ok?u:`https://open.spotify.com/search/${encodeURIComponent(s.c==="green"?"running 150 bpm":"gym workout")}`;
+  if(!(NATIVE&&NATIVE.media)) return `<a class="chip" href="${esc(href)}" target="_blank" rel="noopener">♫ Spotify</a>`;
+  return `<span class="music" role="group" aria-label="Musik"><a href="${esc(href)}" target="_blank" rel="noopener" aria-label="Playlist in Spotify öffnen">♫</a><button data-media="prev" aria-label="Vorheriger Titel">⏮</button><button data-media="play" aria-label="Wiedergabe oder Pause">⏯</button><button data-media="next" aria-label="Nächster Titel">⏭</button></span>`;
+}
 function plateTxt(w){const bar=state.profile.bar||20, ps=plateSplit(Number(w),bar).out; return ps.length?`Scheiben pro Seite bei ${fmt(w,1)} kg: <b class="mono">${ps.map(fmtP).join(" + ")}</b>`:""}
 function rowCheck(i,k){
   const r=ui.run, s=runSession(r), it=s.items[i], y=r.rows[i].sets[k];
@@ -1515,6 +1527,7 @@ function finishRun(){
   const prevBest=bestE1rm(r.date), before=badgeList();
   state.done[r.date]={rpe:rpeEl?Number(rpeEl.value):null,at:new Date().toISOString(),sets:r.logs,min:Math.max(1,Math.round((Date.now()-r.t0)/60000))};
   if(r.warm&&r.warm.done&&wuSec(r)>=30) state.done[r.date].warm=Math.round(wuSec(r));
+  if(r.hr&&r.hr.n>=10) state.done[r.date].hr={avg:Math.round(r.hr.sum/r.hr.n),max:r.hr.max};
   const prs=[]; let vol=0, sets=0;
   for(const [id,arr] of Object.entries(r.logs)){
     for(const x of arr){if(x.t!=="w") sets++; vol+=setVol(x)}
@@ -1758,7 +1771,7 @@ function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".ta
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -1783,6 +1796,7 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.pe){planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i)); return}
   if(t.dataset.start){ui.summary=null; ui.run={date:t.dataset.start,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false},restUntil:null,t0:Date.now()}; ui.sel=t.dataset.start; go("training"); return}
   if(t.dataset.rest){if(t.dataset.rest==="skip"){ui.run.restUntil=null; keepScroll(render)} else {ui.run.restUntil+=30000; tick()} return}
+  if(t.dataset.media){if(NATIVE&&NATIVE.media) NATIVE.media(t.dataset.media); return}
   if(t.dataset.editdone){const d=t.dataset.editdone; if(ui.run&&!ui.run.edit) return; ui.summary=null; ui.delDone=null; ui.run={date:d,edit:true,logs:{},rows:{},warm:{acc:0,start:null,done:true},restUntil:null,t0:Date.now()}; go("training"); return}
   if(t.dataset.editsave){saveEdit(); return}
   if(t.dataset.editcancel){const d=ui.run.date; ui.run=null; ui.sel=d; go("kalender"); return}
@@ -1838,7 +1852,7 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.id==="bkfile"&&t.files[0]){const fr=new FileReader(); fr.onload=()=>backupParse(String(fr.result||"")); fr.readAsText(t.files[0]); t.value=""}
 });
 document.getElementById("view").addEventListener("input",e=>{
-  if(e.target.dataset.rv&&ui.run){const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
+  if(e.target.dataset.rv&&ui.run){const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="w"&&y.w!==""){ui.run.rows[i].sets.forEach((x,j)=>{if(j>Number(k)&&!x.done&&x.t!=="w"&&(x.w===""||x.auto)){x.w=y.w; x.auto=true; const el=document.querySelector(`[data-rv="${i}:${j}:w"]`); if(el) el.value=y.w}})} if(f==="w") delete y.auto; if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
     const pl=document.getElementById("pl-"+i); if(pl&&f==="w"&&ui.run.rows[i].sets.find(x=>!x.done)===y) pl.innerHTML=plateTxt(y.w); return}
   if(e.target.id==="sg"&&ui.scan){const g=Number(e.target.value)||0, s2=ui.scan, el=document.getElementById("scanprev"); if(el) el.textContent=(s2.kcal!=null?Math.round(s2.kcal*g/100)+" kcal":"")+(s2.prot!=null?" · "+Math.round(s2.prot*g/100)+" g Protein":""); return}
   if(e.target.id==="setw"&&ui.run){const it=sessionFor(ui.run.date).items[ui.run.i], w=Number(e.target.value); const pl=document.getElementById("plates"), wa=document.getElementById("warm");
@@ -1912,8 +1926,22 @@ viewEl.addEventListener("pointercancel",()=>dragEnd());
 viewEl.addEventListener("click",e=>{if(suppressClick){suppressClick=false; e.stopPropagation(); e.preventDefault()}},true);
 
 /* ---------- Bluetooth-Herzfrequenz ---------- */
+let hrOn=false;
+const HAS_BT=()=>!!(NATIVE&&NATIVE.connectHr)||!!navigator.bluetooth;
+// Pulswerte aus Handy-App (nativ) oder Web Bluetooth: Anzeige aktualisieren und im laufenden Training mitschreiben
+window.onNativeHr=function(bpm){
+  liveHr=bpm>0?bpm:null;
+  const b=document.getElementById("bpm"), z=document.getElementById("bpmzone"), h=document.getElementById("rt-hr");
+  if(b) b.textContent=liveHr||"–"; if(z) z.textContent=liveHr?zoneOf(liveHr,hrZones(state.profile)):"Kein Sensor verbunden"; if(h) h.textContent="♥ "+(liveHr||"–");
+  const r=ui.run; if(r&&!r.edit&&liveHr){r.hr=r.hr||{n:0,sum:0,max:0}; r.hr.n++; r.hr.sum+=liveHr; r.hr.max=Math.max(r.hr.max,liveHr)}
+};
+window.onNativeHrStatus=function(t,ok){
+  btStatus=t; const was=hrOn; hrOn=!!ok; const st=document.getElementById("btstatus"); if(st) st.textContent=t;
+  if(was!==hrOn&&(ui.tab==="wear"||ui.tab==="training")) keepScroll(render);
+};
 async function connectBt(){
-  const st=document.getElementById("btstatus");
+  const st=document.getElementById("btstatus")||{};
+  if(NATIVE&&NATIVE.connectHr){if(hrOn){NATIVE.disconnectHr(); return} st.textContent="Suche Brustgurt …"; NATIVE.connectHr(); return}
   if(!navigator.bluetooth){btStatus="Bluetooth ist hier nicht verfügbar. Öffne die App eigenständig in Chrome oder Edge."; st.textContent=btStatus; return}
   try{
     st.textContent="Suche Sensor …";
@@ -1921,14 +1949,12 @@ async function connectBt(){
     const srv=await dev.gatt.connect();
     const ch=await (await srv.getPrimaryService("heart_rate")).getCharacteristic("heart_rate_measurement");
     await ch.startNotifications();
-    btStatus=`Verbunden mit ${dev.name||"Sensor"}`; st.textContent=btStatus;
+    window.onNativeHrStatus(`Verbunden mit ${dev.name||"Sensor"}`,true);
     ch.addEventListener("characteristicvaluechanged",ev=>{
       const v=ev.target.value, flags=v.getUint8(0);
-      liveHr=(flags&1)?v.getUint16(1,true):v.getUint8(1);
-      const b=document.getElementById("bpm"), z=document.getElementById("bpmzone");
-      if(b) b.textContent=liveHr; if(z) z.textContent=zoneOf(liveHr,hrZones(state.profile));
+      window.onNativeHr((flags&1)?v.getUint16(1,true):v.getUint8(1));
     });
-    dev.addEventListener("gattserverdisconnected",()=>{btStatus="Verbindung getrennt"; liveHr=null; if(ui.tab==="wear") render()});
+    dev.addEventListener("gattserverdisconnected",()=>{window.onNativeHr(0); window.onNativeHrStatus("Verbindung getrennt",false)});
   }catch(err){btStatus=err&&err.name==="NotFoundError"?"Kein Sensor ausgewählt.":"Verbindung nicht möglich: "+(err&&err.message||err)+". In dieser Ansicht blockiert der Browser Bluetooth möglicherweise."; st.textContent=btStatus}
 }
 
