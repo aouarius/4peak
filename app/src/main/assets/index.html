@@ -1279,7 +1279,8 @@ function viewErnaehrung(){
       </section>
     </div>
     <section class="panel stack">
-      <h3>Schnell eintragen</h3>
+      <div class="row" style="justify-content:space-between;align-items:center"><h3>Schnell eintragen</h3>${NATIVE&&NATIVE.scanBarcode?`<button class="btn" data-scan="1">Barcode scannen</button>`:""}</div>
+      ${scanHtml()}
       <div class="row">${FOODS.map((f,i)=>`<button class="chip" data-food="${i}">${esc(f[0])} <span class="muted mono">${f[1]}</span></button>`).join("")}</div>
       <form class="row" id="foodform">
         <label class="f" for="fn" style="flex:1 1 180px">Lebensmittel<input id="fn" type="text" maxlength="60" placeholder="z. B. Pasta Bolognese"></label>
@@ -1287,11 +1288,46 @@ function viewErnaehrung(){
         <label class="f" for="fp">Protein (g)<input id="fp" type="number" min="0" max="400" style="width:100px"></label>
         <button class="btn" type="submit" style="align-self:flex-end">Hinzufügen</button>
       </form>
-      <p class="small muted" style="margin:0">Nährwerte der Schnellauswahl sind gerundete Durchschnittswerte. Ein Barcode-Scanner wie bei MyFitnessPal braucht die Kamera und kommt mit der nativen App.</p>
+      <p class="small muted" style="margin:0">Nährwerte der Schnellauswahl sind gerundete Durchschnittswerte.${NATIVE&&NATIVE.scanBarcode?"":" Der Barcode-Scanner funktioniert in der Android-App."}</p>
     </section>
   </div>`;
 }
 
+
+/* ---------- Barcode-Scanner (nur Handy-App) ---------- */
+function scanSupp(x){
+  const b=norm(x.brand||""); if(!b) return null;
+  const m=matchProducts((x.brand||"")+" "+(x.name||"")).filter(pr=>b.includes(norm(pr.brand))||norm(pr.brand).includes(b.split(" ")[0]));
+  return m[0]||null;
+}
+window.onBarcode=function(x){
+  if(!x||typeof x!=="object"){ui.scan=null; render(); return}
+  if(x.cancelled){ui.scan=null; render(); return}
+  const ean=String(x.ean||"").replace(/\D/g,"").slice(0,14);
+  if(x.error){ui.scan={ean,error:String(x.error)}; render(); return}
+  const num=v=>{const n=Number(v); return isFinite(n)&&n>=0?n:null};
+  const p={ean,name:String(x.name||"").slice(0,80),brand:String(x.brand||"").slice(0,60),kcal:num(x.kcal),prot:num(x.prot),carb:num(x.carb),fat:num(x.fat),serving:num(x.serving),qty:String(x.qty||"").slice(0,30)};
+  state.scans=state.scans||{}; state.scans[ean]=p; save();
+  ui.scan=p; if(ui.tab!=="ernaehrung") ui.tab="ernaehrung"; render();
+};
+function scanHtml(){
+  const s=ui.scan; if(!s) return "";
+  if(s.loading) return `<p class="small muted" style="margin:0">Kamera wird geöffnet …</p>`;
+  if(s.error) return `<p style="margin:0">${esc(s.error)}${s.ean?` <span class="mono muted">${esc(s.ean)}</span>`:""}</p>`;
+  const g=s.serving||100, k=s.kcal!=null?Math.round(s.kcal*g/100):null, pr=s.prot!=null?Math.round(s.prot*g/100):null, sp=scanSupp(s);
+  return `<div class="stack" style="gap:8px">
+    <div><b>${esc(s.name||"Unbekanntes Produkt")}</b>${s.brand?` <span class="muted">· ${esc(s.brand)}</span>`:""}${s.qty?` <span class="muted mono">${esc(s.qty)}</span>`:""}</div>
+    ${s.kcal==null&&s.prot==null?`<p class="small" style="margin:0">Für dieses Produkt sind keine Nährwerte hinterlegt. Trag sie unten von Hand ein.</p>`:
+    `<p class="small muted mono" style="margin:0">pro 100 g: ${s.kcal!=null?fmt(s.kcal)+" kcal":"– kcal"} · ${s.prot!=null?fmt(s.prot,1)+" g Protein":"– Protein"}${s.carb!=null?` · ${fmt(s.carb,1)} g KH`:""}${s.fat!=null?` · ${fmt(s.fat,1)} g Fett`:""}</p>
+    <form class="row" id="scanform">
+      <label class="f" for="sg">Menge (g)<input id="sg" type="number" min="1" max="3000" value="${g}" style="width:100px"></label>
+      <button class="btn" type="submit" style="align-self:flex-end">Eintragen</button>
+      <span class="small muted" id="scanprev" style="align-self:flex-end">${k!=null?k+" kcal":""}${pr!=null?" · "+pr+" g Protein":""}</span>
+    </form>`}
+    ${sp?`<p class="small" style="margin:0">Das ist ein Supplement aus deinem Katalog: <b>${esc(sp.brand)} ${esc(sp.name)}</b>. ${state.myProducts.includes(sp.id)?"Es ist schon bei deinen Produkten.":`<button class="linkbtn" data-prodadd="${esc(sp.id)}">Zu meinen Produkten</button>`}</p>`:""}
+    <p class="sources" style="margin:0">Nährwerte von <a href="https://world.openfoodfacts.org/product/${esc(s.ean)}" target="_blank" rel="noopener">Open Food Facts</a>, bitte mit der Packung abgleichen.</p>
+  </div>`;
+}
 const VIEWS={kalender:viewKalender,training:viewTraining,fortschritt:viewFortschritt,ernaehrung:viewErnaehrung,plan:viewPlan,uebungen:viewUebungen,supps:viewSupps,wear:viewWear,profil:viewProfil};
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===ui.tab?"true":"false"));
@@ -1306,7 +1342,8 @@ function go(tab){ui.tab=tab; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-fdel],[data-food],[data-health],[data-scan]"); if(!t) return;
+  if(t.dataset.scan){ui.scan={loading:true}; render(); NATIVE.scanBarcode(); return}
   if(t.dataset.health){if(NATIVE) NATIVE.requestHealth(); t.textContent="Wird geladen …"; return}
   if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
   if(t.dataset.prodadd){const pr=prodById(t.dataset.prodadd); if(!state.myProducts.includes(pr.id)) state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}
@@ -1351,6 +1388,7 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.id==="actfile"&&t.files[0]){importActivity(t.files[0])}
 });
 document.getElementById("view").addEventListener("input",e=>{
+  if(e.target.id==="sg"&&ui.scan){const g=Number(e.target.value)||0, s2=ui.scan, el=document.getElementById("scanprev"); if(el) el.textContent=(s2.kcal!=null?Math.round(s2.kcal*g/100)+" kcal":"")+(s2.prot!=null?" · "+Math.round(s2.prot*g/100)+" g Protein":""); return}
   if(e.target.id==="setw"&&ui.run){const it=sessionFor(ui.run.date).items[ui.run.i], w=Number(e.target.value); const pl=document.getElementById("plates"), wa=document.getElementById("warm");
     if(pl) pl.innerHTML=platesHtml(w); if(wa) wa.innerHTML=warmHtml(w,it.id); return}
   if(e.target.id==="prodq"){ui.prodQ=e.target.value; ui.prodBrand=""; const pos=e.target.selectionStart; render(); const q=document.getElementById("prodq"); q.focus(); q.setSelectionRange(pos,pos); return}
@@ -1363,6 +1401,7 @@ document.getElementById("view").addEventListener("submit",e=>{
     state.customProducts.push(pr); state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}
   if(e.target.id==="bwform"){e.preventDefault(); const v=Number(document.getElementById("bwv").value), d=document.getElementById("bwd").value||todayIso;
     if(v>=30&&v<=300){state.bw=state.bw.filter(x=>x.d!==d); state.bw.push({d,v}); state.profile.weight=v; save(); render()} return}
+  if(e.target.id==="scanform"){e.preventDefault(); const s=ui.scan, g=Math.max(1,Number(document.getElementById("sg").value)||100); (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${s.name||"Gescannt"}${s.brand?" ("+s.brand+")":""}, ${g} g`.slice(0,60),k:Math.round((s.kcal||0)*g/100),p:Math.round((s.prot||0)*g/100)}); ui.scan=null; save(); render(); return}
   if(e.target.id==="foodform"){e.preventDefault(); const n=document.getElementById("fn").value.trim()||"Eintrag", k=Math.max(0,Math.round(Number(document.getElementById("fk").value)||0)), p=Math.max(0,Math.round(Number(document.getElementById("fp").value)||0));
     if(!k&&!p) return; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:n.slice(0,60),k,p}); save(); render(); return}
   if(e.target.id!=="pform") return; e.preventDefault();

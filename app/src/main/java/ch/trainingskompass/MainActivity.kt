@@ -18,6 +18,9 @@ import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
@@ -143,6 +146,27 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         web.evaluateJavascript("window.onNativeHealth && window.onNativeHealth($obj)", null)
     }
 
+    /** Öffnet den Barcode-Scanner der Google-Play-Dienste (braucht keine Kamera-Berechtigung der App). */
+    private fun startBarcodeScan() {
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
+            .build()
+        GmsBarcodeScanning.getClient(this, options).startScan()
+            .addOnSuccessListener { code ->
+                val ean = code.rawValue
+                if (ean.isNullOrBlank()) sendBarcode(JSONObject().put("error", "Kein Barcode erkannt."))
+                else lifecycleScope.launch { sendBarcode(FoodLookup.lookup(ean)) }
+            }
+            .addOnCanceledListener { sendBarcode(JSONObject().put("cancelled", true)) }
+            .addOnFailureListener {
+                sendBarcode(JSONObject().put("error", "Der Scanner konnte nicht starten. Prüfe, ob die Google-Play-Dienste aktuell sind."))
+            }
+    }
+
+    private fun sendBarcode(obj: JSONObject) {
+        web.evaluateJavascript("window.onBarcode && window.onBarcode($obj)", null)
+    }
+
     inner class Bridge {
         @JavascriptInterface
         fun sendToWatch(json: String) {
@@ -151,6 +175,11 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 dataMap.putLong("t", System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()
             dataClient.putDataItem(request)
+        }
+
+        @JavascriptInterface
+        fun scanBarcode() {
+            runOnUiThread { startBarcodeScan() }
         }
 
         @JavascriptInterface

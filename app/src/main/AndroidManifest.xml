@@ -16,6 +16,11 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.Trainingskompass">
 
+        <!-- Scanner-Modul der Play-Dienste schon bei der Installation laden -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
