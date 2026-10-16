@@ -2,7 +2,7 @@
 <title>Trainingskompass</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <style>
 /* Layout: Trainingsbuch mit Reiter oben, Inhalt in einer Spalte; Farben der Einheiten nach dem Hantelscheiben-Code (rot 25, blau 20, gelb 15, grün 10 kg). */
 :root{
@@ -289,6 +289,107 @@ table.sets tr.t-w .stbtn{color:var(--yellow)}table.sets tr.t-d .stbtn{color:var(
 .music a,.music button{border:0;background:none;color:var(--ink);padding:6px 10px;font-size:.9rem;cursor:pointer;text-decoration:none;line-height:1}
 .music a{color:#1DB954;font-weight:700}
 .music button+button,.music a+button{border-left:1px solid var(--line)}
+
+/* ---------- Design 3: Vorbilder Things 3 und Gentler Streak (Apple Design Award), Apple Fitness (Ringe), Revolut (große Zahlen), Linear (dunkles Design), Duolingo (Abzeichen) ---------- */
+:root{
+  --bg:#F2F3F7; --surface:#FFFFFF; --sunk:#EEF0F5; --ink:#0E1116; --muted:#667085; --line:#E6E8EF;
+  --accent:#3A5BFF; --accent-ink:#FFFFFF; --soft:rgba(58,91,255,.10); --accent2:#8B5CF6;
+  --grad:linear-gradient(135deg,#3A5BFF 0%,#7A4DFF 100%);
+  --shadow:0 1px 1px rgba(16,24,40,.04),0 6px 24px rgba(16,24,40,.06);
+  --f-display:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B0C10; --surface:#15171D; --sunk:#1D2028; --ink:#ECEEF3; --muted:#9097A6; --line:#262A34;
+  --accent:#8EA2FF; --accent-ink:#0B0C10; --soft:rgba(142,162,255,.14); --accent2:#B79BFF;
+  --grad:linear-gradient(135deg,#4A63FF 0%,#8A55FF 100%); --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.35)}}
+:root[data-theme="dark"]{
+  --bg:#0B0C10; --surface:#15171D; --sunk:#1D2028; --ink:#ECEEF3; --muted:#9097A6; --line:#262A34;
+  --accent:#8EA2FF; --accent-ink:#0B0C10; --soft:rgba(142,162,255,.14); --accent2:#B79BFF;
+  --grad:linear-gradient(135deg,#4A63FF 0%,#8A55FF 100%); --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.35)}
+body{font-size:14.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
+.mono{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+h1{font-size:1.35rem;font-weight:800;text-transform:none;letter-spacing:-.02em}
+h2{font-size:1.25rem;font-weight:800;text-transform:none;letter-spacing:-.02em}
+h3{font-size:.98rem;font-weight:700;letter-spacing:-.01em}
+.logo{background:var(--grad);color:#fff;border-radius:11px}
+.panel{border:0;border-radius:20px;padding:16px;box-shadow:var(--shadow)}
+:root[data-theme="dark"] .panel{border:1px solid var(--line)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .panel{border:1px solid var(--line)}}
+.stack{gap:14px}
+.btn{border-radius:12px;padding:9px 16px;font-weight:700;background:var(--grad);color:#fff;box-shadow:0 4px 14px rgba(58,91,255,.25);transition:transform .12s}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.chip{background:var(--sunk);border-color:transparent;font-weight:600}
+.chip.on{background:var(--grad);border-color:transparent;color:#fff}
+.pill{background:var(--sunk);font-weight:700}
+.iconbtn{border-radius:12px;border-color:transparent;background:var(--surface);box-shadow:var(--shadow)}
+label.f select,label.f input,.filters input,.filters select{border:1px solid transparent;background:var(--sunk);border-radius:12px}
+label.f select:focus,label.f input:focus{border-color:var(--accent);outline:none;background:var(--surface)}
+.tile{border:0;border-radius:18px;background:var(--surface);box-shadow:var(--shadow);padding:12px 14px}
+.panel .tile{background:var(--sunk);box-shadow:none}
+.tl{font-size:.68rem;letter-spacing:.06em}
+.tv{font:800 1.7rem var(--f-display);letter-spacing:-.03em;margin-top:2px}
+.note{border-radius:14px}
+/* Kalender */
+.day{border:0;background:var(--sunk);border-radius:12px;min-height:54px}
+.day.out{opacity:.35}
+.day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.day.sel{background:var(--soft)}
+.day .n{font:700 .8rem var(--f-body)}
+.day .bar{height:4px;border-radius:99px}
+.cal-head .btn.ghost{width:36px;height:36px;padding:0;border-radius:12px}
+/* Heute-Karte */
+.hero{position:relative;overflow:hidden;border-radius:24px;padding:18px;color:#fff;background:var(--grad);box-shadow:0 12px 30px rgba(58,91,255,.28)}
+.hero.c-red{background:linear-gradient(135deg,#F0564A,#C2337A)}.hero.c-yellow{background:linear-gradient(135deg,#F5B428,#F0703C)}.hero.c-green{background:linear-gradient(135deg,#1FB57A,#1288A8)}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.12)}
+.hero .hl{font-size:.8rem;font-weight:600;opacity:.85}
+.hero h2{color:#fff;font-size:1.6rem;margin:2px 0 4px}
+.hero .meta{font-size:.85rem;opacity:.9}
+.hero .go{background:#fff;color:#111;border:0;border-radius:14px;padding:11px 18px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.hero .ghostw{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:14px;padding:11px 14px;font-weight:700;cursor:pointer}
+.hero-grid{display:flex;gap:14px;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.hero-stats{display:flex;gap:8px;margin-top:14px;position:relative;z-index:1;flex-wrap:wrap}
+.hero-stats span{background:rgba(255,255,255,.18);border-radius:99px;padding:5px 10px;font-size:.78rem;font-weight:700}
+/* Ringe */
+.rings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ring{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.ring svg{width:118px;height:118px;display:block}
+.ring .rt{stroke:var(--sunk)}
+.ring .rv{fill:none;stroke-linecap:round;transition:stroke-dashoffset .6s ease}
+.ring .big{font:800 1.35rem var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.ring .unit{font:600 .62rem var(--f-body);fill:var(--muted)}
+.ring b{font-size:.85rem}
+/* Abzeichen als Medaillen */
+.medals{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:12px}
+.medal{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:.72rem;font-weight:700;line-height:1.2}
+.medal i{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:1.4rem;background:var(--grad);color:#fff;box-shadow:0 6px 16px rgba(58,91,255,.3)}
+.medal.off{color:var(--muted)}
+.medal.off i{background:var(--sunk);box-shadow:none;filter:grayscale(1);opacity:.55}
+/* Untere Leiste schwebend */
+@media (max-width:760px){
+  .bnav{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));border:1px solid var(--line);border-radius:22px;box-shadow:0 10px 30px rgba(16,24,40,.14);padding:6px}
+  .wrap{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+  .more:not([hidden]){bottom:calc(86px + env(safe-area-inset-bottom,0px));border-radius:20px}
+  .bnav button[aria-current="true"] .ic{background:var(--grad);color:#fff}
+}
+/* Training */
+.runhead{border:0;border-radius:18px;background:color-mix(in srgb,var(--surface) 88%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.runhead b{font-weight:800}
+.restbar{background:var(--grad);color:#fff;border-radius:16px}
+.restbar b{font-weight:800}
+.rchk[aria-pressed="true"]{animation:pop .25s ease}
+@keyframes pop{0%{transform:scale(.8)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+table.sets input{border-radius:10px;font-weight:700}
+.stbtn,.rchk{border-radius:10px}
+.progress{height:10px;border-radius:99px}
+.progress span{background:var(--grad);border-radius:99px}
+.mbar{background:var(--grad);border-radius:99px}
+.chartwrap .mark{fill:var(--accent)}
+.restsel{border:0;background:var(--soft);font-weight:700}
+a.chip{text-decoration:none;color:var(--ink)}
+@media (prefers-reduced-motion: reduce){.rchk[aria-pressed="true"]{animation:none}.btn{transition:none}}
 </style>
 
 <div class="wrap">
@@ -669,6 +770,30 @@ function sessionHtml(s){
   </li>`).join("")}</ul>`;
 }
 
+function heroHtml(){
+  const h=new Date().getHours(), greet=h<11?"Guten Morgen":h<17?"Hallo":"Guten Abend";
+  const doneToday=state.done[todayIso], d=nextTrainingDate(), s=d?sessionFor(d):null;
+  const wk=mondayOf(TODAY); let planned=0, doneW=0;
+  for(let i=0;i<7;i++){const k=iso(new Date(wk.getFullYear(),wk.getMonth(),wk.getDate()+i)); if(sessionFor(k)) planned++; if(state.done[k]) doneW++}
+  const T=targets(state.profile), prot=(state.food[todayIso]||[]).reduce((a,x)=>a+x.p,0), st=weekStreak();
+  const pct=planned?Math.min(1,doneW/planned):0, R=26, C=2*Math.PI*R;
+  const dd=d?parseIso(d):null, when=!d?"":d===todayIso?"Heute":d===iso(new Date(TODAY.getTime()+DAY))?"Morgen":`${WD[isoWd(dd)]}, ${dd.getDate()}.${dd.getMonth()+1}.`;
+  const est=s?Math.round((s.items.reduce((a,it)=>a+(it.role==="cardio"?20:it.sets*(1+restSec(it.rest)/60)),0)+10)/5)*5:0;
+  return `<section class="hero${s&&!doneToday?" c-"+s.c:""}">
+    <div class="hero-grid"><div style="min-width:0">
+      <div class="hl">${greet}${ui.run&&!ui.run.edit?" · Training läuft":""}</div>
+      ${doneToday&&(!d||d!==todayIso)?`<h2>Heute erledigt ✓</h2><div class="meta">Stark! ${s?`Als Nächstes: ${esc(s.name)}, ${when}.`:"Erhol dich gut."}</div>`
+        :s?`<h2>${esc(s.name)}</h2><div class="meta">${when} · ${s.items.length} Übungen · ca. ${est} min${s.deload?" · Deload":""}</div>`
+        :`<h2>Kein Training geplant</h2><div class="meta">Lege Trainingstage im Profil fest.</div>`}
+    </div>
+    <svg viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Diese Woche ${doneW} von ${planned} Einheiten" style="flex:none">
+      <circle cx="32" cy="32" r="${R}" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="7"/>
+      <circle cx="32" cy="32" r="${R}" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-pct)).toFixed(1)}" transform="rotate(-90 32 32)"/>
+      <text x="32" y="37" text-anchor="middle" fill="#fff" style="font:800 15px var(--f-display)">${doneW}/${planned}</text></svg></div>
+    <div class="hero-stats"><span>🔥 ${st} ${st===1?"Woche":"Wochen"} Serie</span><span>🥩 ${prot}/${T.prot} g Protein</span></div>
+    ${s&&!(doneToday&&d!==todayIso)?`<div class="row" style="margin-top:14px;position:relative;z-index:1">${ui.run&&!ui.run.edit?`<button class="go" data-goto="training">Weiter trainieren</button>`:`<button class="go" data-start="${d}">Training starten</button>`}<button class="ghostw" data-day="${d}">Details</button></div>`:""}
+  </section>`;
+}
 function viewKalender(){
   const m=ui.month, first=new Date(m.getFullYear(),m.getMonth(),1);
   const gridStart=mondayOf(first);
@@ -690,7 +815,8 @@ function viewKalender(){
   const p=state.profile;
   const upcoming=[]; for(let i=0;i<21&&upcoming.length<3;i++){const d=new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i);const ss=sessionFor(iso(d)); if(ss) upcoming.push([d,ss]);}
   return `
-  ${p.example?`<p class="note">Das ist ein Beispielprofil (Muskelaufbau, Mo/Mi/Fr, 75 kg). Passe es unter <button class="linkbtn" data-goto="profil">Ziele &amp; Profil</button> an, dann berechnet sich der Plan neu.</p>`:""}
+  ${heroHtml()}
+  ${p.example?`<p class="note" style="margin-top:12px">Das ist ein Beispielprofil (Muskelaufbau, Mo/Mi/Fr, 75 kg). Passe es unter <button class="linkbtn" data-goto="profil">Ziele &amp; Profil</button> an, dann berechnet sich der Plan neu.</p>`:""}
   <div class="grid2" style="margin-top:12px">
     <section class="panel">
       <div class="cal-head">
@@ -1614,7 +1740,7 @@ function viewFortschritt(){
         </tbody></table></div><p class="small muted" style="margin:0">1RM geschätzt nach Epley aus Sätzen bis 12 Wiederholungen. Tippe auf eine Übung für ihren Verlauf.</p>`:`<p class="small muted" style="margin:0">Erscheinen, sobald du Sätze mit Gewicht speicherst.</p>`}
       </section>
       <section class="panel stack"><h3>Abzeichen</h3>
-        <div class="row">${badgeList().map(b=>`<span class="badge${b.got?"":" off"}">${b.got?"✓ ":""}${esc(b.n)}</span>`).join("")}</div>
+        <div class="medals">${badgeList().map((b,i)=>`<div class="medal${b.got?"":" off"}" title="${b.got?"Erreicht":"Noch offen"}"><i aria-hidden="true">${["🏁","🔟","⭐","🏅","💯","🔥","🌋","🏋️","🏔️"][i]||"🏆"}</i>${esc(b.n)}</div>`).join("")}</div>
       </section>
     </div>
     <section class="panel stack"><h3>Körpergewicht (kg)</h3>
@@ -1639,6 +1765,14 @@ function targets(p){
   const fat=Math.round(kcal*.27/9), carbs=Math.max(0,Math.round((kcal-prot*4-fat*9)/4));
   return {bmr:Math.round(bmr),tdee:Math.round(tdee),adj,f,kcal,prot,fat,carbs};
 }
+function ringHtml(label,val,goal,unit,col){
+  const pct=goal>0?Math.min(1,val/goal):0, R=48, C=2*Math.PI*R, rest=goal-val;
+  return `<div class="ring"><svg viewBox="0 0 120 120" role="img" aria-label="${label}: ${fmt(val)} von ${fmt(goal)} ${unit}">
+    <circle cx="60" cy="60" r="${R}" class="rt" fill="none" stroke-width="12"/>
+    <circle cx="60" cy="60" r="${R}" class="rv" stroke="${col}" stroke-width="12" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-pct)).toFixed(1)}" transform="rotate(-90 60 60)"/>
+    <text x="60" y="62" text-anchor="middle" class="big">${fmt(val)}</text><text x="60" y="80" text-anchor="middle" class="unit">von ${fmt(goal)} ${unit}</text></svg>
+    <b>${label}</b><span class="small muted">${rest>=0?`noch ${fmt(rest)} ${unit}`:`${fmt(-rest)} ${unit} drüber`}</span></div>`;
+}
 function meter(label,val,goal,unit){
   const pct=Math.min(100,Math.round(val/goal*100));
   return `<div class="stack" style="gap:4px"><div class="row" style="justify-content:space-between"><b>${label}</b><span class="mono">${fmt(val)} / ${fmt(goal)} ${unit}</span></div>
@@ -1651,8 +1785,7 @@ function viewErnaehrung(){
     <div class="grid2">
       <section class="panel stack">
         <div class="cal-head"><button class="btn ghost" data-fday="-1" aria-label="Voriger Tag">‹</button><h2>${day===todayIso?"Heute":`${WD[isoWd(dd)]}, ${dd.getDate()}.${dd.getMonth()+1}.`}</h2><button class="btn ghost" data-fday="1" aria-label="Nächster Tag">›</button></div>
-        ${meter("Kalorien",kcal,T.kcal,"kcal")}
-        ${meter("Protein",prot,T.prot,"g")}
+        <div class="rings">${ringHtml("Kalorien",kcal,T.kcal,"kcal","var(--accent)")}${ringHtml("Protein",prot,T.prot,"g","var(--green)")}</div>
         ${list.length?`<ul class="exlist">${list.map((x,i)=>`<li><span>${esc(x.n)}</span><span class="presc">${x.k} kcal · ${x.p} g <button class="linkbtn" data-fdel="${i}" aria-label="${esc(x.n)} entfernen">✕</button></span></li>`).join("")}</ul>`:`<p class="small muted" style="margin:0">Noch nichts eingetragen. Tippe unten auf ein Lebensmittel oder trage eigene Werte ein.</p>`}
       </section>
       <section class="panel stack">
