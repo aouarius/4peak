@@ -1,5 +1,5 @@
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
-<title>Trainingskompass</title>
+<title>4peak</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20108%20108%22%3E%3Crect%20width%3D%22108%22%20height%3D%22108%22%20rx%3D%2224%22%20fill%3D%22%2324282e%22/%3E%3Cpath%20d%3D%22M52.00%2C34.49%20L30.06%2C65.75%20L47.02%2C65.75%20L47.02%2C73.51%20L78.06%2C73.51%20Z%20M52.23%2C35.82%20L52.23%2C73.51%20M52.23%2C61.09%20L57.21%2C61.09%20L57.21%2C65.75%20L52.23%2C65.75%20M47.13%2C48.90%20L38.37%2C61.32%20L47.13%2C61.32%20Z%20M52.23%2C53.89%20L59.43%2C45.80%22%20fill%3D%22none%22%20stroke%3D%22%23b450ff%22%20stroke-width%3D%224%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -400,7 +400,7 @@ a.chip{text-decoration:none;color:var(--ink)}
     <div class="brand">
       <span class="logo" aria-hidden="true"><svg viewBox="26 26 56 56" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"><path d="M52.00,34.49 L30.06,65.75 L47.02,65.75 L47.02,73.51 L78.06,73.51 Z M52.23,35.82 L52.23,73.51 M52.23,61.09 L57.21,61.09 L57.21,65.75 L52.23,65.75 M47.13,48.90 L38.37,61.32 L47.13,61.32 Z M52.23,53.89 L59.43,45.80"/></svg></span>
       <div style="min-width:0">
-        <h1>Trainingskompass</h1>
+        <h1>4peak</h1>
         <p class="sub">Plan, Training, Ernährung und Supplements an einem Ort.</p>
       </div>
     </div>
@@ -1105,7 +1105,7 @@ function backupHtml(){
   return `<section class="panel stack" id="backup" style="margin-top:14px"><h2>Daten sichern</h2>
     <p class="small muted" style="margin:0">Eine Datei mit allen Trainings, deinem Plan, Notizen, eigenen Übungen und der Ernährung. Damit holst du alles nach einem Handywechsel oder einer Neuinstallation zurück.${lb?` Letzte Sicherung: ${dt(lb)}.`:" Noch keine Sicherung."}</p>
     <div class="row"><button class="btn" data-backup="save">Sicherung speichern</button><button class="btn ghost" data-backup="load">Sicherung laden</button>${web?`<input type="file" id="bkfile" accept=".json,application/json,text/plain" hidden>`:""}<span id="bkmsg" class="small muted">${esc(ui.bkMsg||"")}</span></div>
-    ${R?(R.err?`<p class="small" style="margin:0">Diese Datei ist keine Trainingskompass-Sicherung.</p>`
+    ${R?(R.err?`<p class="small" style="margin:0">Diese Datei ist keine 4peak-Sicherung.</p>`
       :`<div class="panel stack" style="background:var(--bg)"><b>Sicherung${R.at?` vom ${dt(R.at)}`:""} mit ${R.n} ${R.n===1?"Training":"Trainings"} laden?</b>
         <span class="small muted">Deine aktuellen Daten auf diesem Gerät werden dadurch ersetzt.</span>
         <div class="row"><button class="btn" data-backup="apply">Ersetzen</button><button class="btn ghost" data-backup="cancel">Abbrechen</button></div></div>`):""}
@@ -1118,7 +1118,7 @@ async function backupAction(a){
   if(a==="apply"&&ui.restore&&ui.restore.st){state=normalize(ui.restore.st); applyCustomEx(); ui.restore=null; ui.run=null; ui.summary=null; ui.bkMsg="Sicherung geladen ✓"; save(); render(); return}
   if(a==="load"){ui.bkMsg=""; if(NATIVE&&NATIVE.openBackup) NATIVE.openBackup(); else {const f=document.getElementById("bkfile"); if(f) f.click()} return}
   if(a!=="save") return;
-  const name=`trainingskompass-${todayIso}.json`;
+  const name=`4peak-${todayIso}.json`;
   const data=JSON.stringify({app:"trainingskompass",v:1,at:new Date().toISOString(),state});
   if(NATIVE&&NATIVE.saveBackup){backupMsg("Speicherort wählen …"); NATIVE.saveBackup(name,data); return}
   try{const dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;

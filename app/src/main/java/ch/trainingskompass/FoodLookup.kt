@@ -18,7 +18,7 @@ object FoodLookup {
                 connectTimeout = 10_000
                 readTimeout = 10_000
                 // Open Food Facts verlangt eine erkennbare App-Kennung
-                setRequestProperty("User-Agent", "Trainingskompass/0.1 (Android; github.com/aouarius/4peak)")
+                setRequestProperty("User-Agent", "4peak/0.1 (Android; github.com/aouarius/4peak)")
             }
         }.getOrNull() ?: return@withContext result.put("error", "Keine Verbindung zu Open Food Facts.")
         try {

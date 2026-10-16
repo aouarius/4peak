@@ -223,7 +223,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
         val p = plan
         val open = p?.sessions?.filter { it.date !in doneDates }.orEmpty()
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("Trainingskompass", style = MaterialTheme.typography.title3) }
+            item { Text("4peak", style = MaterialTheme.typography.title3) }
             if (open.isEmpty()) {
                 item {
                     Text(

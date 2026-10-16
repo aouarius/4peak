@@ -1,8 +1,8 @@
-# Trainingskompass
+# 4peak
 
 Fitness-App für Android mit Uhr-App für Wear OS.
 
-- **Handy (`app/`):** der komplette Trainingskompass, also Kalender, Plan aus deinen Zielen, 133 Übungen, Supplements und Ernährung. Die App liest Ruhepuls, HRV und Schlaf aus Health Connect und schickt deine nächsten Trainings an die Uhr.
+- **Handy (`app/`):** die komplette 4peak-App, also Kalender, Plan aus deinen Zielen, 133 Übungen, Supplements und Ernährung. Die App liest Ruhepuls, HRV und Schlaf aus Health Connect und schickt deine nächsten Trainings an die Uhr.
 - **Uhr (`wear/`):** zeigt das heutige Training. Pro Satz stellst du Gewicht und Wiederholungen ein und speicherst mit einem Tipp. Danach läuft der Pausentimer und die Uhr vibriert, wenn es weitergeht. Während des Trainings misst die Uhr deinen Puls live und zeigt die Zone an. Am Ende geht das Training ans Handy, auch wenn das Handy erst später wieder in der Nähe ist.
 
 ## Installieren
