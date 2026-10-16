@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.widget.FrameLayout
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -36,6 +38,7 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     private lateinit var web: WebView
+    private lateinit var root: FrameLayout
     private var pageReady = false
     private val dataClient by lazy { Wearable.getDataClient(this) }
     private val health by lazy { HealthBridge(this) }
@@ -71,12 +74,19 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 }
             }
         }
-        ViewCompat.setOnApplyWindowInsetsListener(web) { v, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+        // Die WebView beachtet kein eigenes Padding, deshalb hält ein Rahmen sie von
+        // Statusleiste, Navigationstasten und Tastatur fern.
+        root = FrameLayout(this).apply {
+            addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime()
+            )
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             WindowInsetsCompat.CONSUMED
         }
-        setContentView(web)
+        setContentView(root)
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
         else web.loadUrl("file:///android_asset/index.html")
 
@@ -185,6 +195,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val color = runCatching { Color.parseColor(background) }.getOrNull() ?: return
             runOnUiThread {
                 window.decorView.setBackgroundColor(color)
+                root.setBackgroundColor(color)
                 web.setBackgroundColor(color)
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !dark
