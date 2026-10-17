@@ -3,7 +3,7 @@
 Fitness-App für Android mit Uhr-App für Wear OS.
 
 - **Handy (`app/`):** die komplette 4peak-App, also Kalender, Plan aus deinen Zielen, 133 Übungen, Supplements und Ernährung. Die App liest Ruhepuls, HRV und Schlaf aus Health Connect und schickt deine nächsten Trainings an die Uhr.
-- **Uhr (`wear/`):** zeigt das heutige Training. Pro Satz stellst du Gewicht und Wiederholungen ein und speicherst mit einem Tipp. Danach läuft der Pausentimer und die Uhr vibriert, wenn es weitergeht. Während des Trainings misst die Uhr deinen Puls live und zeigt die Zone an. Am Ende geht das Training ans Handy, auch wenn das Handy erst später wieder in der Nähe ist.
+- **Uhr (`wear/`):** zeigt das heutige Training. Pro Satz stellst du Gewicht und Wiederholungen ein und speicherst mit einem Tipp. Danach läuft der Pausentimer und die Uhr vibriert, wenn es weitergeht. Während des Trainings misst die Uhr Puls und Kalorien über Health Services, zeigt das Training als laufende Aktivität auf dem Zifferblatt und vibriert am Pausenende auch bei dunklem Bildschirm. Dazu kommen eine Kachel und eine Komplikation mit dem nächsten Training, eine Always-on-Ansicht und Bedienung über die Lünette. Das Layout ist auf die Galaxy Watch 8 (40 mm) abgestimmt. Am Ende geht das Training ans Handy, auch wenn das Handy erst später wieder in der Nähe ist.
 
 ## Installieren
 
@@ -21,6 +21,6 @@ Alle Builds sind mit demselben Schlüssel (`keystore/debug.keystore`) signiert. 
 | Handy-App | WebView mit `app/src/main/assets/index.html`, Brücke `TKNative` (Kotlin) |
 | Gesundheitsdaten | Health Connect: Ruhepuls, HRV (RMSSD), Schlaf |
 | Handy ↔ Uhr | Wearable Data Layer: `/plan` (Handy → Uhr), `/log/<datum>/<zeit>` (Uhr → Handy) |
-| Uhr-App | Kotlin, Compose for Wear OS, Pulssensor der Uhr |
+| Uhr-App | Kotlin, Compose for Wear OS, Health Services, Tiles, Komplikationen, Ongoing Activity |
 
 Die Web-App aktualisieren: `python3 tools/sync-web.py <pfad>/trainingskompass.html`
