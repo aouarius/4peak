@@ -2,17 +2,17 @@ package ch.trainingskompass.wear
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -33,12 +35,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.wear.ambient.AmbientLifecycleObserver
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -63,12 +71,11 @@ import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.time.LocalDate
-import java.time.format.TextStyle
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
-class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, SensorEventListener {
+class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     private val dataClient by lazy { Wearable.getDataClient(this) }
     private val prefs by lazy { getSharedPreferences("tk", MODE_PRIVATE) }
@@ -76,22 +83,47 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
     private var plan by mutableStateOf<Plan?>(null)
     private var run by mutableStateOf<Run?>(null)
     private var doneDates by mutableStateOf<Set<String>>(emptySet())
-    private var hr by mutableIntStateOf(0)
-    private var hrSum = 0L
-    private var hrCount = 0L
-    private var hrMax = 0
+    private var ambient by mutableStateOf(false)
+    private var ambientTick by mutableLongStateOf(0L)
+    private var pendingStart: String? = null
+
+    // Always-on: Während des Trainings bleibt eine schlichte, stromsparende Ansicht sichtbar.
+    private val ambientObserver = AmbientLifecycleObserver(this, object : AmbientLifecycleObserver.AmbientLifecycleCallback {
+        override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) { ambient = true; ambientTick = System.currentTimeMillis() }
+        override fun onExitAmbient() { ambient = false }
+        override fun onUpdateAmbient() { ambientTick = System.currentTimeMillis() }
+    })
 
     private val sensorPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted && run != null) startHeartRate()
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
+            val r = run ?: return@registerForActivityResult
+            if (res[Manifest.permission.BODY_SENSORS] == true || res[Manifest.permission.ACTIVITY_RECOGNITION] == true || sensorsGranted()) {
+                WorkoutService.start(this, r.session.name)
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        doneDates = prefs.getStringSet("done", emptySet())!!.toSet()
-        prefs.getString("plan", null)?.let { plan = parsePlan(it) }
+        lifecycle.addObserver(ambientObserver)
+        doneDates = Store.done(this)
+        plan = Store.plan(this)
+        if (savedInstanceState == null) pendingStart = intent.getStringExtra(EXTRA_START)
+        startPending()
         lifecycleScope.launch { loadPlanFromDataLayer() }
         setContent { App() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(EXTRA_START)?.let { pendingStart = it; startPending() }
+    }
+
+    /** Start aus Kachel oder Komplikation: gleich das Training dieses Tages öffnen. */
+    private fun startPending() {
+        val d = pendingStart ?: return
+        val s = plan?.sessions?.firstOrNull { it.date == d } ?: return
+        pendingStart = null
+        if (run == null && d !in doneDates) startRun(s)
     }
 
     override fun onResume() {
@@ -105,7 +137,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
     }
 
     override fun onDestroy() {
-        stopHeartRate()
+        if (isFinishing) WorkoutService.stop(this)
         super.onDestroy()
     }
 
@@ -136,38 +168,39 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
     private fun setPlan(json: String) {
         val p = parsePlan(json) ?: return
         plan = p
-        prefs.edit().putString("plan", json).apply()
+        Store.savePlan(this, json)
+        startPending()
     }
 
     // ---------- Training ----------
 
+    private fun granted(p: String) = ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+    private fun sensorsGranted() = granted(Manifest.permission.BODY_SENSORS) || granted(Manifest.permission.ACTIVITY_RECOGNITION)
+
     private fun startRun(s: Session) {
-        hrSum = 0; hrCount = 0; hrMax = 0
         run = Run(s)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) == PackageManager.PERMISSION_GRANTED) {
-            startHeartRate()
-        } else {
-            sensorPermission.launch(Manifest.permission.BODY_SENSORS)
-        }
+        val wanted = buildList {
+            add(Manifest.permission.BODY_SENSORS)
+            add(Manifest.permission.ACTIVITY_RECOGNITION)
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.filterNot { granted(it) }
+        if (wanted.isEmpty()) WorkoutService.start(this, s.name) else sensorPermission.launch(wanted.toTypedArray())
     }
 
     private fun closeRun() {
         run = null
-        stopHeartRate()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        WorkoutService.stop(this)
     }
 
     /** Speichert das Training als Data-Layer-Eintrag. Er erreicht das Handy, sobald es verbunden ist. */
     private suspend fun sendRun(r: Run) {
-        val avg = if (hrCount > 0) (hrSum / hrCount).toInt() else 0
-        val json = r.toJson(avg, hrMax).toString()
+        val json = r.toJson(WorkoutService.hrAvg, WorkoutService.hrMax, WorkoutService.kcal.value).toString()
         val request = PutDataMapRequest.create("/log/${r.session.date}/${System.currentTimeMillis()}").apply {
             dataMap.putString("json", json)
         }.asPutDataRequest().setUrgent()
         runCatching { dataClient.putDataItem(request).await() }
         doneDates = doneDates + r.session.date
-        prefs.edit().putStringSet("done", doneDates).apply()
+        Store.saveDone(this, doneDates)
     }
 
     private fun vibrate() {
@@ -175,40 +208,22 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
         v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300), -1))
     }
 
-    // ---------- Puls ----------
-
-    private fun startHeartRate() {
-        val sm = getSystemService(SensorManager::class.java) ?: return
-        sm.getDefaultSensor(Sensor.TYPE_HEART_RATE)?.let {
-            sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-        }
+    /** Kurzes Klicken als Bestätigung, z. B. nach einem gespeicherten Satz. */
+    private fun tick() {
+        getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
     }
-
-    private fun stopHeartRate() {
-        getSystemService(SensorManager::class.java)?.unregisterListener(this)
-        hr = 0
-    }
-
-    override fun onSensorChanged(event: SensorEvent) {
-        val v = event.values.firstOrNull()?.roundToInt() ?: return
-        if (v <= 0) return
-        hr = v
-        if (run != null) {
-            hrSum += v; hrCount++
-            if (v > hrMax) hrMax = v
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     // ---------- Oberfläche ----------
 
     @Composable
     private fun App() {
         MaterialTheme {
-            Scaffold(timeText = { TimeText() }) {
+            Scaffold(timeText = { if (!ambient) TimeText() }) {
                 val r = run
+                // Pausenende ans Hintergrund-Training melden, damit es auch bei dunklem Bildschirm vibriert
+                if (r != null) LaunchedEffect(r.restUntil) { WorkoutService.rest(this@WatchActivity, r.restUntil) }
                 when {
+                    ambient && r != null && !r.finished -> AmbientScreen(r)
                     r == null -> PlanList()
                     r.finished -> FinishScreen(r)
                     r.restUntil > 0 -> RestScreen(r)
@@ -238,7 +253,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
                 Chip(
                     onClick = { startRun(s) },
                     label = { Text(s.name) },
-                    secondaryLabel = { Text(dayLabel(s.date) + if (s.deload) " · Deload" else "") },
+                    secondaryLabel = { Text(Store.dayLabel(s.date) + if (s.deload) " · Deload" else "") },
                     colors = ChipDefaults.primaryChipColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -248,10 +263,12 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
 
     @Composable
     private fun HeartRateLine() {
+        val hr by WorkoutService.hr.collectAsState()
+        val kcal by WorkoutService.kcal.collectAsState()
         if (hr <= 0) return
         val z = hrZone(hr, plan)
         Text(
-            "♥ $hr" + if (z > 0) " · Zone $z" else "",
+            "♥ $hr" + (if (z > 0) " · Zone $z" else "") + if (kcal > 0) " · $kcal kcal" else "",
             style = MaterialTheme.typography.caption1,
             color = MaterialTheme.colors.secondary,
         )
@@ -266,12 +283,35 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
         }
         // Drehräder wie bei Hevy: Gewicht und Wiederholungen wischen, unten zurück, speichern, weiter
         key(r.index, r.setNo) {
+            val small = LocalConfiguration.current.screenWidthDp < 225 // Watch 8 mit 40 mm
             val step = it.step
             val wCount = (300.0 / step).roundToInt() + 1
             val wState = rememberPickerState(wCount, (r.weight / step).roundToInt().coerceIn(0, wCount - 1), repeatItems = false)
             val rState = rememberPickerState(61, r.reps.coerceIn(0, 60), repeatItems = false)
+            // Lünette bzw. Drehrand: dreht das ausgewählte Rad (Antippen von «kg» oder «Wdh.» wechselt)
+            var active by remember { mutableIntStateOf(0) }
+            var acc by remember { mutableStateOf(0f) }
+            val focus = remember { FocusRequester() }
+            val scope = rememberCoroutineScope()
+            LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
             Column(
-                modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 24.dp, bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onRotaryScrollEvent { e ->
+                        val px = e.verticalScrollPixels
+                        val steps = if (abs(px) >= 20f) { acc = 0f; if (px > 0) 1 else -1 } else {
+                            acc += px
+                            if (abs(acc) >= 60f) { val s = if (acc > 0) 1 else -1; acc = 0f; s } else 0
+                        }
+                        if (steps != 0) {
+                            val st = if (active == 0) wState else rState
+                            scope.launch { st.scrollToOption((st.selectedOption + steps).coerceIn(0, st.numberOfOptions - 1)) }
+                        }
+                        true
+                    }
+                    .focusRequester(focus)
+                    .focusable()
+                    .padding(start = 12.dp, end = 12.dp, top = if (small) 20.dp else 24.dp, bottom = if (small) 4.dp else 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HeartRateLine()
@@ -289,8 +329,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PickerBox(if (it.bodyweight) "+ kg" else "kg", wState) { i -> formatKg(i * step) }
-                    PickerBox(if (it.unilateral) "Wdh./Seite" else "Wdh.", rState) { i -> i.toString() }
+                    PickerBox(if (it.bodyweight) "+ kg" else "kg", wState, active == 0, small, { active = 0; runCatching { focus.requestFocus() } }) { i -> formatKg(i * step) }
+                    PickerBox(if (it.unilateral) "Wdh./Seite" else "Wdh.", rState, active == 1, small, { active = 1; runCatching { focus.requestFocus() } }) { i -> i.toString() }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -301,20 +341,21 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
                         onClick = { r.prev() },
                         enabled = r.index > 0,
                         colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
+                        modifier = Modifier.size(if (small) ButtonDefaults.ExtraSmallButtonSize else ButtonDefaults.SmallButtonSize),
                     ) { Text("‹") }
                     Button(
                         onClick = {
                             r.weight = wState.selectedOption * step
                             r.reps = rState.selectedOption
                             r.logSet()
+                            tick()
                         },
-                        modifier = Modifier.size(ButtonDefaults.DefaultButtonSize),
+                        modifier = Modifier.size(if (small) ButtonDefaults.SmallButtonSize else ButtonDefaults.DefaultButtonSize),
                     ) { Text("✓", fontWeight = FontWeight.Bold) }
                     Button(
                         onClick = { r.next() },
                         colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
+                        modifier = Modifier.size(if (small) ButtonDefaults.ExtraSmallButtonSize else ButtonDefaults.SmallButtonSize),
                     ) { Text("›") }
                 }
             }
@@ -322,13 +363,20 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
     }
 
     @Composable
-    private fun PickerBox(label: String, state: PickerState, text: (Int) -> String) {
+    private fun PickerBox(label: String, state: PickerState, selected: Boolean, small: Boolean, onSelect: () -> Unit, text: (Int) -> String) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.caption3)
+            Text(
+                label,
+                style = MaterialTheme.typography.caption3,
+                color = if (selected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurfaceVariant,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.clickable { onSelect() },
+            )
             Picker(
                 state = state,
                 contentDescription = label,
-                modifier = Modifier.size(width = 66.dp, height = 74.dp),
+                onSelected = onSelect,
+                modifier = Modifier.size(width = if (small) 58.dp else 66.dp, height = if (small) 62.dp else 74.dp),
             ) { i ->
                 Text(text(i), style = MaterialTheme.typography.title3, fontWeight = FontWeight.Bold)
             }
@@ -375,7 +423,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
                 now = System.currentTimeMillis()
             }
             if (r.restUntil > 0) {
-                vibrate()
+                if (!WorkoutService.active.value) vibrate() // sonst vibriert der Hintergrund-Dienst
                 r.restUntil = 0
             }
         }
@@ -415,7 +463,9 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
             item { Text("Training beendet", style = MaterialTheme.typography.title3) }
             item {
                 Text(
-                    "${r.setCount} Sätze · $minutes min" + if (hrMax > 0) " · max. ♥ $hrMax" else "",
+                    "${r.setCount} Sätze · $minutes min" +
+                        (if (WorkoutService.hrMax > 0) " · max. ♥ ${WorkoutService.hrMax}" else "") +
+                        if (WorkoutService.kcal.value > 0) " · ${WorkoutService.kcal.value} kcal" else "",
                     style = MaterialTheme.typography.body2,
                     textAlign = TextAlign.Center,
                 )
@@ -449,13 +499,32 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
         }
     }
 
-    private fun dayLabel(date: String): String {
-        val d = runCatching { LocalDate.parse(date) }.getOrNull() ?: return date
-        val today = LocalDate.now()
-        return when (d) {
-            today -> "Heute"
-            today.plusDays(1) -> "Morgen"
-            else -> d.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.GERMAN) + ", ${d.dayOfMonth}.${d.monthValue}."
+    /** Always-on-Ansicht: schwarz, nur Umrisse und wenig Text, aktualisiert sich einmal pro Minute. */
+    @Composable
+    private fun AmbientScreen(r: Run) {
+        val hr by WorkoutService.hr.collectAsState()
+        val now = ambientTick
+        val it = r.item
+        Column(
+            modifier = Modifier.fillMaxSize().background(Color.Black).padding(20.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                java.time.LocalTime.now().let { t -> "%d:%02d".format(t.hour, t.minute) },
+                style = MaterialTheme.typography.display3,
+                color = Color.White,
+            )
+            Spacer(Modifier.size(6.dp))
+            if (it != null) Text(it.name, color = Color.LightGray, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.caption1)
+            val left = ((r.restUntil - now) / 1000).coerceAtLeast(0)
+            Text(
+                if (r.restUntil > 0 && left > 0) "Pause · noch ca. ${(left + 59) / 60} min"
+                else if (it != null && !it.cardio) "Satz ${r.setNo} von ${it.sets}" else "Training läuft",
+                color = Color.Gray,
+                style = MaterialTheme.typography.caption2,
+            )
+            if (hr > 0) Text("♥ $hr", color = Color.Gray, style = MaterialTheme.typography.caption2)
         }
     }
 
@@ -464,5 +533,6 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener, Sen
 
     companion object {
         const val PLAN_PATH = "/plan"
+        const val EXTRA_START = "start"
     }
 }

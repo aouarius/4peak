@@ -691,7 +691,7 @@ window.onWatchSessions=function(arr){
     if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date)||!x.sets||typeof x.sets!=="object") continue;
     const prev=state.done[x.date]; if(prev&&prev.at===x.at) continue;
     const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; return o});
-    state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},src:"uhr"}; n++;
+    state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},kcal:Number(x.kcal)||null,src:"uhr"}; n++;
   }
   if(n){save(); render()} return n;
 };
@@ -1582,7 +1582,7 @@ function runSession(r){
 }
 function doneHtml(d){
   const L=Object.entries(d.sets||{}); const vol=L.reduce((a,[id,x])=>a+x.reduce((b,y)=>b+setVol(y),0),0), n=L.reduce((a,[id,x])=>a+work(x).filter(y=>y.min==null).length,0);
-  return `<div class="small muted">${n} Sätze${vol?` · ${fmt(vol)} kg Volumen`:""}${d.min?` · ${d.min} min`:""}${d.hr&&d.hr.avg?` · ♥ Ø ${d.hr.avg} / max ${d.hr.max}`:""}${d.src==="uhr"?" · von der Uhr":""}</div>
+  return `<div class="small muted">${n} Sätze${vol?` · ${fmt(vol)} kg Volumen`:""}${d.min?` · ${d.min} min`:""}${d.hr&&d.hr.avg?` · ♥ Ø ${d.hr.avg} / max ${d.hr.max}`:""}${d.kcal?` · ${d.kcal} kcal`:""}${d.src==="uhr"?" · von der Uhr":""}</div>
   <ul class="exlist">${L.map(([id,x])=>`<li><button class="linkbtn" data-ex="${id}">${esc(EX[id]?EX[id].n:"Übung")}</button>
     <span class="presc">${x[0]&&x[0].min!=null?x[0].min+" min":""}</span><span class="meta mono">${x[0]&&x[0].min!=null?"":x.map(setTxt).join(" · ")}</span></li>`).join("")}</ul>`;
 }

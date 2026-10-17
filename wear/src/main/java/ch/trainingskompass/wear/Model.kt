@@ -141,7 +141,7 @@ class Run(val session: Session) {
         index = session.items.size
     }
 
-    fun toJson(hrAvg: Int, hrMax: Int): JSONObject {
+    fun toJson(hrAvg: Int, hrMax: Int, kcal: Int = 0): JSONObject {
         val sets = JSONObject()
         logs.forEach { (id, list) -> sets.put(id, JSONArray(list)) }
         val o = JSONObject()
@@ -150,6 +150,7 @@ class Run(val session: Session) {
             .put("min", ((System.currentTimeMillis() - startedAt) / 60_000).coerceAtLeast(1))
             .put("sets", sets)
         if (hrMax > 0) o.put("hr", JSONObject().put("avg", hrAvg).put("max", hrMax))
+        if (kcal > 0) o.put("kcal", kcal)
         return o
     }
 }
