@@ -222,9 +222,19 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 val r = run
                 // Pausenende ans Hintergrund-Training melden, damit es auch bei dunklem Bildschirm vibriert
                 if (r != null) LaunchedEffect(r.restUntil, r.warmUntil) { WorkoutService.rest(this@WatchActivity, maxOf(r.restUntil, r.warmUntil)) }
+                // Während des Aufwärmens den Puls beobachten und melden, sobald du warm bist
+                if (r != null && r.warmPhase) LaunchedEffect(r) {
+                    WorkoutService.hr.collect { bpm ->
+                        val p = plan
+                        if (r.checkWarm(bpm, p?.maxHr ?: 190, p?.restHr ?: 60)) {
+                            getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 200, 100, 200, 100, 400), -1))
+                        }
+                    }
+                }
                 when {
                     ambient && r != null && !r.finished -> AmbientScreen(r)
                     r == null -> PlanList()
+                    r.warmPhase && r.warmReady && !r.warmReadyNo -> WarmReadyScreen(r)
                     r.warmPhase -> WarmupScreen(r)
                     r.finished -> FinishScreen(r)
                     r.restUntil > 0 -> RestScreen(r)
@@ -504,6 +514,31 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
     }
 
+    /** Hinweis: Puls zeigt, dass du warm bist. Weiter oder noch aufwärmen. */
+    @Composable
+    private fun WarmReadyScreen(r: Run) {
+        ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
+            item { Text("Aufgewärmt ✓", style = MaterialTheme.typography.title2, color = MaterialTheme.colors.secondary) }
+            item {
+                Text(
+                    "Dein Puls liegt seit 2 Minuten im Aufwärmbereich. Mit dem Training beginnen?",
+                    style = MaterialTheme.typography.body2,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            item { HeartRateLine() }
+            item {
+                Chip(
+                    onClick = { r.endWarmup(skip = false); tick() },
+                    label = { Text("Weiter zum Training") },
+                    colors = ChipDefaults.primaryChipColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item { CompactChip(onClick = { r.warmReadyNo = true }, label = { Text("Noch aufwärmen") }, colors = ChipDefaults.secondaryChipColors()) }
+        }
+    }
+
     /** Aufwärmen: Arten an- und abwählen, Übungen sehen, Timer stellen. */
     @Composable
     private fun WarmupScreen(r: Run) {
@@ -522,6 +557,17 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
             item { Text("Aufwärmen", style = MaterialTheme.typography.title3) }
+            item {
+                val bpm by WorkoutService.hr.collectAsState()
+                val p = plan
+                val target = (p?.restHr ?: 60) + ((p?.maxHr ?: 190) - (p?.restHr ?: 60)) / 2
+                Text(
+                    if (bpm > 0) "♥ $bpm · warm ab $target" else "Die Uhr meldet sich, wenn du warm bist.",
+                    style = MaterialTheme.typography.caption2,
+                    color = MaterialTheme.colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
             item {
                 if (r.warmUntil > 0) {
                     val left = ((r.warmUntil - now + 999) / 1000).coerceAtLeast(0)
@@ -581,7 +627,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val left = ((r.restUntil - now) / 1000).coerceAtLeast(0)
             val wleft = ((r.warmUntil - now) / 1000).coerceAtLeast(0)
             Text(
-                if (r.warmPhase) (if (r.warmUntil > 0 && wleft > 0) "Aufwärmen · noch ca. ${(wleft + 59) / 60} min" else "Aufwärmen")
+                if (r.warmPhase && r.warmReady && !r.warmReadyNo) "Aufgewärmt ✓ · tippe zum Weitermachen"
+                else if (r.warmPhase) (if (r.warmUntil > 0 && wleft > 0) "Aufwärmen · noch ca. ${(wleft + 59) / 60} min" else "Aufwärmen")
                 else if (r.restUntil > 0 && left > 0) "Pause · noch ca. ${(left + 59) / 60} min"
                 else if (it != null && !it.cardio) "Satz ${r.setNo} von ${it.sets}" else "Training läuft",
                 color = Color.Gray,

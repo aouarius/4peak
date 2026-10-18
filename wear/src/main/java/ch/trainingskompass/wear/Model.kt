@@ -119,6 +119,27 @@ class Run(val session: Session) {
     var warmOn by mutableStateOf(session.warm?.types?.filter { it.on }?.map { it.key }?.toSet().orEmpty())
     var warmSec = 0L
     var warmIdx by mutableIntStateOf(0)
+    /** Aufgewärmt erkannt (Puls) und ob der Hinweis weggeklickt wurde */
+    var warmReady by mutableStateOf(false)
+    var warmReadyNo by mutableStateOf(false)
+    private var hiAt = 0L
+    private var lowAt = 0L
+
+    /**
+     * Aufgewärmt, wenn der Puls mindestens 2 Minuten am Stück über 50 % der Herzfrequenzreserve liegt
+     * (Beginn Zone 1) und das Aufwärmen schon 4 Minuten läuft. Einbrüche unter 15 s zählen nicht.
+     * Gibt true zurück, sobald es das erste Mal erkannt wird.
+     */
+    fun checkWarm(bpm: Int, maxHr: Int, restHr: Int): Boolean {
+        if (!warmPhase || warmReady || bpm <= 0) return false
+        val now = System.currentTimeMillis()
+        val target = restHr + (maxHr - restHr) / 2
+        if (bpm >= target) { lowAt = 0; if (hiAt == 0L) hiAt = now }
+        else if (hiAt != 0L) { if (lowAt == 0L) lowAt = now else if (now - lowAt > 15_000) { hiAt = 0; lowAt = 0 } }
+        val began = if (warmStart > 0) minOf(warmStart, startedAt) else startedAt
+        if (hiAt != 0L && now - hiAt >= 120_000 && now - began >= 240_000) { warmReady = true; return true }
+        return false
+    }
     val startedAt = System.currentTimeMillis()
     private var itemStartedAt = startedAt
     val logs = linkedMapOf<String, MutableList<JSONObject>>()
