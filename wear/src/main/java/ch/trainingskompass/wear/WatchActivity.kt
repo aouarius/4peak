@@ -221,10 +221,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             Scaffold(timeText = { if (!ambient) TimeText() }) {
                 val r = run
                 // Pausenende ans Hintergrund-Training melden, damit es auch bei dunklem Bildschirm vibriert
-                if (r != null) LaunchedEffect(r.restUntil) { WorkoutService.rest(this@WatchActivity, r.restUntil) }
+                if (r != null) LaunchedEffect(r.restUntil, r.warmUntil) { WorkoutService.rest(this@WatchActivity, maxOf(r.restUntil, r.warmUntil)) }
                 when {
                     ambient && r != null && !r.finished -> AmbientScreen(r)
                     r == null -> PlanList()
+                    r.warmPhase -> WarmupScreen(r)
                     r.finished -> FinishScreen(r)
                     r.restUntil > 0 -> RestScreen(r)
                     else -> ExerciseScreen(r)
@@ -282,7 +283,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             return
         }
         // Drehräder wie bei Hevy: Gewicht und Wiederholungen wischen, unten zurück, speichern, weiter
-        key(r.index, r.setNo) {
+        key(r.index, r.setNo, r.warmIdx) {
             val small = LocalConfiguration.current.screenWidthDp < 225 // Watch 8 mit 40 mm
             val step = it.step
             val wCount = (300.0 / step).roundToInt() + 1
@@ -323,7 +324,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text("Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}", style = MaterialTheme.typography.caption3)
+                Text(
+                    if (r.inWarmSet) "Aufwärmsatz ${r.warmIdx + 1} von ${it.warmSets.size}" else "Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}",
+                    style = MaterialTheme.typography.caption3,
+                    color = if (r.inWarmSet) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -499,6 +504,62 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
     }
 
+    /** Aufwärmen: Arten an- und abwählen, Übungen sehen, Timer stellen. */
+    @Composable
+    private fun WarmupScreen(r: Run) {
+        val w = r.session.warm ?: return
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(r.warmUntil) {
+            while (r.warmUntil > 0 && System.currentTimeMillis() < r.warmUntil) {
+                delay(250)
+                now = System.currentTimeMillis()
+            }
+            if (r.warmUntil > 0) {
+                if (!WorkoutService.active.value) vibrate() // sonst vibriert der Hintergrund-Dienst
+                r.warmUntil = 0
+                now = System.currentTimeMillis()
+            }
+        }
+        ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
+            item { Text("Aufwärmen", style = MaterialTheme.typography.title3) }
+            item {
+                if (r.warmUntil > 0) {
+                    val left = ((r.warmUntil - now + 999) / 1000).coerceAtLeast(0)
+                    Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CompactChip(onClick = { if (r.warmMinutes > 1) r.warmMinutes-- }, label = { Text("−") }, colors = ChipDefaults.secondaryChipColors())
+                        Text("${r.warmMinutes} min", style = MaterialTheme.typography.title2, modifier = Modifier.padding(horizontal = 10.dp))
+                        CompactChip(onClick = { if (r.warmMinutes < 30) r.warmMinutes++ }, label = { Text("+") }, colors = ChipDefaults.secondaryChipColors())
+                    }
+                }
+            }
+            item {
+                if (r.warmUntil > 0) CompactChip(onClick = { r.warmUntil += 60_000 }, label = { Text("+1 min") }, colors = ChipDefaults.secondaryChipColors())
+                else Chip(onClick = { r.startWarmTimer() }, label = { Text(if (r.warmStart == 0L) "Timer starten" else "Timer neu starten") }, colors = ChipDefaults.primaryChipColors(), modifier = Modifier.fillMaxWidth())
+            }
+            for (t in w.types) {
+                val on = t.key in r.warmOn
+                item {
+                    Chip(
+                        onClick = { r.warmOn = if (on) r.warmOn - t.key else r.warmOn + t.key },
+                        label = { Text((if (on) "✓ " else "") + t.name) },
+                        colors = if (on) ChipDefaults.secondaryChipColors() else ChipDefaults.childChipColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (on) items(t.steps) { (n, d) ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp)) {
+                        Text(n, style = MaterialTheme.typography.caption1, fontWeight = FontWeight.Bold)
+                        Text(d, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.onSurfaceVariant)
+                    }
+                }
+            }
+            item { Chip(onClick = { r.endWarmup(skip = false); tick() }, label = { Text("Fertig, los geht's") }, colors = ChipDefaults.primaryChipColors(), modifier = Modifier.fillMaxWidth()) }
+            item { CompactChip(onClick = { r.endWarmup(skip = true) }, label = { Text("Überspringen") }, colors = ChipDefaults.secondaryChipColors()) }
+        }
+    }
+
     /** Always-on-Ansicht: schwarz, nur Umrisse und wenig Text, aktualisiert sich einmal pro Minute. */
     @Composable
     private fun AmbientScreen(r: Run) {
@@ -516,10 +577,12 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 color = Color.White,
             )
             Spacer(Modifier.size(6.dp))
-            if (it != null) Text(it.name, color = Color.LightGray, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.caption1)
+            if (it != null && !r.warmPhase) Text(it.name, color = Color.LightGray, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.caption1)
             val left = ((r.restUntil - now) / 1000).coerceAtLeast(0)
+            val wleft = ((r.warmUntil - now) / 1000).coerceAtLeast(0)
             Text(
-                if (r.restUntil > 0 && left > 0) "Pause · noch ca. ${(left + 59) / 60} min"
+                if (r.warmPhase) (if (r.warmUntil > 0 && wleft > 0) "Aufwärmen · noch ca. ${(wleft + 59) / 60} min" else "Aufwärmen")
+                else if (r.restUntil > 0 && left > 0) "Pause · noch ca. ${(left + 59) / 60} min"
                 else if (it != null && !it.cardio) "Satz ${r.setNo} von ${it.sets}" else "Training läuft",
                 color = Color.Gray,
                 style = MaterialTheme.typography.caption2,

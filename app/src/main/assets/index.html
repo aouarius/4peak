@@ -315,6 +315,8 @@ h1{font-size:1.35rem;font-weight:800;text-transform:none;letter-spacing:-.02em}
 h2{font-size:1.25rem;font-weight:800;text-transform:none;letter-spacing:-.02em}
 h3{font-size:.98rem;font-weight:700;letter-spacing:-.01em}
 .logo{background:var(--grad);color:#fff;border-radius:11px}
+.wutime.up{color:var(--green)}
+.wustep{display:flex;flex-wrap:nowrap;align-items:flex-start;gap:8px;margin:0}.wustep input{flex:none;margin-top:3px}.wustep.on b{text-decoration:line-through;opacity:.6}
 .meal{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:14px;background:var(--bg)}
 .logo{background:#24282e;color:#b450ff;border-radius:11px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .logo svg{width:26px;height:26px;filter:drop-shadow(0 0 3px rgba(168,58,253,.75))}
@@ -657,12 +659,18 @@ function watchPayload(){
   for(let i=0;i<14&&out.length<3;i++){
     const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)), s=sessionFor(k);
     if(!s||state.done[k]) continue;
-    out.push({date:k,name:s.name,deload:!!s.deload,items:s.items.map(it=>{const x=EX[it.id], c=it.role==="cardio";
+    let firstMain=true;
+    out.push({date:k,name:s.name,deload:!!s.deload,warm:warmWatch(s),items:s.items.map(it=>{const x=EX[it.id], c=it.role==="cardio";
+      const wu=!c&&it.role==="main"&&firstMain&&warmPref().mods.includes("sets")?(firstMain=false,warmups(Number(suggestion(it,k).w)||0,it.id)):[];
       return {id:it.id,n:x.n,cardio:c,txt:it.txt||"",sets:it.sets||0,reps:it.reps||"",rest:it.rest?restSec(it.rest):0,
-        w:c?0:(Number(suggestion(it,k).w)||0),uni:UNI.has(it.id),bw:x.e==="kg",step:BB.has(it.id)?2.5:1}})});
+        w:c?0:(Number(suggestion(it,k).w)||0),uni:UNI.has(it.id),bw:x.e==="kg",step:BB.has(it.id)?2.5:1,warm:wu}})});
   }
   return {v:1,maxHr:Math.round(208-0.7*p.age),restHr:p.restHr,sessions:out};
 }
+/* Für die Uhr: alle Aufwärmarten mit ihren Übungen, die gewählten markiert, und die Timer-Minuten */
+function warmWatch(s){const P=warmPref(), keep=state.profile.warm;
+  const all=WARM_TYPES.filter(([k])=>k!=="sets").map(([k,n])=>{state.profile.warm={...P,mods:[k]}; const g=warmPlan(s)[0]; return {k,n,on:P.mods.includes(k),steps:(g?g.steps:[]).map(x=>({n:x.n,d:x.d}))}});
+  state.profile.warm=keep; return {min:P.min,types:all}}
 let lastWatch="";
 /* Widget und Erinnerungen der Android-App: die nächsten 14 Tage, fällige Supplements und Uhrzeiten */
 function homePayload(){
@@ -690,8 +698,8 @@ window.onWatchSessions=function(arr){
   for(const x of arr||[]){
     if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date)||!x.sets||typeof x.sets!=="object") continue;
     const prev=state.done[x.date]; if(prev&&prev.at===x.at) continue;
-    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; return o});
-    state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},kcal:Number(x.kcal)||null,src:"uhr"}; n++;
+    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; if(v.t==="w") o.t="w"; return o});
+    state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},kcal:Number(x.kcal)||null,warm:Number(x.warm)||null,src:"uhr"}; n++;
   }
   if(n){save(); render()} return n;
 };
@@ -1122,7 +1130,7 @@ function viewProfil(){
   ${remindHtml()}
   ${backupHtml()}`;
 }
-function startRun(d){ui.summary=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
+function startRun(d){ui.summary=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false,target:warmPref().min*60,tmin:warmPref().min},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
 function remindHtml(){
   if(!(NATIVE&&NATIVE.setHome)) return "";
   const R=state.remind, row=(k,label)=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><label class="checkline" style="margin:0;min-width:0"><input type="checkbox" data-remind="${k}" ${R[k].on?"checked":""}> ${label}</label><input type="time" data-remindt="${k}" value="${esc(R[k].t)}" style="width:auto;flex:none" ${R[k].on?"":"disabled"}></div>`;
@@ -1501,7 +1509,10 @@ function tick(){
   const r=ui.run;
   if(!r){clearInterval(timerInt);timerInt=null;return}
   const d=document.getElementById("rt-dur"); if(d) d.textContent=durTxt((Date.now()-r.t0)/1000);
-  const wt=document.getElementById("wu-time"); if(wt&&r.warm) wt.textContent=durTxt(wuSec(r));
+  const wt=document.getElementById("wu-time"), wl=r.warm&&!r.warm.done?wuLeft(r):null;
+  if(wt&&r.warm) wt.textContent=durTxt(wl!=null?wl:wuSec(r));
+  // Aufwärm-Timer abgelaufen: Ton und Vibration, einmal
+  if(wl===0&&r.warm.start&&!r.warm.alerted){r.warm.alerted=true; beep(); setTimeout(beep,450); try{navigator.vibrate&&navigator.vibrate([300,150,300])}catch(e){} if(wt) wt.classList.add("up")}
   if(!r.restUntil) return;
   const left=Math.max(0,Math.ceil((r.restUntil-Date.now())/1000)), el=document.getElementById("timer");
   if(el) el.textContent=durTxt(left);
@@ -1604,6 +1615,9 @@ function runInit(r,s){
       const same=pv&&pv.w===w, rr=same?(pv.l!=null?Math.min(pv.l,pv.rr):pv.r):lower(it.reps);
       sets.push(uni?{w,r:rr,l:same&&pv.l!=null?pv.l:rr,rr:same&&pv.rr!=null?pv.rr:rr,done:false}:{w,r:rr,done:false});
     }
+    // Aufwärmsätze bei der ersten Hauptübung automatisch eintragen
+    if(!r.edit&&it.role==="main"&&!r.autoWarm&&warmPref().mods.includes("sets")){r.autoWarm=true;
+      const ws=warmups(Number(sets[0]&&sets[0].w),it.id).map(x=>uni?{w:x.w,r:x.r,l:x.r,rr:x.r,t:"w",done:false}:{w:x.w,r:x.r,t:"w",done:false}); sets.unshift(...ws)}
     r.rows[i]={id:it.id,sets};
   });
 }
@@ -1613,14 +1627,80 @@ function runLogs(r){
     (L[x.id]||(L[x.id]=[])).push(o)}
   return L;
 }
+/* Aufwärmen nach dem RAMP-Prinzip: locker steigern, dann die Muskeln und Gelenke der Einheit mobilisieren, dann Aufwärmsätze. */
+const WARM_MOB=[
+  {id:"armkreisen",n:"Armkreisen",d:"je 10× vorwärts und rückwärts",m:["schultern","brust","ruecken","trizeps","bizeps"]},
+  {id:"thorrot",n:"Rotation im Vierfüsslerstand",d:"je Seite 6×, Blick folgt der Hand",m:["ruecken","brust","schultern"]},
+  {id:"pushslow",n:"Liegestütze, langsam",d:"6–10×, auch auf den Knien",m:["brust","trizeps","schultern"]},
+  {id:"catcow",n:"Katze-Kuh",d:"8× langsam",m:["ruecken","rumpf"]},
+  {id:"legswing",n:"Beinpendel",d:"je Bein 10× vor-zurück und 10× seitlich",m:["quads","beinbeuger","gesaess"]},
+  {id:"airsquat",n:"Kniebeugen ohne Gewicht",d:"10×, tief und kontrolliert",m:["quads","gesaess"]},
+  {id:"lungerot",n:"Ausfallschritt mit Rotation",d:"je Seite 5×",m:["quads","gesaess","rumpf","beinbeuger"]},
+  {id:"hinge",n:"Hüftbeuge mit Stock",d:"10×, Rücken gerade",m:["beinbeuger","gesaess","ruecken"]},
+  {id:"ankle",n:"Knöchel zur Wand",d:"je Seite 10×",m:["waden","quads"]},
+  {id:"deadbugw",n:"Dead Bug",d:"je Seite 6×",m:["rumpf"]}];
+const WARM_ROLL=[
+  {id:"rquads",n:"Oberschenkel vorne rollen",d:"je Seite 45 s",m:["quads"]},
+  {id:"rham",n:"Oberschenkel hinten rollen",d:"je Seite 45 s",m:["beinbeuger"]},
+  {id:"rglute",n:"Gesäss rollen",d:"je Seite 45 s, Bein überschlagen",m:["gesaess"]},
+  {id:"rcalf",n:"Waden rollen",d:"je Seite 30 s",m:["waden"]},
+  {id:"rtspine",n:"Oberer Rücken rollen",d:"60 s, Arme verschränkt",m:["ruecken","schultern"]},
+  {id:"rlat",n:"Lat seitlich rollen",d:"je Seite 45 s",m:["ruecken","schultern"]},
+  {id:"rpec",n:"Brust mit Ball an der Wand",d:"je Seite 45 s",m:["brust","schultern"]}];
+const WARM_BAND=[
+  {id:"pullapart",n:"Band Pull-Aparts",d:"15×",m:["schultern","ruecken","brust"]},
+  {id:"facepull",n:"Face Pulls mit Band",d:"15×, Ellbogen hoch",m:["schultern","ruecken"]},
+  {id:"extrot",n:"Aussenrotation mit Band",d:"je Seite 12×",m:["schultern","brust"]},
+  {id:"bandpull",n:"Latzug mit Band, gestreckte Arme",d:"12×",m:["ruecken","trizeps"]},
+  {id:"monster",n:"Monster Walk mit Miniband",d:"je Richtung 10 Schritte",m:["gesaess","quads"]},
+  {id:"clam",n:"Clamshells mit Miniband",d:"je Seite 12×",m:["gesaess"]},
+  {id:"bridgeb",n:"Glute Bridge mit Miniband",d:"12×, Knie nach aussen",m:["gesaess","beinbeuger"]},
+  {id:"plankt",n:"Plank mit Schulterantippen",d:"je Seite 8×",m:["rumpf","schultern"]}];
+const WARM_CARDIO=["Rudergerät","Velo","Crosstrainer","Laufband","Seilspringen","Treppensteiger"];
+const WARM_TYPES=[["cardio","Cardio"],["mob","Mobilität"],["roll","Faszienrolle"],["band","Aktivierung mit Band"],["sets","Aufwärmsätze"]];
+function warmPref(){const w=state.profile.warm||{}; return {mods:Array.isArray(w.mods)?w.mods:["cardio","mob","sets"],cardio:w.cardio||"Rudergerät",min:w.min!=null?w.min:5}}
+function pickDrills(s,list,max){
+  const sc={}; for(const it of s.items){if(it.role==="cardio") continue; const m=MUS[it.id]||[[],[]]; m[0].forEach(x=>sc[x]=(sc[x]||0)+2); (m[1]||[]).forEach(x=>sc[x]=(sc[x]||0)+1)}
+  const ranked=list.map((d,i)=>({d,v:d.m.reduce((a,x)=>a+(sc[x]||0),0)-i*.01})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  // Abwechslung: pro Muskelgruppe höchstens zwei Übungen
+  const out=[], used={}; for(const {d} of ranked){if(out.length>=max) break; const k=d.m[0]; if((used[k]||0)>=2) continue; used[k]=(used[k]||0)+1; out.push(d)}
+  return out.length?out:list.slice(0,Math.min(3,max));
+}
+/* Die gewählten Aufwärmarten mit den Übungen, die zu den Muskeln der Einheit passen */
+function warmPlan(s){
+  const P=warmPref(), out=[];
+  for(const [k,n] of WARM_TYPES){ if(!P.mods.includes(k)) continue;
+    const steps=k==="cardio"?[{id:"cardio",n:P.cardio,d:"locker, bis dir warm ist und du leicht schwitzt"}]
+      :k==="mob"?pickDrills(s,WARM_MOB,4):k==="roll"?pickDrills(s,WARM_ROLL,3):k==="band"?pickDrills(s,WARM_BAND,3)
+      :[{id:"wsets",n:"Aufwärmsätze",d:"bei der ersten Hauptübung eingetragen"}];
+    out.push({k,n,steps});
+  }
+  return out;
+}
+function warmSteps(s){return warmPlan(s).flatMap(g=>g.steps)}
 function wuSec(r){const w=r.warm||{}; return (w.acc||0)+(w.start?(Date.now()-w.start)/1000:0)}
+/* Aufwärmsätze bei der ersten Hauptübung ein- oder austragen (nur solange dort noch nichts abgehakt ist) */
+function setWarmSets(r,on){
+  const s=runSession(r); const i=s.items.findIndex(it=>it.role==="main"); if(i<0||!r.rows[i]) return;
+  const R=r.rows[i], it=s.items[i]; if(R.sets.some(x=>x.done)) return;
+  R.sets=R.sets.filter(x=>x.t!=="w");
+  if(on){const uni=UNI.has(it.id); R.sets.unshift(...warmups(Number(R.sets[0]&&R.sets[0].w),it.id).map(x=>uni?{w:x.w,r:x.r,l:x.r,rr:x.r,t:"w",done:false}:{w:x.w,r:x.r,t:"w",done:false}))}
+}
+function wuLeft(r){const w=r.warm; return w.target?Math.max(0,Math.ceil(w.target-wuSec(r))):null}
 function warmCardHtml(r){
   const w=r.warm;
   if(w.done) return `<section class="panel row wucard" style="justify-content:space-between"><b>Aufwärmen</b><span class="mono">${durTxt(wuSec(r))}</span><span class="pill"><i class="dot c-green"></i>erledigt</span><button class="linkbtn" data-wu="undo">Ändern</button></section>`;
+  const P=warmPref(), plan=warmPlan(runSession(r)), steps=plan.flatMap(g=>g.steps), ck=w.ck||{}, n=steps.filter(x=>ck[x.id]).length, left=wuLeft(r);
+  const chip=(attr,v,on,l)=>`<button class="chip${on?" on":""}" ${attr}="${esc(v)}">${esc(l)}</button>`;
   return `<section class="panel stack wucard">
-    <div class="row" style="justify-content:space-between"><h3>Aufwärmen</h3><span class="mono wutime" id="wu-time">${durTxt(wuSec(r))}</span></div>
-    <p class="small muted" style="margin:0">5–10 Minuten locker auf Rudergerät, Velo oder Crosstrainer, danach Armkreisen, Beinpendel und Hampelmänner. Bereit bist du, wenn dir warm ist und du leicht schwitzt. Für die erste Übung kannst du unten Aufwärmsätze einfügen.</p>
+    <div class="row" style="justify-content:space-between"><h3>Aufwärmen${steps.length?` <span class="small muted">${n}/${steps.length}</span>`:""}</h3><span class="mono wutime${left===0?" up":""}" id="wu-time">${durTxt(left!=null?left:wuSec(r))}</span></div>
+    <div class="row" style="gap:6px">${WARM_TYPES.map(([k,l])=>chip("data-wumod",k,P.mods.includes(k),l)).join("")}</div>
+    ${P.mods.includes("cardio")?`<div class="row" style="gap:6px">${WARM_CARDIO.map(c=>chip("data-wucardio",c,P.cardio===c,c)).join("")}</div>`:""}
+    ${plan.map(g=>`<div class="stack" style="gap:6px"><span class="small muted">${esc(g.n)}</span>${g.steps.map(x=>`<label class="checkline wustep${ck[x.id]?" on":""}"><input type="checkbox" data-wuck="${x.id}" ${ck[x.id]?"checked":""}> <span><b>${esc(x.n)}</b> <span class="small muted">${esc(x.d)}</span></span></label>`).join("")}</div>`).join("")}
+    ${plan.length?"":`<p class="small muted" style="margin:0">Wähle oben, wie du dich aufwärmen willst.</p>`}
+    <div class="row" style="gap:6px;align-items:center"><span class="small muted">Timer</span>${[0,3,5,8,10,15].map(m=>chip("data-wumin",m,(w.tmin!=null?w.tmin:(w.target?Math.round(w.target/60):0))===m,m?m+" min":"aus")).join("")}</div>
     <div class="row"><button class="btn ghost" data-wu="toggle">${w.start?"Pause":w.acc?"Weiter":"Start"}</button><button class="btn" data-wu="done">✓ Fertig</button><button class="linkbtn" data-wu="skip">Überspringen</button></div>
+    <p class="small muted" style="margin:0">Die Übungen passen zu den Muskeln von heute, deine Auswahl bleibt für die nächsten Trainings gespeichert. <a href="https://doi.org/10.1519/JSC.0b013e3181c643a0" target="_blank" rel="noopener">Fradkin et al., 2010</a></p>
   </section>`;
 }
 function exCardHtml(r,s,it,i){
@@ -2035,7 +2115,7 @@ function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".ta
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2072,6 +2152,14 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.radd){const R=ui.run.rows[Number(t.dataset.radd)], last=R.sets.filter(x=>x.t!=="w").pop()||R.sets[R.sets.length-1], y={...last,done:false}; delete y.t; R.sets.push(y); keepScroll(render); return}
   if(t.dataset.rdel){const R=ui.run.rows[Number(t.dataset.rdel)]; if(R.sets.length>1&&!R.sets[R.sets.length-1].done) R.sets.pop(); keepScroll(render); return}
   if(t.dataset.rwarm){const i=Number(t.dataset.rwarm), R=ui.run.rows[i], it=runSession(ui.run).items[i]; const ws=warmups(Number(R.sets[0].w),it.id).map(x=>UNI.has(it.id)?{w:x.w,r:x.r,l:x.r,rr:x.r,t:"w",done:false}:{w:x.w,r:x.r,t:"w",done:false}); R.sets=ws.concat(R.sets); keepScroll(render); return}
+  if(t.dataset.wumod){const P=warmPref(), k=t.dataset.wumod, i=P.mods.indexOf(k); if(i<0) P.mods.push(k); else P.mods.splice(i,1);
+    state.profile.warm=P; if(k==="sets") setWarmSets(ui.run,i<0); save(); keepScroll(render); return}
+  if(t.dataset.wucardio){const P=warmPref(); P.cardio=t.dataset.wucardio; state.profile.warm=P; save(); keepScroll(render); return}
+  if(t.dataset.wumin!=null&&t.dataset.wumin!==undefined&&t.matches("[data-wumin]")){const m=Number(t.dataset.wumin), w=ui.run.warm, P=warmPref();
+    w.target=m?m*60+Math.floor(wuSec(ui.run)):0; w.tmin=m; w.alerted=false; if(m&&!w.start) w.start=Date.now(); P.min=m; state.profile.warm=P; save(); keepScroll(render); return}
+  if(t.dataset.wuck){const w=ui.run.warm, ck=w.ck||(w.ck={}); ck[t.dataset.wuck]=!ck[t.dataset.wuck]; if(!w.start&&!w.acc) w.start=Date.now();
+    const steps=warmSteps(runSession(ui.run)); if(steps.length&&steps.every(x=>ck[x.id])){if(w.start){w.acc+=(Date.now()-w.start)/1000; w.start=null} w.done=true; ui.run.scrollTo=0}
+    keepScroll(render); return}
   if(t.dataset.wu){const w=ui.run.warm, a=t.dataset.wu;
     if(a==="toggle"){if(w.start){w.acc+=(Date.now()-w.start)/1000; w.start=null} else w.start=Date.now()}
     else if(a==="done"||a==="skip"){if(w.start){w.acc+=(Date.now()-w.start)/1000; w.start=null} w.done=true; if(a==="skip") w.acc=0; ui.run.scrollTo=0}
