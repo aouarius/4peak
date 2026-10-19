@@ -1152,7 +1152,7 @@ function viewProfil(){
   ${remindHtml()}
   ${backupHtml()}`;
 }
-function startRun(d){ui.summary=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false,target:warmPref().min*60,tmin:warmPref().min},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
+function startRun(d){ui.summary=null; ui.runAdd=false; ui.runDelAsk=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false,target:warmPref().min*60,tmin:warmPref().min},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
 function remindHtml(){
   if(!(NATIVE&&NATIVE.setHome)) return "";
   const R=state.remind, row=(k,label)=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><label class="checkline" style="margin:0;min-width:0"><input type="checkbox" data-remind="${k}" ${R[k].on?"checked":""}> ${label}</label><input type="time" data-remindt="${k}" value="${esc(R[k].t)}" style="width:auto;flex:none" ${R[k].on?"":"disabled"}></div>`;
@@ -1576,8 +1576,9 @@ function viewTraining(){
   const s=runSession(r); runInit(r,s);
   const L=runLogs(r), all=Object.values(L).flat(), wk=all.filter(x=>x.t!=="w"&&x.min==null);
   const vol=all.reduce((a,x)=>a+setVol(x),0);
-  const total=s.items.reduce((a,x)=>a+(x.role==="cardio"?0:x.sets),0);
-  const allDone=s.items.every((x,i)=>r.rows[i].sets.length&&r.rows[i].sets.every(y=>y.done));
+  const del=r.del||{}, gone=s.items.map((x,i)=>i).filter(i=>del[i]);
+  const total=s.items.reduce((a,x,i)=>a+(x.role==="cardio"||del[i]?0:r.rows[i].sets.filter(y=>y.t!=="w").length),0);
+  const allDone=s.items.every((x,i)=>del[i]||r.rows[i].sets.length&&r.rows[i].sets.every(y=>y.done));
   return `<div class="runhead">
       ${r.edit?`<div><span>Bearbeiten</span><b>${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.</b></div>`:`<div><span>Dauer</span><b class="mono" id="rt-dur">${durTxt((Date.now()-r.t0)/1000)}</b></div>`}
       <div><span>Volumen</span><b class="mono">${fmt(vol)} kg</b></div>
@@ -1591,7 +1592,11 @@ function viewTraining(){
       ${r.edit?"":`<span class="row" style="gap:6px;margin-left:auto">${!hrOn&&HAS_BT()?`<button class="chip" id="btconnect">♥ Gurt verbinden</button>`:""}${musicHtml(s)}</span>`}</div>
     <div class="stack">
       ${r.edit?`<p class="small muted" style="margin:0 2px">Werte ändern, Häkchen setzen oder entfernen und dann speichern. Nur Sätze mit Häkchen werden gespeichert.</p>`:warmCardHtml(r)}
-      ${s.items.map((it,i)=>exCardHtml(r,s,it,i)).join("")}
+      ${s.items.map((it,i)=>del[i]?"":exCardHtml(r,s,it,i)).join("")}
+      ${gone.length?`<p class="small muted" style="margin:0 2px">Entfernt: ${gone.map(i=>`<button class="linkbtn" data-rundel="${i}">${esc(EX[s.items[i].id].n)} ↺</button>`).join(", ")}</p>`:""}
+      ${ui.runAdd?`<section class="panel stack"><label class="f" for="runaddsel">Übung hinzufügen<select id="runaddsel"><optgroup label="Kraft">${exOptions(null,false)}</optgroup><optgroup label="Ausdauer">${exOptions(null,true)}</optgroup></select></label>
+        <div class="row"><button class="btn" data-runadd="ok">Hinzufügen</button><button class="btn ghost" data-runadd="cancel">Abbrechen</button></div></section>`
+        :`<button class="btn ghost" data-runadd="open">+ Übung hinzufügen</button>`}
       ${allDone&&!r.edit?`<div class="panel stack" style="text-align:center"><b>Alle Sätze erledigt 💪</b></div>`:""}
       <section class="panel row" style="justify-content:space-between">
         <label class="f" for="rpe2" style="flex-direction:row;align-items:center;gap:8px">Anstrengung<select id="rpe2">${[5,6,7,8,9,10].map(v=>`<option${v===(r.edit&&state.done[r.date]&&state.done[r.date].rpe||8)?" selected":""}>${v}</option>`).join("")}</select></label>
@@ -1608,9 +1613,11 @@ function restFor(it){const v=(state.restPref||{})[it.id]; return v!=null?v:restS
 function runSession(r){
   if(r._s) return r._s;
   const base=sessionFor(r.date)||{name:"Training",c:"blue",items:[]};
-  if(!r.edit) return base;
-  const items=base.items.slice(), sets=(state.done[r.date]||{}).sets||{};
+  if(!r.edit&&!(r.add||[]).length) return base;
+  const items=base.items.slice(), sets=r.edit?(state.done[r.date]||{}).sets||{}:{};
   for(const [id,a] of Object.entries(sets)) if(EX[id]&&!items.some(x=>x.id===id)) items.push(EX[id].cardio?{id,role:"cardio",txt:""}:{id,role:"acc",sets:Math.max(1,work(a).length),reps:EX[id].r||"8–12",rest:"90 s",rir:""});
+  // Während des Trainings hinzugefügte Übungen
+  for(const id of r.add||[]) if(EX[id]) items.push(EX[id].cardio?{id,role:"cardio",txt:"20 min"}:{id,role:"acc",sets:3,reps:EX[id].r||"8–12",rest:"90 s",rir:"",added:true});
   return r._s={...base,items};
 }
 function doneHtml(d){
@@ -1644,7 +1651,7 @@ function runInit(r,s){
   });
 }
 function runLogs(r){
-  const L={}; for(const [i,x] of Object.entries(r.rows||{})) for(const y of x.sets) if(y.done){
+  const L={}, del=r.del||{}; for(const [i,x] of Object.entries(r.rows||{})) if(!del[i]) for(const y of x.sets) if(y.done){
     const o=y.min!=null?{w:0,r:0,min:Number(y.min)||0}:{w:Number(y.w)||0,r:Number(y.r)||0}; if(y.l!=null&&y.min==null){o.l=Number(y.l)||0; o.rr=Number(y.rr)||0; o.r=Math.min(o.l,o.rr)} if(y.t) o.t=y.t;
     (L[x.id]||(L[x.id]=[])).push(o)}
   return L;
@@ -1731,7 +1738,8 @@ function exCardHtml(r,s,it,i){
     <h3><button class="linkbtn" data-ex="${it.id}">${esc(ex.n)}</button></h3><div class="small muted">${esc(it.txt||"")}</div>
     <table class="sets"><thead><tr><th>Dauer (min)</th><th class="ck">✓</th></tr></thead><tbody><tr class="${y.done?"done":""}">
       <td><input data-rv="${i}:0:min" type="number" inputmode="numeric" min="1" max="300" value="${y.min}"></td>
-      <td class="ck"><button class="rchk" data-rdone="${i}:0" aria-pressed="${y.done}" aria-label="Erledigt">✓</button></td></tr></tbody></table></section>`}
+      <td class="ck"><button class="rchk" data-rdone="${i}:0" aria-pressed="${y.done}" aria-label="Erledigt">✓</button></td></tr></tbody></table>
+    <div class="row"><button class="chip" data-rundel="${i}">${ui.runDelAsk===i?"Wirklich entfernen?":"✕ Entfernen"}</button></div></section>`}
   const l=lastSets(it.id,r.date), prev=l?work(l[1].sets[it.id]):[], uni=UNI.has(it.id);
   let wn=0;
   const rows=R.sets.map((y,k)=>{const isW=y.t==="w"; if(!isW) wn++; const pv=isW?null:prev[wn-1];
@@ -1752,7 +1760,8 @@ function exCardHtml(r,s,it,i){
     ${BB.has(it.id)&&nx&&Number(nx.w)>(state.profile.bar||20)?`<div class="small muted" id="pl-${i}">${plateTxt(nx.w)}</div>`:""}
     <div class="row" style="gap:6px"><button class="chip" data-radd="${i}">+ Satz</button>${R.sets.length>1&&!R.sets[R.sets.length-1].done?`<button class="chip" data-rdel="${i}">− Satz</button>`:""}
       ${it.role==="main"&&!anyDone&&!r.edit&&!R.sets.some(x=>x.t==="w")&&warmups(Number(R.sets[0].w),it.id).length?`<button class="chip" data-rwarm="${i}">+ Aufwärmsätze</button>`:""}
-      ${!anyDone&&!r.edit?`<button class="chip" data-blockrun="${it.id}">Nope! Alternative</button>`:""}</div>
+      ${!anyDone&&!r.edit&&!it.added?`<button class="chip" data-blockrun="${it.id}">Nope! Alternative</button>`:""}
+      <button class="chip" data-rundel="${i}">${ui.runDelAsk===i?"Wirklich entfernen?":"✕ Entfernen"}</button></div>
   </section>`;
 }
 function musicHtml(s){
@@ -1774,7 +1783,7 @@ function rowCheck(i,k){
   else if(q>=0&&y.t!=="w"&&r.rows[q].sets.some(x=>!x.done)) r.scrollTo=q;
 }
 function itemLeft(r,s,i){
-  const it=s.items[i]; if(!it||(r.skip||{})[i]) return 0;
+  const it=s.items[i]; if(!it||(r.skip||{})[i]||(r.del||{})[i]) return 0;
   if(it.role==="cardio") return (r.logs[it.id]||[]).length?0:1;
   return Math.max(0,it.sets-work(r.logs[it.id]).length);
 }
@@ -2137,7 +2146,7 @@ function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".ta
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2171,6 +2180,14 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.rtype){const [i,k]=t.dataset.rtype.split(":").map(Number), y=ui.run.rows[i].sets[k], o=["","w","d","f"]; y.t=o[(o.indexOf(y.t||"")+1)%4]||undefined; if(!y.t) delete y.t; keepScroll(render); return}
   if(t.dataset.rprev){const [i,k]=t.dataset.rprev.split(":").map(Number), r=ui.run, it=runSession(r).items[i], l=lastSets(it.id,r.date), y=r.rows[i].sets[k];
     const wn=r.rows[i].sets.slice(0,k+1).filter(x=>x.t!=="w").length, pv=l&&work(l[1].sets[it.id])[wn-1]; if(pv){y.w=pv.w; y.r=pv.r; if(pv.l!=null){y.l=pv.l; y.rr=pv.rr}} keepScroll(render); return}
+  if(t.dataset.rundel){const r=ui.run, i=Number(t.dataset.rundel); r.del=r.del||{};
+    if(r.del[i]){delete r.del[i]; keepScroll(render); return}
+    // Mit erledigten Sätzen erst nachfragen, sonst gehen sie verloren
+    if(r.rows[i]&&r.rows[i].sets.some(x=>x.done)&&ui.runDelAsk!==i){ui.runDelAsk=i; keepScroll(render); return}
+    ui.runDelAsk=null; r.del[i]=true; r.restUntil=null; keepScroll(render); return}
+  if(t.dataset.runadd){const r=ui.run, a=t.dataset.runadd;
+    if(a==="ok"){const id=document.getElementById("runaddsel").value; if(EX[id]){(r.add||(r.add=[])).push(id); r._s=null; r.scrollTo=runSession(r).items.length-1}}
+    ui.runAdd=a==="open"; render(); return}
   if(t.dataset.radd){const R=ui.run.rows[Number(t.dataset.radd)], last=R.sets.filter(x=>x.t!=="w").pop()||R.sets[R.sets.length-1], y={...last,done:false}; delete y.t; R.sets.push(y); keepScroll(render); return}
   if(t.dataset.rdel){const R=ui.run.rows[Number(t.dataset.rdel)]; if(R.sets.length>1&&!R.sets[R.sets.length-1].done) R.sets.pop(); keepScroll(render); return}
   if(t.dataset.rwarm){const i=Number(t.dataset.rwarm), R=ui.run.rows[i], it=runSession(ui.run).items[i]; const ws=warmups(Number(R.sets[0].w),it.id).map(x=>UNI.has(it.id)?{w:x.w,r:x.r,l:x.r,rr:x.r,t:"w",done:false}:{w:x.w,r:x.r,t:"w",done:false}); R.sets=ws.concat(R.sets); keepScroll(render); return}
