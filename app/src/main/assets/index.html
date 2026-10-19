@@ -84,6 +84,7 @@ label.f select,label.f input{font-weight:400;padding:8px;border:1px solid var(--
 .wdpick label{display:inline-flex;align-items:center;justify-content:center;width:42px;height:38px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-weight:600;font-size:.85rem;background:var(--surface)}
 .wdpick input{position:absolute;opacity:0;pointer-events:none}
 .wdpick label:has(input:checked){background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sugbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:inherit;font:inherit;cursor:pointer}
 .wdpick.wide label{width:auto;padding:0 12px}
 .wdpick label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 /* Supplements */
@@ -1594,7 +1595,8 @@ function viewTraining(){
       ${r.edit?`<p class="small muted" style="margin:0 2px">Werte ändern, Häkchen setzen oder entfernen und dann speichern. Nur Sätze mit Häkchen werden gespeichert.</p>`:warmCardHtml(r)}
       ${s.items.map((it,i)=>del[i]?"":exCardHtml(r,s,it,i)).join("")}
       ${gone.length?`<p class="small muted" style="margin:0 2px">Entfernt: ${gone.map(i=>`<button class="linkbtn" data-rundel="${i}">${esc(EX[s.items[i].id].n)} ↺</button>`).join(", ")}</p>`:""}
-      ${ui.runAdd?`<section class="panel stack"><label class="f" for="runaddsel">Übung hinzufügen<select id="runaddsel"><optgroup label="Kraft">${exOptions(null,false)}</optgroup><optgroup label="Ausdauer">${exOptions(null,true)}</optgroup></select></label>
+      ${ui.runAdd?`<section class="panel stack"><b>Übung hinzufügen</b>${(()=>{const sg=runSuggest(r,s); return sg.length?`<div class="stack" style="gap:6px"><span class="small muted">Passt zu deinem Training heute</span>${sg.map(x=>`<button class="sugbtn" data-runaddid="${x.id}"><b>+ ${esc(EX[x.id].n)}</b><span class="small muted">${esc(MUS_N[x.m]||"")}${x.why?" · "+x.why:""}</span></button>`).join("")}</div>`:""})()}
+        <label class="f" for="runaddsel">Oder aus allen Übungen<select id="runaddsel"><optgroup label="Kraft">${exOptions(null,false)}</optgroup><optgroup label="Ausdauer">${exOptions(null,true)}</optgroup></select></label>
         <div class="row"><button class="btn" data-runadd="ok">Hinzufügen</button><button class="btn ghost" data-runadd="cancel">Abbrechen</button></div></section>`
         :`<button class="btn ghost" data-runadd="open">+ Übung hinzufügen</button>`}
       ${allDone&&!r.edit?`<div class="panel stack" style="text-align:center"><b>Alle Sätze erledigt 💪</b></div>`:""}
@@ -1649,6 +1651,21 @@ function runInit(r,s){
       const ws=warmups(Number(sets[0]&&sets[0].w),it.id).map(x=>uni?{w:x.w,r:x.r,l:x.r,rr:x.r,t:"w",done:false}:{w:x.w,r:x.r,t:"w",done:false}); sets.unshift(...ws)}
     r.rows[i]={id:it.id,sets};
   });
+}
+/* Vorschläge zum Hinzufügen: Muskeln der Einheit, die heute noch wenig abbekommen, zuerst; was schon reichlich dran war, nach hinten. */
+function runSuggest(r,s){
+  const del=r.del||{}, load={}, inS=new Set();
+  s.items.forEach((it,i)=>{if(del[i]) return; inS.add(it.id); if(it.role==="cardio") return; const m=MUS[it.id]||[[],[]]; m[0].forEach(x=>load[x]=(load[x]||0)+2); (m[1]||[]).forEach(x=>load[x]=(load[x]||0)+1)});
+  const p=state.profile, fav=state.fav||[], block=state.block||[], focus=Object.keys(load).length>0;
+  const c=Object.keys(EX).filter(id=>{const x=EX[id]; return !x.del&&!x.cardio&&!x.mob&&MUS[id]&&MUS[id][0].length&&!inS.has(id)&&!block.includes(id)&&EQ_RANK[x.e]<=EQ_RANK[p.equip]&&gearOk(id)})
+    .map(id=>{const pm=MUS[id][0]; let sc=(fav.includes(id)?2:0)+(pm.length===1?1:pm.length>=3?-2:0);
+      // schon als Hauptmuskel trainiert (≥2): eher nicht; nur mitbelastet (1): gut; gar nicht: ok
+      for(const m of pm){const l=load[m]||0; sc+=!focus?1:l===0?1.5:l===1?3:-3}
+      const m=pm.slice().sort((a,b)=>(load[a]||0)-(load[b]||0))[0];
+      return {id,sc,m,why:!focus?"":(load[m]||0)===0?"heute noch nicht dran":"heute nur nebenbei"}})
+    .sort((a,b)=>b.sc-a.sc);
+  const out=[], seen=new Set(); for(const x of c){if(x.sc<=0||seen.has(x.m)) continue; seen.add(x.m); out.push(x); if(out.length>=4) break}
+  return out;
 }
 function runLogs(r){
   const L={}, del=r.del||{}; for(const [i,x] of Object.entries(r.rows||{})) if(!del[i]) for(const y of x.sets) if(y.done){
@@ -2146,7 +2163,7 @@ function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".ta
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2185,8 +2202,8 @@ document.getElementById("view").addEventListener("click",e=>{
     // Mit erledigten Sätzen erst nachfragen, sonst gehen sie verloren
     if(r.rows[i]&&r.rows[i].sets.some(x=>x.done)&&ui.runDelAsk!==i){ui.runDelAsk=i; keepScroll(render); return}
     ui.runDelAsk=null; r.del[i]=true; r.restUntil=null; keepScroll(render); return}
-  if(t.dataset.runadd){const r=ui.run, a=t.dataset.runadd;
-    if(a==="ok"){const id=document.getElementById("runaddsel").value; if(EX[id]){(r.add||(r.add=[])).push(id); r._s=null; r.scrollTo=runSession(r).items.length-1}}
+  if(t.dataset.runadd||t.dataset.runaddid){const r=ui.run, a=t.dataset.runaddid?"ok":t.dataset.runadd;
+    if(a==="ok"){const id=t.dataset.runaddid||document.getElementById("runaddsel").value; if(EX[id]){(r.add||(r.add=[])).push(id); r._s=null; r.scrollTo=runSession(r).items.length-1}}
     ui.runAdd=a==="open"; render(); return}
   if(t.dataset.radd){const R=ui.run.rows[Number(t.dataset.radd)], last=R.sets.filter(x=>x.t!=="w").pop()||R.sets[R.sets.length-1], y={...last,done:false}; delete y.t; R.sets.push(y); keepScroll(render); return}
   if(t.dataset.rdel){const R=ui.run.rows[Number(t.dataset.rdel)]; if(R.sets.length>1&&!R.sets[R.sets.length-1].done) R.sets.pop(); keepScroll(render); return}
