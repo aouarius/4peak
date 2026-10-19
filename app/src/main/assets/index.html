@@ -84,6 +84,7 @@ label.f select,label.f input{font-weight:400;padding:8px;border:1px solid var(--
 .wdpick label{display:inline-flex;align-items:center;justify-content:center;width:42px;height:38px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-weight:600;font-size:.85rem;background:var(--surface)}
 .wdpick input{position:absolute;opacity:0;pointer-events:none}
 .wdpick label:has(input:checked){background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.wdpick.wide label{width:auto;padding:0 12px}
 .wdpick label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 /* Supplements */
 .grade{font:700 .9rem var(--f-display);letter-spacing:.04em;padding:2px 8px;border-radius:4px;color:#fff}
@@ -502,6 +503,21 @@ Object.assign(EX,NEW_EX);
 const EX_TIPS={"bench": "Füße fest in den Boden drücken und die Schulterblätter die ganze Zeit zusammenhalten.", "squat": "Vor dem Abstieg tief einatmen und den Bauch fest anspannen. Lieber weniger Gewicht und volle Tiefe.", "deadlift": "Vor dem Ziehen Spannung aufbauen, die Stange nicht vom Boden reißen.", "latpull": "Mit den Ellbogen ziehen, nicht mit den Händen.", "ohp": "Gesäß und Bauch fest, strikt drücken ohne Schwung aus den Beinen.", "row": "Wenn die Hüfte mitschwingt, ist das Gewicht zu schwer.", "lateral": "Nur bis Schulterhöhe und ohne Schwung, lieber leichter.", "pullup": "Volle Bewegung: unten ganz strecken, oben die Brust zur Stange.", "rdl": "Nur so tief, wie der Rücken gerade bleibt.", "triceps": "Die Oberarme bleiben fest am Körper, nur der Unterarm bewegt sich.", "dips": "Für die Brust leicht nach vorn lehnen, für den Trizeps aufrecht bleiben.", "splitsquat": "Das vordere Bein arbeitet, das hintere hält nur die Balance.", "legcurl": "Hüfte bleibt am Polster, langsam zurück.", "hipthrust": "Oben die Knie etwa 90° und das Gesäß fest anspannen.", "calf": "Unten volle Dehnung und kurz halten, nicht federn.", "plank": "Für Muskelaufbau weniger wirksam als Kabel-Crunch oder Beinheben, gut für Stabilität.", "pushup": "Ellbogen eng am Körper, oben die Schulterblätter auseinanderschieben.", "invrow": "Rudern ist laut BWF-Routine Pflicht und wird nicht durch Klimmzüge ersetzt.", "pikepush": "Kopf vor die Hände bringen, nicht zwischen sie, dann bleiben die Ellbogen eng.", "nordic": "Mit Band unterstützen, bis du die Absenkung kontrollierst.", "slrdl": "Flüssig bewegen statt roboterhaft, bei Wackeln mit einer Hand abstützen.", "goblet": "Ellbogen drücken die Knie unten nach außen, kurz in der Tiefe „hebeln“.", "deadbug": "Nur so weit strecken, wie der untere Rücken am Boden bleibt.", "lunge": "Rückwärts-Ausfallschritte sind knieschonender als vorwärts."};
 for(const [k,t] of Object.entries(EX_TIPS)) if(EX[k]&&!EX[k].tip) EX[k].tip=t;
 const EQ_RANK = {kg:0,kh:1,gym:2};
+/* Gerät einer Übung, damit sich einzelne Geräte (z. B. die Langhantel) aus dem Plan ausschliessen lassen */
+const GEAR={lh:"Langhantel",kh:"Kurzhantel",kb:"Kettlebell",masch:"Maschinen",kabel:"Kabelzug",kg:"Körpergewicht"};
+const LH_EXTRA=new Set(["bbcurl","skull","tbarrow"]);
+function gearOf(id){
+  const x=EX[id]; if(!x) return "kg";
+  if(x.gear) return x.gear;
+  if(BB.has(id)||LH_EXTRA.has(id)) return "lh";
+  const t=(x.n+" "+(x.en||"")).toLowerCase();
+  if(/kettlebell|turkish get/.test(t)) return "kb";
+  if(/kabel|cable|pallof|face pull/.test(t)) return "kabel";
+  if(x.e==="gym") return "masch";
+  if(x.e==="kh") return "kh";
+  return "kg";
+}
+function gearOk(id){return !(state.profile.noGear||[]).includes(gearOf(id))}
 function resolveEx(id, equip){
   let cur=id, guard=0;
   while(cur && EQ_RANK[EX[cur].e] > EQ_RANK[equip] && guard++<4){ cur = EX[cur].alt ? EX[cur].alt[equip] : null; }
@@ -588,7 +604,7 @@ function splitFor(p){
 }
 function altCands(id,used){
   const p=state.profile, prim=MUS[id]?MUS[id][0]:[], block=state.block||[], fav=state.fav||[];
-  return Object.keys(EX).filter(c=>c!==id&&!EX[c].del&&!EX[c].cardio===!EX[id].cardio&&!EX[c].mob&&EQ_RANK[EX[c].e]<=EQ_RANK[p.equip]&&!block.includes(c)&&!(used&&used.has(c))&&MUS[c]&&MUS[c][0].some(m=>prim.includes(m)))
+  return Object.keys(EX).filter(c=>c!==id&&!EX[c].del&&!EX[c].cardio===!EX[id].cardio&&!EX[c].mob&&EQ_RANK[EX[c].e]<=EQ_RANK[p.equip]&&gearOk(c)&&!block.includes(c)&&!(used&&used.has(c))&&MUS[c]&&MUS[c][0].some(m=>prim.includes(m)))
     .map(c=>({c,sc:(fav.includes(c)?2:0)+MUS[c][0].filter(m=>prim.includes(m)).length*3-Math.abs(MUS[c][0].length-prim.length)+(EX[c].e===EX[id].e?1:0)}))
     .sort((a,b)=>b.sc-a.sc).map(x=>x.c);
 }
@@ -607,7 +623,7 @@ function buildSession(key,p,deload){
     if(!tmpl&&strength>=cap) continue;
     let id=tmpl?x.id:resolveEx(x.id,p.equip); if(!id||!EX[id]) continue;
     const ss=tmpl&&x.ss?{ss:true}:{};
-    if((state.block||[]).includes(id)){id=altFor(id,used); if(!id) continue}
+    if((state.block||[]).includes(id)||!gearOk(id)){id=altFor(id,used); if(!id) continue}
     else if(!tmpl&&role==="acc"){const fv=favFor(id,used); if(fv) id=fv}
     if(!tmpl&&used.has(id)){id=altFor(id,used); if(!id) continue}
     used.add(id);
@@ -938,6 +954,7 @@ function viewUebungen(){
   const f=norm(ui.exFilter||"");
   const list=Object.entries(EX).filter(([id,x])=>!x.del&&(!f||norm(x.n+" "+x.m+" "+(x.en||"")).includes(f))
     &&(ui.exEquip==="all"||EQ_RANK[x.e]<=EQ_RANK[ui.exEquip])
+    &&(!ui.exGear||(!x.cardio&&!x.mob&&(ui.exGear.startsWith("no-")?gearOf(id)!==ui.exGear.slice(3):gearOf(id)===ui.exGear)))
     &&(!ui.exMus||(ui.exMus==="mob"?x.mob:ui.exMus==="cardio"?x.cardio:MUS[id]&&MUS[id][0].includes(ui.exMus)))
     &&(!ui.exMark||(ui.exMark==="fav"?fav.includes(id):block.includes(id))))
     .sort((a,b)=>(fav.includes(b[0])-fav.includes(a[0]))||(block.includes(a[0])-block.includes(b[0])));
@@ -948,6 +965,7 @@ function viewUebungen(){
         <option value="all"${ui.exEquip==="all"?" selected":""}>Alle Ausrüstungen</option>
         ${Object.entries(EQUIP).map(([k,v])=>`<option value="${k}"${ui.exEquip===k?" selected":""}>${v}</option>`).join("")}
       </select>
+      <select id="exgear" aria-label="Gerät"><option value="">Alle Geräte</option>${Object.entries(GEAR).map(([k,v])=>`<option value="${k}"${ui.exGear===k?" selected":""}>Nur ${v}</option>`).join("")}<option value="no-lh"${ui.exGear==="no-lh"?" selected":""}>Ohne Langhantel</option></select>
       <select id="exmark" aria-label="Markierung"><option value="">Alle Übungen</option><option value="fav"${ui.exMark==="fav"?" selected":""}>Nur Favoriten (${fav.length})</option><option value="block"${ui.exMark==="block"?" selected":""}>Nope! (${block.length})</option></select>
     </div>
     <div class="row" style="justify-content:space-between;align-items:flex-start;margin:0 0 12px;gap:8px"><p class="small muted" style="margin:0;flex:1;min-width:200px">${list.length} Übungen. Favoriten bevorzugt der Plan bei Ergänzungsübungen. Übungen mit „Nope!“ ersetzt er durch eine Alternative für dieselben Muskeln.</p>
@@ -955,7 +973,7 @@ function viewUebungen(){
     ${ui.exNew?exFormHtml():""}
     <div class="cards">${list.map(([id,x])=>{const isF=fav.includes(id), isB=block.includes(id), alt=isB?altFor(id,null):null;
       return `<article class="panel ex-card${isB?" blocked":""}" id="ex-${id}">
-      <div class="row" style="justify-content:space-between;align-items:flex-start"><h3>${esc(x.n)}</h3><span class="pill">${x.own?"Eigene · ":""}${x.e==="gym"?"Studio":x.e==="kh"?"Kurzhanteln":"Körpergewicht"}</span></div>
+      <div class="row" style="justify-content:space-between;align-items:flex-start"><h3>${esc(x.n)}</h3><span class="pill">${x.own?"Eigene · ":""}${x.cardio||x.mob?(x.e==="gym"?"Studio":x.e==="kh"?"Kurzhanteln":"Körpergewicht"):GEAR[gearOf(id)]}</span></div>
       <div class="small muted">${esc(x.m)}</div>
       <div class="row" style="gap:6px">
         <button class="chip${isF?" on":""}" data-fav="${id}" aria-pressed="${isF}">${isF?"★ Favorit":"☆ Favorit"}</button>
@@ -1125,6 +1143,10 @@ function viewProfil(){
     <fieldset style="border:0;padding:0;margin:0"><legend class="small" style="font-weight:600;margin-bottom:6px">Trainingstage</legend>
       <div class="wdpick">${WD.map((w,i)=>`<label><input type="checkbox" id="wd${i}" value="${i}" ${p.weekdays.includes(i)?"checked":""}>${w}</label>`).join("")}</div>
     </fieldset>
+    <fieldset style="border:0;padding:0;margin:0"><legend class="small" style="font-weight:600;margin-bottom:6px">Diese Geräte vorerst weglassen</legend>
+      <div class="wdpick wide">${Object.entries(GEAR).filter(([k])=>k!=="kg").map(([k,v])=>`<label><input type="checkbox" id="ng-${k}" ${(p.noGear||[]).includes(k)?"checked":""}>${v}</label>`).join("")}</div>
+      <p class="small muted" style="margin:6px 0 0">Der Plan ersetzt solche Übungen durch eine Alternative für dieselben Muskeln. Langhantel und Kurzhantel zusammen sind alle Freihanteln.</p>
+    </fieldset>
     <div class="row"><button class="btn" type="submit">Plan neu berechnen</button><span id="pmsg" class="small muted"></span></div>
   </form>
   ${remindHtml()}
@@ -1273,7 +1295,7 @@ function materialize(key){
 }
 function exOptions(cur,cardio){
   const p=state.profile, prim=MUS[cur]?MUS[cur][0]:[];
-  const ok=Object.entries(EX).filter(([id,x])=>!x.del&&!!x.cardio===!!cardio&&EQ_RANK[x.e]<=EQ_RANK[p.equip]);
+  const ok=Object.entries(EX).filter(([id,x])=>!x.del&&!!x.cardio===!!cardio&&EQ_RANK[x.e]<=EQ_RANK[p.equip]&&(id===cur||cardio||gearOk(id)));
   const same=ok.filter(([id])=>MUS[id]&&MUS[id][0].some(m=>prim.includes(m)));
   const rest=ok.filter(e=>!same.includes(e));
   const fav=state.fav||[], bl=state.block||[];
@@ -2207,6 +2229,7 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.id==="exmus"){ui.exMus=t.value; render()}
   else if(t.id==="exmark"){ui.exMark=t.value; render()}
   else if(t.id==="exeq"){ui.exEquip=t.value; render()}
+  else if(t.id==="exgear"){ui.exGear=t.value; render()}
   else if(t.id==="actfile"&&t.files[0]){importActivity(t.files[0])}
   else if(t.dataset.restpref){state.restPref=state.restPref||{}; state.restPref[t.dataset.restpref]=Number(t.value); save()}
   else if(t.dataset.note){const v=t.value.trim().slice(0,200); state.notes=state.notes||{}; if(v) state.notes[t.dataset.note]=v; else delete state.notes[t.dataset.note]; save()}
@@ -2248,7 +2271,7 @@ document.getElementById("view").addEventListener("submit",e=>{
   const num=(v,lo,hi,d)=>{const n=Number(v); return isFinite(n)&&n>=lo&&n<=hi?n:d};
   state.profile={goal:g("goal"),level:g("level"),equip:g("equip"),len:Number(g("len")),
     bar:Number(g("bar"))||20,weight:num(g("weight"),35,250,75),height:num(g("height"),120,230,178),sex:g("sex"),age:num(g("age"),14,100,30),restHr:num(g("restHr"),30,110,60),
-    start:g("start")||iso(mondayOf(TODAY)),weekdays:wds,example:false,split:state.profile.split||"auto",spKraft:g("spKraft").trim().slice(0,300),spCardio:g("spCardio").trim().slice(0,300)};
+    start:g("start")||iso(mondayOf(TODAY)),weekdays:wds,example:false,noGear:Object.keys(GEAR).filter(k=>{const c=document.getElementById("ng-"+k); return c&&c.checked}),split:state.profile.split||"auto",spKraft:g("spKraft").trim().slice(0,300),spCardio:g("spCardio").trim().slice(0,300)};
   save(); ui.sel=todayIso; go("plan");
 });
 
