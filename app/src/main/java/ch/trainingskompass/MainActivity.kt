@@ -159,7 +159,14 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (web.canGoBack()) web.goBack() else finish()
+                // Die Web-App entscheidet: Tab zurück, bei laufendem Training nur in den Hintergrund, sonst schliessen
+                web.evaluateJavascript("window.onNativeBack ? window.onNativeBack() : 'exit'") { res ->
+                    when (res?.trim('"')) {
+                        "ok" -> Unit
+                        "bg" -> moveTaskToBack(true)
+                        else -> if (web.canGoBack()) web.goBack() else finish()
+                    }
+                }
             }
         })
     }

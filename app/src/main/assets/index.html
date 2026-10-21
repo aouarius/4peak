@@ -656,6 +656,13 @@ const LS_KEY="trainingskompass.v1";
 try{const raw=localStorage.getItem(LS_KEY); if(raw) state=normalize(JSON.parse(raw));}catch(e){}
 let ui={tab:"kalender",month:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),sel:todayIso,exFilter:"",exEquip:"all",openEx:null,run:null,prodQ:"",prodBrand:"",summary:null,foodDay:todayIso};
 try{const t=localStorage.getItem(LS_KEY+".tab"); if(t) ui.tab=t;}catch(e){}
+/* Laufendes Training überlebt Zurück, Tab-Wechsel, Neuladen und das Schliessen der App (bis 18 h nach dem Start). */
+const RUN_KEY=LS_KEY+".run";
+try{const r=JSON.parse(localStorage.getItem(RUN_KEY)||"null"); if(r&&r.date&&r.t0&&!r.edit&&Date.now()-r.t0<18*3600e3){ui.run=r; ui.tab="training"} else localStorage.removeItem(RUN_KEY)}catch(e){}
+let lastRunJ="";
+function persistRun(){try{if(!ui.run){if(lastRunJ){localStorage.removeItem(RUN_KEY); lastRunJ=""} return}
+  const j=JSON.stringify(ui.run,(k,v)=>k==="_s"?undefined:v); if(j!==lastRunJ){localStorage.setItem(RUN_KEY,j); lastRunJ=j}}catch(e){}}
+addEventListener("visibilitychange",persistRun); addEventListener("pagehide",persistRun);
 
 let dbRef=null, saveTimer=null;
 function save(){
@@ -702,6 +709,12 @@ function homePayload(){
 }
 let lastHome="";
 function pushHome(){if(!NATIVE||!NATIVE.setHome) return; try{const j=JSON.stringify(homePayload()); if(j===lastHome) return; lastHome=j; NATIVE.setHome(j)}catch(e){}}
+// Android-Zurück: erst Menü schliessen, dann zum vorherigen Tab; läuft ein Training, App nur in den Hintergrund legen
+window.onNativeBack=function(){
+  if(ui.more){ui.more=false; navSync(); return "ok"}
+  const h=ui.hist||[]; while(h.length){const t=h.pop(); if(t!==ui.tab&&VIEWS[t]){ui.tab=t; try{localStorage.setItem(LS_KEY+".tab",t)}catch(e){} render(); window.scrollTo(0,0); return "ok"}}
+  persistRun(); return ui.run?"bg":"exit";
+};
 window.onNativeStart=function(d){
   if(!/^\d{4}-\d\d-\d\d$/.test(d)) return;
   if(ui.run&&ui.run.date===d){go("training"); return}
@@ -896,7 +909,7 @@ function viewKalender(){
           <button class="btn ghost" data-undone="${sel}">${ui.delDone===sel?"Wirklich löschen?":"Löschen"}</button>`
         :`<label class="f" style="flex-direction:row;align-items:center;gap:8px" for="rpe">Anstrengung
             <select id="rpe">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
-          <button class="btn" data-start="${sel}">Training starten</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>`}
+          <button class="btn" data-start="${sel}">${ui.run&&!ui.run.edit&&ui.run.date===sel?"Training fortsetzen":"Training starten"}</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>`}
       </div>`:""}
       ${acts.map(a=>`<div class="small"><b>Wearable-Aktivität:</b> ${a.dur} min, Ø ${a.avg||"–"} bpm, max ${a.max||"–"} bpm <span class="muted">(${esc(a.src)})</span></div>`).join("")}
       ${state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
@@ -1153,7 +1166,8 @@ function viewProfil(){
   ${remindHtml()}
   ${backupHtml()}`;
 }
-function startRun(d){ui.summary=null; ui.runAdd=false; ui.runDelAsk=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false,target:warmPref().min*60,tmin:warmPref().min},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
+function startRun(d){if(ui.run&&!ui.run.edit&&ui.run.date===d){go("training"); return}
+  ui.summary=null; ui.runAdd=false; ui.runDelAsk=null; ui.run={date:d,i:0,logs:{},rows:{},warm:{acc:0,start:null,done:false,target:warmPref().min*60,tmin:warmPref().min},restUntil:null,t0:Date.now()}; ui.sel=d; go("training")}
 function remindHtml(){
   if(!(NATIVE&&NATIVE.setHome)) return "";
   const R=state.remind, row=(k,label)=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><label class="checkline" style="margin:0;min-width:0"><input type="checkbox" data-remind="${k}" ${R[k].on?"checked":""}> ${label}</label><input type="time" data-remindt="${k}" value="${esc(R[k].t)}" style="width:auto;flex:none" ${R[k].on?"":"disabled"}></div>`;
@@ -2156,8 +2170,9 @@ function render(){
   if(ui.tab==="training"&&ui.run){tick(); if(!timerInt) timerInt=setInterval(tick,250);
     if(ui.run.scrollTo!=null){const el=document.getElementById("it-"+ui.run.scrollTo); ui.run.scrollTo=null; if(el) el.scrollIntoView({block:"start",behavior:"smooth"})}}
   if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el) el.scrollIntoView({block:"start"}); ui.openEx=null;}
+  persistRun();
 }
-function go(tab){ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
+function go(tab){if(tab!==ui.tab){(ui.hist||(ui.hist=[])).push(ui.tab); if(ui.hist.length>20) ui.hist.shift()} ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
 
 /* ---------- Ereignisse ---------- */
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
@@ -2270,7 +2285,7 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.id==="bkfile"&&t.files[0]){const fr=new FileReader(); fr.onload=()=>backupParse(String(fr.result||"")); fr.readAsText(t.files[0]); t.value=""}
 });
 document.getElementById("view").addEventListener("input",e=>{
-  if(e.target.dataset.rv&&ui.run){const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="w"&&y.w!==""){ui.run.rows[i].sets.forEach((x,j)=>{if(j>Number(k)&&!x.done&&x.t!=="w"&&(x.w===""||x.auto)){x.w=y.w; x.auto=true; const el=document.querySelector(`[data-rv="${i}:${j}:w"]`); if(el) el.value=y.w}})} if(f==="w") delete y.auto; if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
+  if(e.target.dataset.rv&&ui.run){setTimeout(persistRun,0); const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="w"&&y.w!==""){ui.run.rows[i].sets.forEach((x,j)=>{if(j>Number(k)&&!x.done&&x.t!=="w"&&(x.w===""||x.auto)){x.w=y.w; x.auto=true; const el=document.querySelector(`[data-rv="${i}:${j}:w"]`); if(el) el.value=y.w}})} if(f==="w") delete y.auto; if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
     const pl=document.getElementById("pl-"+i); if(pl&&f==="w"&&ui.run.rows[i].sets.find(x=>!x.done)===y) pl.innerHTML=plateTxt(y.w); return}
   if(e.target.id==="sg"&&ui.scan){const g=Number(e.target.value)||0, s2=ui.scan, el=document.getElementById("scanprev"); if(el) el.textContent=(s2.kcal!=null?Math.round(s2.kcal*g/100)+" kcal":"")+(s2.prot!=null?" · "+Math.round(s2.prot*g/100)+" g Protein":""); return}
   if(e.target.id==="setw"&&ui.run){const it=sessionFor(ui.run.date).items[ui.run.i], w=Number(e.target.value); const pl=document.getElementById("plates"), wa=document.getElementById("warm");
