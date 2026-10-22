@@ -19,7 +19,7 @@ android {
         versionName = "0.1.$build"
     }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     // Fester Debug-Schlüssel im Repo: jede Version installiert sich über die vorige,
     // und Handy- und Uhr-App haben dieselbe Signatur. Für den Play Store braucht es einen eigenen Schlüssel.
     signingConfigs {

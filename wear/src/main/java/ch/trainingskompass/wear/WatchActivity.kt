@@ -104,6 +104,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Nach einem Absturz zuerst den Fehler zeigen (ohne Compose, damit das sicher klappt)
+        FourPeakApp.take(this)?.let { showCrash(it); return }
         lifecycle.addObserver(ambientObserver)
         doneDates = Store.done(this)
         plan = Store.plan(this)
@@ -111,6 +113,27 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         startPending()
         lifecycleScope.launch { loadPlanFromDataLayer() }
         setContent { App() }
+    }
+
+    private fun showCrash(trace: String) {
+        val pad = (resources.displayMetrics.density * 28).toInt()
+        val col = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+            setBackgroundColor(android.graphics.Color.BLACK)
+        }
+        col.addView(android.widget.TextView(this).apply {
+            text = "4peak ist abgestürzt. Bitte fotografieren und an Claude schicken:"
+            setTextColor(android.graphics.Color.rgb(255, 200, 80)); textSize = 13f
+        })
+        col.addView(android.widget.TextView(this).apply {
+            text = trace; setTextColor(android.graphics.Color.WHITE); textSize = 10f; setTextIsSelectable(true)
+        })
+        col.addView(android.widget.Button(this).apply {
+            text = "Weiter"
+            setOnClickListener { FourPeakApp.clear(this@WatchActivity); recreate() }
+        })
+        setContentView(android.widget.ScrollView(this).apply { addView(col); isFocusableInTouchMode = true; requestFocus() })
     }
 
     override fun onNewIntent(intent: Intent) {
