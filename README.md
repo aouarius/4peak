@@ -7,10 +7,10 @@ Fitness-App für Android mit Uhr-App für Wear OS.
 
 ## Installieren
 
-Jeder Push auf `main` baut beide Apps automatisch (Reiter **Actions** → letzter Lauf → **trainingskompass-apks**).
+Jeder Push auf `main` baut beide Apps automatisch (Reiter **Actions** → letzter Lauf → **4peak-apps**).
 
-1. **Handy:** `trainingskompass-handy.apk` auf das Handy laden und öffnen. Android fragt einmal, ob du Apps aus dieser Quelle erlauben willst.
-2. **Uhr:** `trainingskompass-uhr.apk` muss vom Handy auf die Uhr übertragen werden, zum Beispiel mit der App „Wear Installer 2“ aus dem Play Store. Dafür auf der Uhr unter *Einstellungen → Entwickleroptionen* das *ADB-Debugging* und das *Debugging über WLAN* einschalten.
+1. **Handy:** `4peak-HANDY.apk` auf das Handy laden und öffnen. Android fragt einmal, ob du Apps aus dieser Quelle erlauben willst.
+2. **Uhr:** `4peak-UHR.apk` muss vom Handy auf die Uhr übertragen werden, zum Beispiel mit der App „Wear Installer 2“ aus dem Play Store. Dafür auf der Uhr unter *Einstellungen → Entwickleroptionen* das *ADB-Debugging* und das *Debugging über WLAN* einschalten.
 
 Alle Builds sind mit demselben Schlüssel (`keystore/debug.keystore`) signiert. Neue Versionen installieren sich deshalb über die alten, und Handy- und Uhr-App erkennen sich gegenseitig.
 
