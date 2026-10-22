@@ -66,6 +66,7 @@ button,select,input{font:inherit;color:inherit}
 .day .bar{height:5px;border-radius:3px;width:100%}
 .day .lbl{font-size:.66rem;line-height:1.15;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .day .chk{position:absolute;top:3px;right:5px;font-size:.75rem;color:var(--green);font-weight:700}
+.day .xact{position:absolute;bottom:2px;right:5px;font-size:.8rem;color:var(--green);font-weight:700}
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:.78rem;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 /* Übungszeilen */
@@ -753,6 +754,15 @@ window.onWatchSessions=function(arr){
 window.onNativeHealth=function(h){
   if(!h||typeof h!=="object") return;
   state.health={at:new Date().toISOString(),rest:Array.isArray(h.rest)?h.rest:[],hrv:Array.isArray(h.hrv)?h.hrv:[],sleep:Array.isArray(h.sleep)?h.sleep:[],error:h.error||""};
+  // Sport aus Health Connect (z. B. Samsung Health) als Aktivität übernehmen; Trainings dieser App nicht doppelt
+  let added=0;
+  for(const x of Array.isArray(h.ex)?h.ex:[]){
+    if(!x||!x.id||!/^\d{4}-\d\d-\d\d$/.test(x.d)||state.acts.some(a=>a.hc===x.id)) continue;
+    const dn=state.done[x.d], endT=Date.parse(x.start)+(Number(x.min)||0)*60000;
+    if(dn&&dn.at&&x.k==="kraft"&&Math.abs(Date.parse(dn.at)-endT)<45*60000) continue;
+    state.acts.push({date:x.d,dur:Number(x.min)||0,avg:Math.round(Number(x.avg))||0,max:Math.round(Number(x.max))||0,kcal:Number(x.kcal)||0,name:String(x.n||"Sport").slice(0,40),kind:x.k||"cardio",hc:String(x.id),src:/shealth|samsung/.test(x.src||"")?"Samsung Health":"Health Connect"}); added++;
+  }
+  if(added){state.acts.sort((a,b)=>a.date<b.date?-1:1); render()}
   const r=state.health.rest.slice(-7).map(x=>Number(x.v)).filter(v=>v>30&&v<110); if(r.length) state.profile.restHr=Math.round(r.reduce((x,y)=>x+y,0)/r.length)
   save(); if(ui.tab==="wear") render();
 };
@@ -770,7 +780,7 @@ function nativeHtml(){
   const sl=h&&last(h.sleep), rc=h&&recovery(h);
   return `<section class="panel stack">
     <h2>Uhr und Health Connect</h2>
-    <p class="small muted" style="margin:0">Die Uhr bekommt automatisch deine nächsten Trainings. Sätze, die du auf der Uhr speicherst, erscheinen hier im Kalender und im Fortschritt.</p>
+    <p class="small muted" style="margin:0">Die Uhr bekommt automatisch deine nächsten Trainings. Sätze, die du auf der Uhr speicherst, erscheinen hier im Kalender und im Fortschritt. Sport, den Samsung Health erkennt oder den du dort startest (Laufen, Velo, Schwimmen …), übernimmt die App aus Health Connect in den Kalender, auch an trainingsfreien Tagen.</p>
     ${h&&!h.error?`<div class="tiles">${tile("Ruhepuls",last(h.rest)?Math.round(last(h.rest).v)+" bpm":"–")}${tile("HRV",last(h.hrv)?Math.round(last(h.hrv).v)+" ms":"–")}${tile("Schlaf",sl?Math.floor(sl.min/60)+" h "+String(sl.min%60).padStart(2,"0")+" min":"–")}</div>`:""}
     ${rc?`<p style="margin:0"><b>${rc.t}.</b> ${rc.d}</p>`:""}
     ${h&&h.error?`<p class="small" style="margin:0">${esc(h.error)}</p>`:""}
@@ -886,7 +896,7 @@ function viewKalender(){
       <span class="n">${d.getDate()}</span>
       ${done?'<span class="chk" aria-hidden="true">✓</span>':""}
       ${s?`<span class="bar c-${s.c}"></span><span class="lbl">${esc(s.name)}${s.deload?" · Deload":""}</span>`:""}
-      ${act&&!s?`<span class="bar c-green" style="opacity:.5"></span><span class="lbl">Aktivität</span>`:""}
+      ${act&&!s?`<span class="bar c-green" style="opacity:.5"></span><span class="lbl">${esc((state.acts.find(a=>a.date===k)||{}).name||"Aktivität")}</span>`:act&&s?'<span class="xact" aria-hidden="true">+</span>':""}
     </button>`;
   }
   const sel=ui.sel, s=sessionFor(sel), dSel=parseIso(sel), done=state.done[sel];
@@ -928,7 +938,7 @@ function viewKalender(){
             <select id="rpe">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
           <button class="btn" data-start="${sel}">${ui.run&&!ui.run.edit&&ui.run.date===sel?"Training fortsetzen":"Training starten"}</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>`}
       </div>`:""}
-      ${acts.map(a=>`<div class="small"><b>Wearable-Aktivität:</b> ${a.dur} min, Ø ${a.avg||"–"} bpm, max ${a.max||"–"} bpm <span class="muted">(${esc(a.src)})</span></div>`).join("")}
+      ${acts.map(a=>`<div class="small"><b>${a.name?esc(a.name):"Wearable-Aktivität"}${s||done?" (zusätzlich)":""}:</b> ${a.dur} min${a.avg?`, Ø ${a.avg} bpm, max ${a.max||"–"} bpm`:""}${a.kcal?`, ${a.kcal} kcal`:""} <span class="muted">(${esc(a.src)})</span></div>`).join("")}
       ${state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
         ${state.mySupps.filter(id=>suppDue(id,sel)).map(id=>{const sp=SUPPS.find(x=>x.id===id); if(!sp) return ""; return `<label class="checkline"><input type="checkbox" data-supp="${id}" ${supsToday.includes(id)?"checked":""}> ${esc(sp.n)} <span class="muted small">${esc(suppLineProducts(id)||sp.dose(p))}${(e=>e?` · ${e.k} kcal, ${e.p} g Protein`:"")(suppEnergy(id))}</span></label>`}).join("")}
       </div>`:""}

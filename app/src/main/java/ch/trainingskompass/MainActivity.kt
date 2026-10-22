@@ -181,6 +181,8 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         super.onResume()
         dataClient.addListener(this)
         pullWatchLogs()
+        // Sport aus Samsung Health still nachladen, wenn Health Connect schon freigegeben ist
+        lifecycleScope.launch { if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) deliverHealth() }
     }
 
     override fun onDestroy() {
