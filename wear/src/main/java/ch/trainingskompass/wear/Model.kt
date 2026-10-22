@@ -141,16 +141,17 @@ class Run(val session: Session) {
         if (hiAt != 0L && now - hiAt >= 120_000 && now - began >= 240_000) { warmReady = true; return true }
         return false
     }
+    /** Reihenfolge dieses Trainings; lässt sich unterwegs ändern, wenn ein Gerät besetzt ist.
+     *  Muss vor init { prepare() } stehen, sonst ist die Liste beim Start noch leer (Absturz). */
+    val items = mutableStateListOf<Item>().apply { addAll(session.items) }
+    /** Liste zum Umsortieren ist offen */
+    var picking by mutableStateOf(false)
     val startedAt = System.currentTimeMillis()
     private var itemStartedAt = startedAt
     val logs = linkedMapOf<String, MutableList<JSONObject>>()
 
     init { prepare() }
 
-    /** Reihenfolge dieses Trainings; lässt sich unterwegs ändern, wenn ein Gerät besetzt ist */
-    val items = mutableStateListOf<Item>().apply { addAll(session.items) }
-    /** Liste zum Umsortieren ist offen */
-    var picking by mutableStateOf(false)
     val item: Item? get() = items.getOrNull(index)
     val finished: Boolean get() = index >= items.size
     val setCount: Int get() = logs.values.sumOf { list -> list.count { !it.has("min") && it.optString("t") != "w" } }
