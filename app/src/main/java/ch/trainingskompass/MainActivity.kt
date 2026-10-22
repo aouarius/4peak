@@ -23,6 +23,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -268,6 +269,21 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             dataClient.putDataItem(request)
         }
 
+        /** Verbundene Uhren und ob 4peak darauf läuft; Antwort an window.onWatchStatus */
+        @JavascriptInterface
+        fun watchStatus() {
+            lifecycleScope.launch {
+                val nodes = runCatching { Wearable.getNodeClient(this@MainActivity).connectedNodes.await() }.getOrDefault(emptyList())
+                val withApp = runCatching {
+                    Wearable.getCapabilityClient(this@MainActivity)
+                        .getCapability(WATCH_CAPABILITY, CapabilityClient.FILTER_ALL).await().nodes.map { it.id }.toSet()
+                }.getOrDefault(emptySet())
+                val arr = JSONArray()
+                nodes.forEach { arr.put(JSONObject().put("name", it.displayName).put("near", it.isNearby).put("app", it.id in withApp)) }
+                web.evaluateJavascript("window.onWatchStatus && window.onWatchStatus($arr)", null)
+            }
+        }
+
         /** Die Seite meldet ihr Design, damit Statusleiste und Ränder dazu passen. */
         @JavascriptInterface
         fun setTheme(background: String, dark: Boolean) {
@@ -366,6 +382,8 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     companion object {
         const val PLAN_PATH = "/plan"
+        /** Von der Uhr-App angemeldet (wear/res/values/wear.xml) */
+        const val WATCH_CAPABILITY = "fourpeak_watch"
         const val LOG_PATH = "/log/"
     }
 }

@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- Damit die Handy-App erkennt, dass 4peak auf der Uhr installiert ist -->
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>fourpeak_watch</item>
+    </string-array>
+</resources>

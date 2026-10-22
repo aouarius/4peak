@@ -722,7 +722,24 @@ window.onNativeStart=function(d){
   ui.sel=d; go("kalender");
 };
 window.onNotifyPermission=function(ok){ui.remMsg=ok?"":"Ohne Erlaubnis für Benachrichtigungen kann dich die App nicht erinnern. Du kannst sie in den Android-Einstellungen bei 4peak erlauben."; if(ui.tab==="profil") render()};
-function pushWatch(){if(!NATIVE) return; try{const j=JSON.stringify(watchPayload()); if(j===lastWatch) return; lastWatch=j; NATIVE.sendToWatch(j)}catch(e){}}
+function pushWatch(force){if(!NATIVE) return; try{const j=JSON.stringify(watchPayload()); if(j===lastWatch&&!force) return; lastWatch=j; NATIVE.sendToWatch(j); try{localStorage.setItem(LS_KEY+".watchSent",String(Date.now()))}catch(e){}}catch(e){}}
+/* Verbundene Uhren vom Handy abfragen; Antwort kommt über onWatchStatus */
+function askWatch(){if(NATIVE&&typeof NATIVE.watchStatus==="function"){ui.watchBusy=true; try{NATIVE.watchStatus()}catch(e){ui.watchBusy=false}}}
+window.onWatchStatus=function(list){ui.watch=Array.isArray(list)?list:[]; ui.watchBusy=false; if(ui.tab==="wear") keepScroll(render)};
+function watchHtml(){
+  if(!ui.watch&&!ui.watchBusy) setTimeout(askWatch,0);
+  const L=ui.watch, sent=(()=>{try{return Number(localStorage.getItem(LS_KEY+".watchSent"))||0}catch(e){return 0}})();
+  const fromW=Object.entries(state.done).filter(([d,x])=>x.src==="uhr").sort((a,b)=>a[0]<b[0]?1:-1)[0];
+  const when=t=>new Date(t).toLocaleString("de-CH",{weekday:"short",day:"numeric",month:"numeric",hour:"2-digit",minute:"2-digit"});
+  const rows=!L?`<p class="small muted" style="margin:0">${ui.watchBusy?"Suche Uhr …":"Status unbekannt."}</p>`
+    :L.length?L.map(w=>`<div class="row" style="gap:8px;align-items:center"><span style="font-size:1.3rem">⌚</span><span style="flex:1"><b>${esc(w.name||"Uhr")}</b><br><span class="small muted">${w.near?"verbunden":"verbunden über WLAN/Cloud"}${w.app?" · 4peak installiert":""}</span></span><span class="pill"><i class="dot c-green"></i>online</span></div>`).join("")
+    :`<p class="small" style="margin:0">Keine Uhr verbunden. Prüfe, ob die Uhr in der Galaxy-Wearable-App gekoppelt und Bluetooth an ist.</p>`;
+  return `<section class="panel stack">
+    <h2>Deine Uhr</h2>${rows}
+    <div class="small muted">Plan zuletzt an die Uhr gesendet: ${sent?when(sent):"noch nie"}${fromW?` · Letztes Training von der Uhr: ${when(fromW[1].at||fromW[0])}`:""}</div>
+    <div class="row" style="gap:8px"><button class="btn" data-watchsend="1">Plan jetzt an die Uhr senden</button><button class="btn ghost" data-watchask="1">Status aktualisieren</button></div>
+  </section>`;
+}
 window.onWatchSessions=function(arr){
   let n=0;
   for(const x of arr||[]){
@@ -1090,7 +1107,7 @@ function viewWear(){
   const p=state.profile, Z=hrZones(p);
   const hasBt=HAS_BT();
   return `<div class="stack">
-    ${NATIVE?nativeHtml():""}
+    ${NATIVE?watchHtml()+nativeHtml():""}
     <div class="grid2">
       <section class="panel stack">
         <h2>Herzfrequenzzonen</h2>
@@ -2172,13 +2189,13 @@ function render(){
   if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el) el.scrollIntoView({block:"start"}); ui.openEx=null;}
   persistRun();
 }
-function go(tab){if(tab!==ui.tab){(ui.hist||(ui.hist=[])).push(ui.tab); if(ui.hist.length>20) ui.hist.shift()} ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
+function go(tab){if(tab==="wear") askWatch(); if(tab!==ui.tab){(ui.hist||(ui.hist=[])).push(ui.tab); if(ui.hist.length>20) ui.hist.shift()} ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
 
 /* ---------- Ereignisse ---------- */
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2212,6 +2229,8 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.rtype){const [i,k]=t.dataset.rtype.split(":").map(Number), y=ui.run.rows[i].sets[k], o=["","w","d","f"]; y.t=o[(o.indexOf(y.t||"")+1)%4]||undefined; if(!y.t) delete y.t; keepScroll(render); return}
   if(t.dataset.rprev){const [i,k]=t.dataset.rprev.split(":").map(Number), r=ui.run, it=runSession(r).items[i], l=lastSets(it.id,r.date), y=r.rows[i].sets[k];
     const wn=r.rows[i].sets.slice(0,k+1).filter(x=>x.t!=="w").length, pv=l&&work(l[1].sets[it.id])[wn-1]; if(pv){y.w=pv.w; y.r=pv.r; if(pv.l!=null){y.l=pv.l; y.rr=pv.rr}} keepScroll(render); return}
+  if(t.dataset.watchsend){pushWatch(true); askWatch(); keepScroll(render); return}
+  if(t.dataset.watchask){askWatch(); keepScroll(render); return}
   if(t.dataset.rundel){const r=ui.run, i=Number(t.dataset.rundel); r.del=r.del||{};
     if(r.del[i]){delete r.del[i]; keepScroll(render); return}
     // Mit erledigten Sätzen erst nachfragen, sonst gehen sie verloren
