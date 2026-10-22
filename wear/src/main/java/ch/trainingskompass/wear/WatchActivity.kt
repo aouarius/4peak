@@ -237,6 +237,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     r.warmPhase && r.warmReady && !r.warmReadyNo -> WarmReadyScreen(r)
                     r.warmPhase -> WarmupScreen(r)
                     r.finished -> FinishScreen(r)
+                    r.picking -> OrderScreen(r)
                     r.restUntil > 0 -> RestScreen(r)
                     else -> ExerciseScreen(r)
                 }
@@ -326,13 +327,15 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HeartRateLine()
+                // Antippen öffnet die Reihenfolge (Gerät besetzt → andere Übung vorziehen)
                 Text(
-                    it.name,
+                    "⇅ " + it.name,
                     style = MaterialTheme.typography.caption1,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
                 Text(
                     if (r.inWarmSet) "Aufwärmsatz ${r.warmIdx + 1} von ${it.warmSets.size}" else "Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}",
@@ -412,6 +415,13 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            if (r.index < r.items.size - 1) item {
+                CompactChip(
+                    onClick = { r.picking = true },
+                    label = { Text("Reihenfolge ändern") },
+                    colors = ChipDefaults.secondaryChipColors(),
+                )
+            }
             item {
                 CompactChip(
                     onClick = { r.next() },
@@ -423,6 +433,42 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 CompactChip(
                     onClick = { r.end() },
                     label = { Text("Training beenden") },
+                    colors = ChipDefaults.secondaryChipColors(),
+                )
+            }
+        }
+    }
+
+    /** Reihenfolge ändern: eine spätere Übung vorziehen oder die aktuelle ans Ende schieben. */
+    @Composable
+    private fun OrderScreen(r: Run) {
+        ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
+            item { Text("Was machst du jetzt?", style = MaterialTheme.typography.caption1, textAlign = TextAlign.Center) }
+            for (j in r.index + 1 until r.items.size) {
+                val x = r.items[j]
+                val done = r.logs[x.id].orEmpty().count { !it.has("min") && it.optString("t") != "w" }
+                item(key = "o$j-${x.id}") {
+                    Chip(
+                        onClick = { r.doNow(j); tick() },
+                        label = { Text(x.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        secondaryLabel = { Text(if (x.cardio) "Ausdauer" else if (done > 0) "$done von ${x.sets} Sätzen" else "${x.sets} × ${x.reps}") },
+                        colors = ChipDefaults.secondaryChipColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            r.item?.let { cur ->
+                item {
+                    CompactChip(
+                        onClick = { r.later(); tick() },
+                        label = { Text("${cur.name} ans Ende", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                }
+            }
+            item {
+                CompactChip(
+                    onClick = { r.picking = false },
+                    label = { Text("Zurück") },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
             }
@@ -451,7 +497,16 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             Text("Pause", style = MaterialTheme.typography.caption1)
             Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2)
             HeartRateLine()
-            r.item?.let { Text("Als Nächstes: Satz ${r.setNo} von ${it.sets}", style = MaterialTheme.typography.caption2) }
+            r.item?.let {
+                Text(
+                    (if (r.setNo > 1) "Als Nächstes: Satz ${r.setNo} von ${it.sets}" else "Als Nächstes: ${it.name}") + if (r.index < r.items.size - 1) " ⇅" else "",
+                    style = MaterialTheme.typography.caption2,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 16.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
+                )
+            }
             Spacer(Modifier.size(8.dp))
             Row {
                 CompactChip(

@@ -12,8 +12,10 @@ android {
         applicationId = "ch.trainingskompass"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Jeder CI-Build bekommt eine höhere Versionsnummer, damit Updates sauber über die alte Version gehen
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "0.1.$build"
     }
 
     // Fester Debug-Schlüssel im Repo: jede Version installiert sich über die vorige,

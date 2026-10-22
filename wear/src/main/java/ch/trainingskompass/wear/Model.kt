@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.json.JSONArray
@@ -146,8 +147,12 @@ class Run(val session: Session) {
 
     init { prepare() }
 
-    val item: Item? get() = session.items.getOrNull(index)
-    val finished: Boolean get() = index >= session.items.size
+    /** Reihenfolge dieses Trainings; lässt sich unterwegs ändern, wenn ein Gerät besetzt ist */
+    val items = mutableStateListOf<Item>().apply { addAll(session.items) }
+    /** Liste zum Umsortieren ist offen */
+    var picking by mutableStateOf(false)
+    val item: Item? get() = items.getOrNull(index)
+    val finished: Boolean get() = index >= items.size
     val setCount: Int get() = logs.values.sumOf { list -> list.count { !it.has("min") && it.optString("t") != "w" } }
     val inWarmSet: Boolean get() = warmIdx < (item?.warmSets?.size ?: 0)
 
@@ -165,12 +170,32 @@ class Run(val session: Session) {
 
     private fun prepare() {
         val it = item ?: return
-        warmIdx = 0
-        val w = it.warmSets.firstOrNull()
-        weight = w?.first ?: it.weight
-        reps = w?.second ?: targetReps(it.reps)
-        setNo = 1
+        // Schon angefangene Übung (nach Umsortieren): bei den gemachten Sätzen weitermachen
+        val list = logs[it.id].orEmpty()
+        val work = list.filter { x -> !x.has("min") && x.optString("t") != "w" }
+        warmIdx = if (work.isNotEmpty()) it.warmSets.size else list.count { x -> x.optString("t") == "w" }.coerceAtMost(it.warmSets.size)
+        val w = it.warmSets.getOrNull(warmIdx)
+        val last = work.lastOrNull()
+        weight = w?.first ?: last?.optDouble("w") ?: it.weight
+        reps = w?.second ?: last?.optInt("r") ?: targetReps(it.reps)
+        setNo = work.size + 1
         itemStartedAt = System.currentTimeMillis()
+    }
+
+    /** Übung an Position [j] jetzt machen; die aktuelle kommt direkt danach. */
+    fun doNow(j: Int) {
+        if (j <= index || j >= items.size) return
+        items.add(index, items.removeAt(j))
+        picking = false
+        prepare()
+    }
+
+    /** Aktuelle Übung ans Ende schieben, z. B. weil das Gerät besetzt ist. */
+    fun later() {
+        if (index >= items.size - 1) return
+        items.add(items.removeAt(index))
+        picking = false
+        prepare()
     }
 
     fun logSet() {
@@ -216,7 +241,7 @@ class Run(val session: Session) {
 
     fun end() {
         restUntil = 0
-        index = session.items.size
+        index = items.size
     }
 
     fun toJson(hrAvg: Int, hrMax: Int, kcal: Int = 0): JSONObject {
