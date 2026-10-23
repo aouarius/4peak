@@ -2218,7 +2218,6 @@ function viewErnaehrung(){
         <p class="sources" style="margin:0"><a href="https://doi.org/10.1093/ajcn/51.2.241" target="_blank" rel="noopener">Mifflin et al., 1990</a></p>
       </section>
     </div>
-    ${mealHtml(day,kcal,prot,T)}
     <section class="panel stack">
       <div class="row" style="justify-content:space-between;align-items:center"><h3>Schnell eintragen</h3>${NATIVE&&NATIVE.scanBarcode?`<button class="btn" data-scan="1">Barcode scannen</button>`:""}</div>
       ${scanHtml()}
@@ -2231,6 +2230,7 @@ function viewErnaehrung(){
       </form>
       <p class="small muted" style="margin:0">Nährwerte der Schnellauswahl sind gerundete Durchschnittswerte.${NATIVE&&NATIVE.scanBarcode?"":" Der Barcode-Scanner funktioniert in der Android-App."}</p>
     </section>
+    ${mealHtml(day,kcal,prot,T)}
   </div>`;
 }
 
