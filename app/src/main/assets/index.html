@@ -763,6 +763,9 @@ function watchHtml(){
   if(!ui.watch&&!ui.watchBusy) setTimeout(askWatch,0);
   const L=ui.watch, sent=(()=>{try{return Number(localStorage.getItem(LS_KEY+".watchSent"))||0}catch(e){return 0}})();
   const fromW=Object.entries(state.done).filter(([d,x])=>x.src==="uhr").sort((a,b)=>a[0]<b[0]?1:-1)[0];
+  // Wiederholungszähler der Uhr: gezählt (ar) gegen eingetragen (r)
+  const cnt=Object.values(state.done).flatMap(x=>Object.values(x.sets||{}).flat()).filter(v=>v&&v.ar>0);
+  const exact=cnt.filter(v=>v.ar===v.r).length, near=cnt.filter(v=>Math.abs(v.ar-v.r)<=1).length;
   const when=t=>new Date(t).toLocaleString("de-CH",{weekday:"short",day:"numeric",month:"numeric",hour:"2-digit",minute:"2-digit"});
   const rows=!L?`<p class="small muted" style="margin:0">${ui.watchBusy?"Suche Uhr …":"Status unbekannt."}</p>`
     :L.length?L.map(w=>`<div class="row" style="gap:8px;align-items:center"><span style="font-size:1.3rem">⌚</span><span style="flex:1"><b>${esc(w.name||"Uhr")}</b><br><span class="small muted">${w.near?"verbunden":"verbunden über WLAN/Cloud"}${w.app?" · 4peak installiert":""}</span></span><span class="pill"><i class="dot c-green"></i>online</span></div>`).join("")
@@ -770,6 +773,7 @@ function watchHtml(){
   return `<section class="panel stack">
     <h2>Deine Uhr</h2>${rows}
     <div class="small muted">Plan zuletzt an die Uhr gesendet: ${sent?when(sent):"noch nie"}${fromW?` · Letztes Training von der Uhr: ${when(fromW[1].at||fromW[0])}`:""}</div>
+    ${cnt.length?`<div class="small muted">Wiederholungszähler: ${exact} von ${cnt.length} gezählten Sätzen genau, ${near} auf ±1 Wiederholung.</div>`:""}
     <div class="row" style="gap:8px"><button class="btn" data-watchsend="1">Plan jetzt an die Uhr senden</button><button class="btn ghost" data-watchask="1">Status aktualisieren</button></div>
   </section>`;
 }
@@ -778,7 +782,7 @@ window.onWatchSessions=function(arr){
   for(const x of arr||[]){
     if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date)||!x.sets||typeof x.sets!=="object") continue;
     const prev=state.done[x.date]; if(prev&&prev.at===x.at) continue;
-    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; if(v.t==="w") o.t="w"; return o});
+    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; if(v.t==="w") o.t="w"; if(v.ar>0) o.ar=Number(v.ar)||0; return o});
     state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},kcal:Number(x.kcal)||null,warm:Number(x.warm)||null,src:"uhr"}; n++;
   }
   if(n){save(); render()} return n;

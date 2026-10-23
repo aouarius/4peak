@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -160,7 +161,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     }
 
     override fun onDestroy() {
-        if (isFinishing) WorkoutService.stop(this)
+        if (isFinishing) { WorkoutService.stop(this); Motion.stop() }
         super.onDestroy()
     }
 
@@ -202,6 +203,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     private fun startRun(s: Session) {
         run = Run(s)
+        Motion.start(this)
         val wanted = buildList {
             add(Manifest.permission.BODY_SENSORS)
             add(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -212,6 +214,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     private fun closeRun() {
         run = null
+        Motion.stop()
         WorkoutService.stop(this)
     }
 
@@ -252,6 +255,16 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                         if (r.checkWarm(bpm, p?.maxHr ?: 190, p?.restHr ?: 60)) {
                             getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 200, 100, 200, 100, 400), -1))
                         }
+                    }
+                }
+                // Wiederholungszähler: zählt nur während eines Satzes, ein neuer Satz beginnt bei null
+                if (r != null) LaunchedEffect(r) {
+                    while (true) {
+                        val it = r.item
+                        val resting = r.restUntil > System.currentTimeMillis()
+                        val on = !r.warmPhase && !r.finished && !r.picking && !resting && it != null && !it.cardio && Motion.supports(it.id)
+                        Motion.setPhase(if (resting) "rest" else "${r.index}-${r.setNo}-${r.warmIdx}-${it?.id}", on)
+                        delay(500)
                     }
                 }
                 when {
@@ -323,6 +336,20 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val wCount = (300.0 / step).roundToInt() + 1
             val wState = rememberPickerState(wCount, (r.weight / step).roundToInt().coerceIn(0, wCount - 1), repeatItems = false)
             val rState = rememberPickerState(61, r.reps.coerceIn(0, 60), repeatItems = false)
+            // Gezählte Wiederholungen ins Rad übernehmen, bis du es selbst verstellst
+            val counted by Motion.count.collectAsState()
+            val counts = Motion.supports(it.id)
+            var auto by remember { mutableIntStateOf(-1) }
+            var manual by remember { mutableStateOf(false) }
+            LaunchedEffect(counted) {
+                if (counts && !manual && counted >= 2) { auto = counted.coerceAtMost(60); rState.scrollToOption(auto) }
+            }
+            val initial = remember { rState.selectedOption }
+            LaunchedEffect(rState) {
+                snapshotFlow { rState.selectedOption to rState.isScrollInProgress }.collect { (v, moving) ->
+                    if (!moving && v != (if (auto >= 0) auto else initial)) manual = true
+                }
+            }
             // Lünette bzw. Drehrand: dreht das ausgewählte Rad (Antippen von «kg» oder «Wdh.» wechselt)
             var active by remember { mutableIntStateOf(0) }
             var acc by remember { mutableStateOf(0f) }
@@ -365,6 +392,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     style = MaterialTheme.typography.caption3,
                     color = if (r.inWarmSet) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface,
                 )
+                if (counts) Text(
+                    if (counted >= 2) "⟲ $counted gezählt" + (if (manual) " · von dir geändert" else "") else "⟲ zählt mit",
+                    style = MaterialTheme.typography.caption3,
+                    color = MaterialTheme.colors.secondary,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -388,7 +420,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                         onClick = {
                             r.weight = wState.selectedOption * step
                             r.reps = rState.selectedOption
-                            r.logSet()
+                            val ar = if (r.inWarmSet) 0 else Motion.finishSet(this@WatchActivity, it.id, r.reps, r.weight)
+                            r.logSet(ar)
                             tick()
                         },
                         modifier = Modifier.size(if (small) ButtonDefaults.SmallButtonSize else ButtonDefaults.DefaultButtonSize),
@@ -520,6 +553,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             Text("Pause", style = MaterialTheme.typography.caption1)
             Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2)
             HeartRateLine()
+            val sum by Motion.lastSummary.collectAsState()
+            sum?.let { Text(it, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 18.dp)) }
             r.item?.let {
                 Text(
                     (if (r.setNo > 1) "Als Nächstes: Satz ${r.setNo} von ${it.sets}" else "Als Nächstes: ${it.name}") + if (r.index < r.items.size - 1) " ⇅" else "",

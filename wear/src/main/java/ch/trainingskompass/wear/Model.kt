@@ -199,7 +199,8 @@ class Run(val session: Session) {
         prepare()
     }
 
-    fun logSet() {
+    /** [auto] = von der Uhr gezählte Wiederholungen (0 = keine), zum späteren Abgleich */
+    fun logSet(auto: Int = 0) {
         val it = item ?: return
         if (inWarmSet) {
             // Aufwärmsatz: zählt nicht als Arbeitssatz, keine Pause
@@ -211,6 +212,7 @@ class Run(val session: Session) {
             return
         }
         val o = JSONObject().put("w", weight).put("r", reps)
+        if (auto > 0) o.put("ar", auto)
         if (it.unilateral) o.put("l", reps).put("rr", reps)
         logs.getOrPut(it.id) { mutableListOf() }.add(o)
         if (setNo >= it.sets) next()
