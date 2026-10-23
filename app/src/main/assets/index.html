@@ -608,15 +608,16 @@ const LVL_I={anf:0,fort:1,erf:2};
 const EQUIP={gym:"Fitnessstudio",kh:"Kurzhanteln und Bank zu Hause",kg:"Nur Körpergewicht"};
 
 const T = {
-  gkA:{n:"Ganzkörper A",c:"blue",x:[["squat","main"],["bench","main"],["row","main"],["lateral","acc"],["curl","acc"],["plank","core"]]},
-  gkB:{n:"Ganzkörper B",c:"blue",x:[["rdl","main"],["ohp","main"],["latpull","main"],["lunge","acc"],["triceps","acc"],["deadbug","core"]]},
-  upA:{n:"Oberkörper A",c:"red",x:[["bench","main"],["row","main"],["ohp","acc"],["latpull","acc"],["curl","acc"],["triceps","acc"]]},
-  loA:{n:"Unterkörper A",c:"yellow",x:[["squat","main"],["rdl","main"],["lunge","acc"],["calf","acc"],["plank","core"]]},
-  upB:{n:"Oberkörper B",c:"red",x:[["ohp","main"],["pullup","main"],["dbbench","acc"],["dbrow","acc"],["lateral","acc"],["dips","acc"]]},
-  loB:{n:"Unterkörper B",c:"yellow",x:[["deadlift","main"],["splitsquat","main"],["hipthrust","acc"],["legcurl","acc"],["calf","acc"],["deadbug","core"]]},
-  push:{n:"Push",c:"red",x:[["bench","main"],["ohp","main"],["dbbench","acc"],["lateral","acc"],["triceps","acc"],["dips","acc"]]},
-  pull:{n:"Pull",c:"red",x:[["pullup","main"],["row","main"],["latpull","acc"],["dbrow","acc"],["curl","acc"],["deadbug","core"]]},
-  legs:{n:"Beine",c:"yellow",x:[["squat","main"],["rdl","main"],["lunge","acc"],["legcurl","acc"],["calf","acc"],["plank","core"]]},
+  // Reihenfolge = Priorität: kürzere Einheiten nehmen nur die ersten Übungen (siehe maxStrength)
+  gkA:{n:"Ganzkörper A",c:"blue",x:[["squat","main"],["bench","main"],["row","main"],["lateral","acc"],["curl","acc"],["legcurl","acc"],["calf","acc"],["plank","core"]]},
+  gkB:{n:"Ganzkörper B",c:"blue",x:[["rdl","main"],["ohp","main"],["latpull","main"],["lunge","acc"],["triceps","acc"],["legext","acc"],["facepull","acc"],["deadbug","core"]]},
+  upA:{n:"Oberkörper A",c:"red",x:[["bench","main"],["row","main"],["ohp","acc"],["latpull","acc"],["curl","acc"],["triceps","acc"],["cablefly","acc"],["plank","core"]]},
+  loA:{n:"Unterkörper A",c:"yellow",x:[["squat","main"],["rdl","main"],["lunge","acc"],["calf","acc"],["legcurl","acc"],["legext","acc"],["hipthrust","acc"],["plank","core"]]},
+  upB:{n:"Oberkörper B",c:"red",x:[["ohp","main"],["pullup","main"],["dbbench","acc"],["dbrow","acc"],["lateral","acc"],["dips","acc"],["hammer","acc"],["deadbug","core"]]},
+  loB:{n:"Unterkörper B",c:"yellow",x:[["deadlift","main"],["splitsquat","main"],["hipthrust","acc"],["legcurl","acc"],["calf","acc"],["legpress","acc"],["legext","acc"],["deadbug","core"]]},
+  push:{n:"Push",c:"red",x:[["bench","main"],["ohp","main"],["dbbench","acc"],["lateral","acc"],["triceps","acc"],["dips","acc"],["ohext","acc"],["plank","core"]]},
+  pull:{n:"Pull",c:"red",x:[["pullup","main"],["row","main"],["latpull","acc"],["dbrow","acc"],["curl","acc"],["facepull","acc"],["hammer","acc"],["deadbug","core"]]},
+  legs:{n:"Beine",c:"yellow",x:[["squat","main"],["rdl","main"],["lunge","acc"],["legcurl","acc"],["calf","acc"],["legext","acc"],["hipthrust","acc"],["plank","core"]]},
   z2long:{n:"Zone 2 lang",c:"green",x:[["z2","cardio","45–90 min"]]},
   z2:{n:"Zone 2 locker",c:"green",x:[["z2","cardio","30–45 min"]]},
   int:{n:"Intervalle 4×4",c:"green",x:[["intervals","cardio","ca. 40 min gesamt"]]}
@@ -641,7 +642,7 @@ function altCands(id,used){
 function altFor(id,used){return altCands(id,used)[0]||null}
 function favFor(id,used){const fav=state.fav||[]; if(!fav.length||fav.includes(id)) return null; const prim=MUS[id]?MUS[id][0]:[];
   return altCands(id,used).find(c=>fav.includes(c)&&prim.length&&prim.every(m=>MUS[c][0].includes(m)))||null}
-function maxStrength(len){return len<=45?4:len<=60?5:6}
+function maxStrength(len){return len<=45?4:len<=60?5:len<=75?6:7}
 function buildSession(key,p,deload){
   const t=T[key], G=GOALS[p.goal], li=LVL_I[p.level];
   const out=[]; let strength=0; const cap=maxStrength(p.len);
@@ -650,18 +651,21 @@ function buildSession(key,p,deload){
   for(const x of list){
     const role=x.role;
     if(role==="cardio"){out.push({id:x.id,role,txt:x.dur});continue}
-    if(!tmpl&&strength>=cap) continue;
-    let id=tmpl?x.id:resolveEx(x.id,p.equip); if(!id||!EX[id]) continue;
+    // Rumpfübung erst ab 75 Minuten, zählt nicht zum Übungslimit
+    if(!tmpl&&(role==="core"?p.len<75:strength>=cap)) continue;
+    let id=tmpl?x.id:resolveEx(x.id,p.equip); if(!tmpl&&!id&&EX[x.id]) id=altFor(x.id,used); if(!id||!EX[id]) continue;
     const ss=tmpl&&x.ss?{ss:true}:{};
     if((state.block||[]).includes(id)||!gearOk(id)){id=altFor(id,used); if(!id) continue}
     else if(!tmpl&&role==="acc"){const fv=favFor(id,used); if(fv) id=fv}
     if(!tmpl&&used.has(id)){id=altFor(id,used); if(!id) continue}
     used.add(id);
-    strength++;
+    if(role!=="core") strength++;
     const half=n=>deload?Math.max(1,Math.ceil(n/2)):n;
     if(role==="core"){out.push({id,role,sets:x.sets?half(x.sets):(deload?2:3),reps:x.reps||EX[id].r||"30–60 s",rir:"",rest:"60 s",...ss});continue}
     const pr=G[role]||G.acc;
-    out.push({id,role,sets:half(x.sets||pr.s[li]),reps:x.reps||pr.r,rir:deload?"3–4":pr.rir,rest:pr.rest,...ss});
+    // Ab 75 Minuten je Ergänzungsübung ein Satz mehr (höchstens 4)
+    const base=x.sets||(role==="acc"&&p.len>=75?Math.min(4,pr.s[li]+1):pr.s[li]);
+    out.push({id,role,sets:half(base),reps:x.reps||pr.r,rir:deload?"3–4":pr.rir,rest:pr.rest,...ss});
   }
   if(!tmpl && G.finisher && t.c!=="green") out.push({id:"z2",role:"cardio",txt:G.finisher+" Zone 2 im Anschluss"});
   return {key,name:t.n,c:t.c,items:out,deload};
@@ -1215,6 +1219,7 @@ function viewProfil(){
       <div class="wdpick wide">${Object.entries(GEAR).filter(([k])=>k!=="kg").map(([k,v])=>`<label><input type="checkbox" id="ng-${k}" ${(p.noGear||[]).includes(k)?"checked":""}>${v}</label>`).join("")}</div>
       <p class="small muted" style="margin:6px 0 0">Der Plan ersetzt solche Übungen durch eine Alternative für dieselben Muskeln. Langhantel und Kurzhantel zusammen sind alle Freihanteln.</p>
     </fieldset>
+    ${Object.keys(state.custom||{}).length?`<label class="check" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="resetCustom" checked><span>Angepasste Einheiten neu zusammenstellen<br><span class="small muted">Sonst bleiben deine Änderungen aus „Plan bearbeiten“ bestehen und die neue Trainingszeit wirkt dort nicht.</span></span></label>`:""}
     <div class="row"><button class="btn" type="submit">Plan neu berechnen</button><span id="pmsg" class="small muted"></span></div>
   </form>
   ${remindHtml()}
@@ -2581,6 +2586,7 @@ document.getElementById("view").addEventListener("submit",e=>{
   state.profile={goal:g("goal"),level:g("level"),equip:g("equip"),len:Number(g("len")),
     bar:Number(g("bar"))||20,weight:num(g("weight"),35,250,75),height:num(g("height"),120,230,178),sex:g("sex"),age:num(g("age"),14,100,30),restHr:num(g("restHr"),30,110,60),
     start:g("start")||iso(mondayOf(TODAY)),weekdays:wds,example:false,noGear:Object.keys(GEAR).filter(k=>{const c=document.getElementById("ng-"+k); return c&&c.checked}),split:state.profile.split||"auto",spKraft:g("spKraft").trim().slice(0,300),spCardio:g("spCardio").trim().slice(0,300)};
+  const rc=document.getElementById("resetCustom"); if(rc&&rc.checked) state.custom={};
   save(); ui.sel=todayIso; go("plan");
 });
 
