@@ -99,8 +99,11 @@ label.f select,label.f input{font-weight:400;padding:8px;border:1px solid var(--
 .pickex{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:inherit;font:inherit;cursor:pointer}
 .pickex.in{opacity:.55;cursor:default}
 .pickex:not(.in):hover{border-color:var(--accent)}
-.infobtn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:6px;vertical-align:middle;border-radius:50%;border:1.5px solid var(--muted);background:none;color:var(--muted);font:700 12px/1 var(--f-body);font-style:italic;cursor:pointer;padding:0}
-.infobtn[aria-expanded="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.hasinfo{display:flex;align-items:center;flex-wrap:wrap;column-gap:8px}
+.infobtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;margin:-4px 0;border:0;border-radius:8px;background:none;color:var(--muted);cursor:pointer;padding:0;opacity:.75}
+.infobtn svg{width:17px;height:17px;display:block}
+.infobtn:hover{opacity:1}
+.infobtn[aria-expanded="true"]{color:var(--accent);opacity:1;background:var(--sunk)}
 p.hint{animation:hintin .15s ease-out}
 p.hint[hidden]{display:none!important}
 @keyframes hintin{from{opacity:0;transform:translateY(-3px)}}
@@ -981,8 +984,8 @@ function viewPlan(){
       <p style="margin:4px 0 0">${p.weekdays.length} Trainingstage pro Woche (${wds}), etwa ${p.len} Minuten pro Einheit.</p></div>
       <div class="row">
         <button class="btn${ui.editPlan?"":" ghost"}" data-editplan="1">${ui.editPlan?"Fertig":"Plan bearbeiten"}</button>
-        ${p.goal!=="ausd"?`<label class="f" for="planSplit" style="flex-direction:row;align-items:center;gap:8px">Aufteilung<select id="planSplit">
-          ${[["auto","Automatisch nach Trainingstagen"],["gk","Ganzkörper"],["ul","Oberkörper/Unterkörper"],["ppl","Push/Pull/Beine"]].map(([v,t])=>`<option value="${v}"${(p.split||"auto")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:""}
+        ${p.goal!=="ausd"?`<label class="f" for="planSplit" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 240px;min-width:0;max-width:100%">Aufteilung<select id="planSplit" style="flex:1 1 180px;min-width:0;max-width:100%">
+          ${[["auto","Automatisch"],["gk","Ganzkörper"],["ul","Oberkörper/Unterkörper"],["ppl","Push/Pull/Beine"]].map(([v,t])=>`<option value="${v}"${(p.split||"auto")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:""}
       </div>
       ${p.split==="ppl"&&p.weekdays.length<6?`<p class="small muted" style="margin:0">Mit Push/Pull/Beine und weniger als 6 Tagen wird jeder Muskel seltener als zweimal pro Woche trainiert.</p>`:""}
       ${ui.editPlan?`<p class="small muted" style="margin:0">Tausche Übungen, ändere Sätze und Wiederholungen oder die Reihenfolge. Kalender und Trainingsmodus übernehmen die Änderungen sofort.</p>`:""}
@@ -2400,7 +2403,7 @@ function tidyInfo(root){
     if(!h) return;
     const key=(ui.tab+":"+h.textContent.trim()).slice(0,60);
     p.classList.add("hint"); p.dataset.ikey=key; p.hidden=!ui.infoOpen.has(key);
-    if(!h.querySelector(".infobtn")) h.insertAdjacentHTML("beforeend",` <button class="infobtn" data-info="${esc(key)}" aria-expanded="${ui.infoOpen.has(key)}" aria-label="Erklärung ein- oder ausblenden">i</button>`);
+    if(!h.querySelector(".infobtn")){h.classList.add("hasinfo"); h.insertAdjacentHTML("beforeend",`<button class="infobtn" data-info="${esc(key)}" aria-expanded="${ui.infoOpen.has(key)}" aria-label="Erklärung ein- oder ausblenden" title="Erklärung"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/></svg></button>`)}
     // Reine Quellen-Zeile direkt dahinter gehört zur Erklärung
     const n=p.nextElementSibling;
     if(n&&n.tagName==="P"&&n.querySelector("a[target=_blank]")&&[...n.querySelectorAll("a")].reduce((x,a)=>x+a.textContent.length,0)>=n.textContent.trim().length-6){n.classList.add("hint"); n.dataset.ikey=key; n.hidden=!ui.infoOpen.has(key)}
