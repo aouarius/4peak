@@ -99,6 +99,11 @@ label.f select,label.f input{font-weight:400;padding:8px;border:1px solid var(--
 .pickex{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:inherit;font:inherit;cursor:pointer}
 .pickex.in{opacity:.55;cursor:default}
 .pickex:not(.in):hover{border-color:var(--accent)}
+.infobtn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:6px;vertical-align:middle;border-radius:50%;border:1.5px solid var(--muted);background:none;color:var(--muted);font:700 12px/1 var(--f-body);font-style:italic;cursor:pointer;padding:0}
+.infobtn[aria-expanded="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+p.hint{animation:hintin .15s ease-out}
+p.hint[hidden]{display:none!important}
+@keyframes hintin{from{opacity:0;transform:translateY(-3px)}}
 .sugbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:inherit;font:inherit;cursor:pointer}
 .wdpick.wide label{width:auto;padding:0 12px}
 .wdpick label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
@@ -932,9 +937,8 @@ function viewKalender(){
       <div class="legend">
         <span><i class="dot c-blue"></i>Ganzkörper</span><span><i class="dot c-red"></i>Oberkörper</span>
         <span><i class="dot c-yellow"></i>Beine</span><span><i class="dot c-green"></i>Ausdauer</span>
-        <span>Farben wie Hantelscheiben (25/20/15/10 kg)</span>
       </div>
-      <p class="small muted" style="margin:8px 0 0">Zum Verschieben eine Einheit gedrückt halten und auf einen anderen Tag ziehen. Auf einem Tag mit Training tauschen die beiden.</p>
+      <p class="small muted" style="margin:8px 0 0">Die Farben sind wie bei Hantelscheiben (25/20/15/10 kg). Zum Verschieben eine Einheit gedrückt halten und auf einen anderen Tag ziehen. Auf einem Tag mit Training tauschen die beiden.</p>
     </section>
     <section class="panel stack">
       <div>
@@ -2309,11 +2313,29 @@ function navSync(){
       +`<button type="button" class="navcfg" data-navedit="1">Leiste anpassen …</button>`;
   m.hidden=!ui.more;
 }
+/* Lange Erklärtexte hinter ein ⓘ an der Überschrift legen, damit die Ansichten ruhig bleiben.
+   Leer-Hinweise („Noch …“), Statuszeilen mit id und Texte mit data-keep bleiben sichtbar. */
+function tidyInfo(root){
+  ui.infoOpen=ui.infoOpen||new Set();
+  root.querySelectorAll("p.small.muted").forEach(p=>{
+    const txt=p.textContent.trim();
+    if(txt.length<90||p.id||p.closest("[data-keep]")||/^Noch /.test(txt)) return;
+    const box=p.closest(".panel,section"), h=box&&[...box.querySelectorAll("h2,h3")].find(x=>x.closest(".panel,section")===box);
+    if(!h) return;
+    const key=(ui.tab+":"+h.textContent.trim()).slice(0,60);
+    p.classList.add("hint"); p.dataset.ikey=key; p.hidden=!ui.infoOpen.has(key);
+    if(!h.querySelector(".infobtn")) h.insertAdjacentHTML("beforeend",` <button class="infobtn" data-info="${esc(key)}" aria-expanded="${ui.infoOpen.has(key)}" aria-label="Erklärung ein- oder ausblenden">i</button>`);
+    // Reine Quellen-Zeile direkt dahinter gehört zur Erklärung
+    const n=p.nextElementSibling;
+    if(n&&n.tagName==="P"&&n.querySelector("a[target=_blank]")&&[...n.querySelectorAll("a")].reduce((x,a)=>x+a.textContent.length,0)>=n.textContent.trim().length-6){n.classList.add("hint"); n.dataset.ikey=key; n.hidden=!ui.infoOpen.has(key)}
+  });
+}
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===ui.tab?"true":"false"));
   navSync();
   const v=document.getElementById("view");
   v.innerHTML=VIEWS[ui.tab]();
+  tidyInfo(v);
   if(ui.tab==="training"&&ui.run){tick(); if(!timerInt) timerInt=setInterval(tick,250);
     if(ui.run.scrollTo!=null){const el=document.getElementById("it-"+ui.run.scrollTo); ui.run.scrollTo=null; if(el) el.scrollIntoView({block:"start",behavior:"smooth"})}}
   if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el) el.scrollIntoView({block:"start"}); ui.openEx=null;}
@@ -2325,7 +2347,7 @@ function go(tab){if(tab==="wear") askWatch(); if(tab!==ui.tab){(ui.hist||(ui.his
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2348,6 +2370,8 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.fav){const id=t.dataset.fav; state.fav=state.fav||[]; const i=state.fav.indexOf(id); if(i<0){state.fav.push(id); state.block=(state.block||[]).filter(x=>x!==id)} else state.fav.splice(i,1); save(); render(); return}
   if(t.dataset.block||t.dataset.blockrun){const id=t.dataset.block||t.dataset.blockrun; state.block=state.block||[]; const i=state.block.indexOf(id); if(i<0){state.block.push(id); state.fav=(state.fav||[]).filter(x=>x!==id)} else state.block.splice(i,1); save(); render(); return}
   if(t.dataset.editplan){ui.editPlan=!ui.editPlan; render(); return}
+  if(t.dataset.info){const k=t.dataset.info, on=!ui.infoOpen.has(k); on?ui.infoOpen.add(k):ui.infoOpen.delete(k); t.setAttribute("aria-expanded",on);
+    document.querySelectorAll("p.hint").forEach(p=>{if(p.dataset.ikey===k) p.hidden=!on}); return}
   if(t.dataset.pickmus){ui.pickMus=ui.pickMus===t.dataset.pickmus?null:t.dataset.pickmus; keepScroll(render); return}
   if(t.dataset.pe){const y=window.scrollY; planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i),t.dataset.val); if(t.dataset.val) window.scrollTo(0,y); return}
   if(t.dataset.start){startRun(t.dataset.start); return}
