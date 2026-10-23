@@ -139,6 +139,12 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mu
 .bigtimer{font:700 4.5rem var(--f-display);line-height:1}
 .badge{display:inline-block;font-size:.8rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--sunk);border:1px solid var(--line)}
 .badge.off{color:var(--muted);opacity:.6}
+.fwrap{position:relative;display:flex;flex-direction:column}
+.fsug{position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow:auto}
+.fsug button{display:flex;justify-content:space-between;gap:10px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);text-align:left;font:inherit;cursor:pointer}
+.fsug button:last-child{border-bottom:0}
+.fsug button:hover{background:var(--sunk)}
+.fsug .mono{white-space:nowrap;font-size:.8rem}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;cursor:pointer;font-size:.85rem}
 .chip:hover{border-color:var(--accent)}
 .chartwrap{overflow-x:auto}
@@ -2091,7 +2097,77 @@ function viewFortschritt(){
 }
 
 /* ---------- Ernährung (Vorbild MyFitnessPal: Kalorien- und Proteinziel, Tagebuch) ---------- */
-const FOODS=[["Magerquark 250 g",168,30],["Skyr 150 g",95,16],["Hähnchenbrust 150 g",165,35],["Lachs 125 g",260,25],["2 Eier",155,13],["Haferflocken 60 g",225,8],["Reis gekocht 200 g",260,5],["Linsen gekocht 200 g",230,18],["Tofu 150 g",180,20],["Banane",105,1],["Whey-Shake 30 g",120,24],["Vollkornbrot 2 Scheiben",220,8]];
+// Name, kcal pro 100 g, Protein pro 100 g, typische Portion in g, Suchbegriffe
+const FOOD100=[
+["Magerquark",67,12,250,"quark mager"],["Speisequark 20 %",109,12,250,"quark halbfett"],["Speisequark 40 %",160,11,250,"quark rahmquark"],
+["Skyr natur",63,11,150,"isländisch joghurt"],["Griechischer Joghurt 0 %",55,10,170,"greek yogurt fage"],["Griechischer Joghurt 10 %",120,5,150,"greek yogurt"],
+["Naturjoghurt 3,5 %",64,3.6,150,"jogurt yogurt"],["Naturjoghurt 1,5 %",47,4,150,"jogurt yogurt mager"],["Proteinjoghurt / High-Protein-Joghurt",70,10,200,"high protein yogurt ehrmann"],
+["Proteinpudding",80,10,200,"high protein pudding"],["Hüttenkäse (Cottage Cheese)",96,12.5,200,"körniger frischkäse cottage cheese"],
+["Milch 3,5 %",64,3.4,250,"vollmilch"],["Milch 1,5 %",47,3.4,250,"fettarm milchdrink"],["Hafermilch",45,1,250,"haferdrink oat"],
+["Sojamilch",40,3.5,250,"sojadrink"],["Mandelmilch ungesüsst",13,0.5,250,"mandeldrink"],["Kefir",55,3.4,250,""],["Buttermilch",37,3.5,250,""],
+["Protein-Drink (High Protein Milch)",65,8.5,330,"proteinshake fertig"],
+["Harzer Käse",118,28,125,"handkäse sauermilchkäse"],["Mozzarella",250,18,125,""],["Mozzarella light",165,19,125,""],
+["Gouda",356,25,30,"käse"],["Emmentaler",380,28,30,"käse"],["Gruyère / Greyerzer",410,28,30,"käse"],["Parmesan",390,35,15,"käse grana"],
+["Feta",265,14,50,"schafskäse"],["Halloumi",320,21,60,"grillkäse"],["Frischkäse",230,5.5,30,"philadelphia"],["Ricotta",150,9,60,""],
+["Butter",741,0.7,10,""],["Rahm / Sahne",300,2.4,30,"schlagrahm"],
+["Ei (Hühnerei)",143,12.6,60,"eier ganzes ei"],["Eiklar / Flüssigeiweiss",48,11,100,"eiweiss eier"],
+["Hähnchenbrust (roh)",110,23,150,"poulet pouletbrust huhn chicken"],["Hähnchenbrust (gebraten)",165,31,150,"poulet pouletbrust huhn chicken"],
+["Hähnchenschenkel (roh)",170,18,150,"poulet huhn"],["Putenbrust (roh)",105,24,150,"truthahn trute pute"],["Putenbrust (gebraten)",150,30,150,"truthahn trute pute"],
+["Rinderhack 5 %",125,21,125,"hackfleisch faschiertes rind mager"],["Rinderhack 20 %",250,17,125,"hackfleisch rind"],["Hackfleisch gemischt",260,17,125,"faschiertes"],
+["Rindersteak (roh)",130,22,180,"rind hüfte entrecote"],["Rinderfilet (roh)",115,21,180,"rind"],["Schweinefilet (roh)",110,21,150,"schwein"],
+["Schweineschnitzel (roh)",110,22,150,"schwein plätzli"],["Kochschinken",107,19,50,"schinken"],["Putenbrust-Aufschnitt",100,21,50,"truthahn aufschnitt"],
+["Bündnerfleisch",230,38,40,"trockenfleisch"],["Lachsschinken",120,21,40,""],["Salami",380,21,30,"wurst"],["Beef Jerky",290,35,30,"trockenfleisch"],
+["Thunfisch (Dose, natur)",115,26,140,"thon tuna"],["Thunfisch (Dose, in Öl)",200,26,140,"thon tuna"],["Thunfisch (frisch)",110,24,150,"thon tuna"],
+["Lachs (roh)",205,20,125,"salmon lachsfilet"],["Räucherlachs",160,21,50,"lachs geräuchert"],["Kabeljau / Dorsch",82,18,150,"fisch"],
+["Alaska-Seelachs",80,17,150,"fisch pollock"],["Pangasius",90,15,150,"fisch"],["Tilapia",96,20,150,"fisch"],["Forelle",120,20,150,"fisch"],
+["Makrele",205,19,125,"fisch"],["Sardinen (Dose)",210,24,90,"fisch"],["Garnelen / Crevetten",85,19,100,"shrimps scampi"],
+["Tofu natur",120,13,150,"soja"],["Räuchertofu",150,16,150,"soja"],["Tempeh",190,20,100,"soja"],["Seitan",125,25,100,"weizen"],
+["Sojaschnetzel (trocken)",340,50,50,"soja tvp"],["Edamame",120,12,100,"sojabohnen"],["Falafel",330,13,100,""],
+["Linsen (gekocht)",115,9,200,"hülsenfrüchte"],["Linsen (trocken)",335,24,70,"hülsenfrüchte"],["Kichererbsen (gekocht)",150,8,150,"hülsenfrüchte"],
+["Kidneybohnen (Dose)",110,8,150,"bohnen"],["Schwarze Bohnen (gekocht)",132,9,150,"bohnen"],["Weisse Bohnen (Dose)",110,7,150,"bohnen"],
+["Erbsen",80,5,100,"tk"],["Hummus",260,7,50,"humus kichererbsen"],
+["Whey-Protein (Pulver)",390,78,30,"proteinpulver eiweisspulver shake"],["Veganes Proteinpulver",370,72,30,"proteinpulver erbsenprotein"],
+["Casein (Pulver)",360,78,30,"proteinpulver kasein"],["Proteinriegel",360,32,60,"eiweissriegel bar"],["Proteinbrot / Eiweissbrot",250,22,50,"brot"],
+["Erdnussbutter",610,25,20,"erdnussmus peanut"],["Mandelmus",615,21,20,""],["Mandeln",590,21,30,"nüsse"],["Walnüsse",660,15,30,"baumnüsse nüsse"],
+["Cashewkerne",570,18,30,"nüsse"],["Erdnüsse",580,25,30,"nüsse"],["Haselnüsse",640,14,30,"nüsse"],["Pistazien",570,20,30,"nüsse"],
+["Chiasamen",490,17,15,"samen"],["Leinsamen",520,18,15,"samen"],["Kürbiskerne",560,30,30,"samen"],["Sonnenblumenkerne",585,21,30,"samen"],
+["Hanfsamen (geschält)",570,31,30,"samen"],
+["Haferflocken",370,13,60,"porridge oats hafer"],["Müsli ungesüsst",360,10,60,"muesli"],["Granola / Knuspermüsli",450,9,50,"crunchy"],["Cornflakes",377,7,40,""],
+["Reis (roh)",350,7,75,"basmati jasmin"],["Reis (gekocht)",130,2.7,200,"basmati jasmin"],["Vollkornreis (gekocht)",123,2.7,200,"naturreis"],
+["Nudeln (roh)",357,12,100,"pasta teigwaren spaghetti"],["Nudeln (gekocht)",150,5.5,250,"pasta teigwaren spaghetti"],
+["Vollkornnudeln (roh)",350,14,100,"pasta teigwaren"],["Vollkornnudeln (gekocht)",145,6,250,"pasta teigwaren"],
+["Kartoffeln (gekocht)",75,2,250,"härdöpfel erdäpfel"],["Süsskartoffel",85,1.6,200,""],["Quinoa (gekocht)",120,4.4,180,""],["Quinoa (roh)",370,14,70,""],
+["Couscous (gekocht)",112,3.8,180,""],["Couscous (roh)",360,13,70,""],["Bulgur (gekocht)",83,3,180,""],
+["Vollkornbrot",220,7.5,50,"brot scheibe ruchbrot"],["Toastbrot",265,8,25,"brot toast"],["Vollkorntoast",250,9,25,"brot toast"],
+["Brötchen / Semmel",270,9,60,"weggli bürli brot"],["Knäckebrot",340,10,10,"brot"],["Reiswaffeln",390,8,8,"reiswaffel"],["Bagel",257,10,90,""],
+["Tortilla / Wrap",300,8,60,"wraps"],
+["Banane",90,1.1,120,"obst"],["Apfel",52,0.3,150,"obst"],["Birne",57,0.4,150,"obst"],["Orange",47,0.9,150,"obst orangen"],["Kiwi",61,1.1,75,"obst"],
+["Mango",60,0.8,150,"obst"],["Ananas",50,0.5,150,"obst"],["Weintrauben",69,0.7,125,"obst trauben"],["Heidelbeeren",57,0.7,125,"blaubeeren beeren"],
+["Erdbeeren",32,0.7,150,"beeren"],["Himbeeren",52,1.2,125,"beeren"],["Wassermelone",30,0.6,250,"obst"],["Datteln (getrocknet)",280,2.5,30,"trockenobst"],
+["Rosinen",300,3,30,"trockenobst"],["Avocado",160,2,80,""],
+["Brokkoli",35,3,200,"broccoli gemüse"],["Spinat",23,2.9,150,"blattspinat gemüse"],["Blumenkohl",25,2,200,"gemüse"],["Zucchini / Zucchetti",17,1.2,200,"gemüse"],
+["Paprika",31,1,150,"peperoni gemüse"],["Tomaten",18,0.9,150,"gemüse"],["Gurke",15,0.6,150,"gemüse"],["Karotten",41,0.9,150,"rüebli möhren gemüse"],
+["Blattsalat",15,1.3,80,"salat kopfsalat eisberg"],["Rucola",25,2.6,50,"salat"],["Champignons",22,3.1,150,"pilze"],["Grüne Bohnen",31,1.8,150,"gemüse"],
+["Rosenkohl",43,3.4,150,"gemüse"],["Spargel",20,2.2,200,"gemüse"],["Grünkohl",49,4.3,150,"gemüse"],["Mais (Dose)",80,3,100,"gemüse"],["Zwiebel",40,1.1,50,"gemüse"],
+["Olivenöl",884,0,10,"öl"],["Rapsöl",884,0,10,"öl"],["Honig",304,0.3,20,""],["Konfitüre / Marmelade",250,0.4,20,"konfi"],
+["Dunkle Schokolade (70–85 %)",580,9,20,"zartbitter"],["Orangensaft",45,0.7,250,"o-saft saft"]];
+const normF=x=>x.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ß/g,"ss");
+FOOD100.forEach(f=>f.key=normF(f[0]+" "+f[4]));
+function foodSuggest(q){
+  const t=normF(q).split(/\s+/).filter(Boolean); if(!t.length) return [];
+  return FOOD100.filter(f=>t.every(w=>f.key.includes(w)))
+    .sort((a,b)=>(normF(b[0]).startsWith(t[0])-normF(a[0]).startsWith(t[0]))||a[0].length-b[0].length).slice(0,8);
+}
+function foodCalc(){
+  const f=ui.f100; if(!f) return; const g=Number(document.getElementById("fg").value)||0;
+  document.getElementById("fk").value=Math.round(f[1]*g/100); document.getElementById("fp").value=Math.round(f[2]*g/100);
+}
+function showFoodSug(){
+  const box=document.getElementById("fsug"), q=document.getElementById("fn"); if(!box||!q) return;
+  const r=ui.f100?[]:foodSuggest(q.value);
+  box.hidden=!r.length;
+  box.innerHTML=r.map(f=>`<button type="button" data-fsug="${FOOD100.indexOf(f)}"><span>${esc(f[0])}</span><span class="muted mono">${f[1]} kcal · ${fmt(f[2],f[2]%1?1:0)} g P</span></button>`).join("");
+}
 function targets(p){
   const bmr=10*p.weight+6.25*p.height-5*p.age+(p.sex==="w"?-161:5);
   const d=p.weekdays.length, f=d<=2?1.375:d<=5?1.55:1.725;
@@ -2221,14 +2297,14 @@ function viewErnaehrung(){
     <section class="panel stack">
       <div class="row" style="justify-content:space-between;align-items:center"><h3>Schnell eintragen</h3>${NATIVE&&NATIVE.scanBarcode?`<button class="btn" data-scan="1">Barcode scannen</button>`:""}</div>
       ${scanHtml()}
-      <div class="row">${FOODS.map((f,i)=>`<button class="chip" data-food="${i}">${esc(f[0])} <span class="muted mono">${f[1]}</span></button>`).join("")}</div>
       <form class="row" id="foodform">
-        <label class="f" for="fn" style="flex:1 1 180px">Lebensmittel<input id="fn" type="text" maxlength="60" placeholder="z. B. Pasta Bolognese"></label>
-        <label class="f" for="fk">kcal<input id="fk" type="number" min="0" max="5000" style="width:100px"></label>
-        <label class="f" for="fp">Protein (g)<input id="fp" type="number" min="0" max="400" style="width:100px"></label>
+        <div class="fwrap" style="flex:1 1 220px"><label class="f" for="fn">Lebensmittel<input id="fn" type="text" maxlength="60" autocomplete="off" placeholder="Tippen, z. B. Magerquark"></label><div id="fsug" class="fsug" hidden></div></div>
+        <label class="f" for="fg">Menge (g)<input id="fg" type="number" min="1" max="3000" inputmode="numeric" style="width:90px"></label>
+        <label class="f" for="fk">kcal<input id="fk" type="number" min="0" max="5000" style="width:90px"></label>
+        <label class="f" for="fp">Protein (g)<input id="fp" type="number" min="0" max="400" style="width:90px"></label>
         <button class="btn" type="submit" style="align-self:flex-end">Hinzufügen</button>
       </form>
-      <p class="small muted" style="margin:0">Nährwerte der Schnellauswahl sind gerundete Durchschnittswerte.${NATIVE&&NATIVE.scanBarcode?"":" Der Barcode-Scanner funktioniert in der Android-App."}</p>
+      <p class="small muted" style="margin:0">Beim Tippen erscheinen passende Lebensmittel; nach der Auswahl rechnen sich kcal und Protein aus der Menge. Die Werte pro 100 g sind gerundete Durchschnittswerte, eigene Einträge gehen weiterhin.${NATIVE&&NATIVE.scanBarcode?"":" Der Barcode-Scanner funktioniert in der Android-App."}</p>
     </section>
     ${mealHtml(day,kcal,prot,T)}
   </div>`;
@@ -2347,7 +2423,7 @@ function go(tab){if(tab==="wear") askWatch(); if(tab!==ui.tab){(ui.hist||(ui.his
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-food],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2428,7 +2504,6 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.mealmore){ui.mealOff=(ui.mealOff||0)+3; render(); return}
   if(t.dataset.meal){const m=MEALS.find(x=>x.id===t.dataset.meal); if(m){(state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:m.n.slice(0,60),k:m.k,p:m.p}); ui.mealOff=0; save(); render()} return}
   if(t.dataset.fdel){(state.food[ui.foodDay]||[]).splice(Number(t.dataset.fdel),1); save(); render(); return}
-  if(t.dataset.food){const f=FOODS[Number(t.dataset.food)]; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:f[0],k:f[1],p:f[2]}); save(); render(); return}
   if(t.dataset.day){ui.sel=t.dataset.day; render()}
   else if(t.dataset.mon){ui.month=new Date(ui.month.getFullYear(),ui.month.getMonth()+Number(t.dataset.mon),1); render()}
   else if(t.dataset.done){const r=document.getElementById("rpe"); state.done[t.dataset.done]={rpe:r?Number(r.value):null,at:new Date().toISOString()}; save(); render()}
@@ -2458,9 +2533,17 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.dataset.note){const v=t.value.trim().slice(0,200); state.notes=state.notes||{}; if(v) state.notes[t.dataset.note]=v; else delete state.notes[t.dataset.note]; save()}
   else if(t.id==="bkfile"&&t.files[0]){const fr=new FileReader(); fr.onload=()=>backupParse(String(fr.result||"")); fr.readAsText(t.files[0]); t.value=""}
 });
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-fsug]");
+  if(b){const f=FOOD100[Number(b.dataset.fsug)]; ui.f100=f; document.getElementById("fn").value=f[0];
+    const g=document.getElementById("fg"); g.value=f[3]; foodCalc(); showFoodSug(); g.focus(); g.select(); return}
+  if(!e.target.closest(".fwrap")){const x=document.getElementById("fsug"); if(x) x.hidden=true}
+});
 document.getElementById("view").addEventListener("input",e=>{
   if(e.target.dataset.rv&&ui.run){setTimeout(persistRun,0); const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="w"&&y.w!==""){ui.run.rows[i].sets.forEach((x,j)=>{if(j>Number(k)&&!x.done&&x.t!=="w"&&(x.w===""||x.auto)){x.w=y.w; x.auto=true; const el=document.querySelector(`[data-rv="${i}:${j}:w"]`); if(el) el.value=y.w}})} if(f==="w") delete y.auto; if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
     const pl=document.getElementById("pl-"+i); if(pl&&f==="w"&&ui.run.rows[i].sets.find(x=>!x.done)===y) pl.innerHTML=plateTxt(y.w); return}
+  if(e.target.id==="fn"){ui.f100=null; showFoodSug(); return}
+  if(e.target.id==="fg"){foodCalc(); return}
   if(e.target.id==="sg"&&ui.scan){const g=Number(e.target.value)||0, s2=ui.scan, el=document.getElementById("scanprev"); if(el) el.textContent=(s2.kcal!=null?Math.round(s2.kcal*g/100)+" kcal":"")+(s2.prot!=null?" · "+Math.round(s2.prot*g/100)+" g Protein":""); return}
   if(e.target.id==="setw"&&ui.run){const it=sessionFor(ui.run.date).items[ui.run.i], w=Number(e.target.value); const pl=document.getElementById("plates"), wa=document.getElementById("warm");
     if(pl) pl.innerHTML=platesHtml(w); if(wa) wa.innerHTML=warmHtml(w,it.id); return}
@@ -2484,8 +2567,8 @@ document.getElementById("view").addEventListener("submit",e=>{
     (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${p.name}, ${g} g`.slice(0,60),k:Math.round(p.kcal*g/100),p:Math.round(p.prot*g/100)});
     ui.scan=null; save(); render(); return}
   if(e.target.id==="scanform"){e.preventDefault(); const s=ui.scan, g=Math.max(1,Number(document.getElementById("sg").value)||100); (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${s.name||"Gescannt"}${s.brand?" ("+s.brand+")":""}, ${g} g`.slice(0,60),k:Math.round((s.kcal||0)*g/100),p:Math.round((s.prot||0)*g/100)}); ui.scan=null; save(); render(); return}
-  if(e.target.id==="foodform"){e.preventDefault(); const n=document.getElementById("fn").value.trim()||"Eintrag", k=Math.max(0,Math.round(Number(document.getElementById("fk").value)||0)), p=Math.max(0,Math.round(Number(document.getElementById("fp").value)||0));
-    if(!k&&!p) return; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:n.slice(0,60),k,p}); save(); render(); return}
+  if(e.target.id==="foodform"){e.preventDefault(); const g=Math.round(Number(document.getElementById("fg").value)||0), n0=document.getElementById("fn").value.trim()||"Eintrag", n=ui.f100&&g?`${n0}, ${g} g`:n0; k=Math.max(0,Math.round(Number(document.getElementById("fk").value)||0)), p=Math.max(0,Math.round(Number(document.getElementById("fp").value)||0));
+    if(!k&&!p) return; ui.f100=null; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:n.slice(0,60),k,p}); save(); render(); return}
   if(e.target.id!=="pform") return; e.preventDefault();
   const g=id=>document.getElementById(id).value;
   const wds=[0,1,2,3,4,5,6].filter(i=>document.getElementById("wd"+i).checked);
