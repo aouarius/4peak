@@ -23,6 +23,8 @@ data class Item(
     val unilateral: Boolean,
     val bodyweight: Boolean,
     val step: Double,
+    /** Halteübung (Plank usw.): Sekunden statt Wiederholungen, Gewicht ist Zusatzgewicht */
+    val timed: Boolean = false,
     /** Aufwärmsätze (Gewicht, Wiederholungen), nur bei der ersten Hauptübung */
     val warmSets: List<Pair<Double, Int>> = emptyList(),
 )
@@ -77,6 +79,7 @@ fun parsePlan(json: String): Plan? = runCatching {
                         unilateral = x.optBoolean("uni"),
                         bodyweight = x.optBoolean("bw"),
                         step = x.optDouble("step", 1.0).takeIf { it > 0 } ?: 1.0,
+                        timed = x.optBoolean("sec", Regex("\\d\\s*s\\b").containsMatchIn(x.optString("reps"))),
                         warmSets = x.optJSONArray("warm")?.let { a ->
                             (0 until a.length()).map { k -> a.getJSONObject(k).let { it.optDouble("w", 0.0) to it.optInt("r", 5) } }
                         }.orEmpty(),
@@ -146,6 +149,8 @@ class Run(val session: Session) {
     val items = mutableStateListOf<Item>().apply { addAll(session.items) }
     /** Liste zum Umsortieren ist offen */
     var picking by mutableStateOf(false)
+    /** Stoppuhr einer Halteübung: Startzeit, 0 = läuft nicht */
+    var holdStart by mutableLongStateOf(0L)
     val startedAt = System.currentTimeMillis()
     private var itemStartedAt = startedAt
     val logs = linkedMapOf<String, MutableList<JSONObject>>()
@@ -181,6 +186,7 @@ class Run(val session: Session) {
         reps = w?.second ?: last?.optInt("r") ?: targetReps(it.reps)
         setNo = work.size + 1
         itemStartedAt = System.currentTimeMillis()
+        holdStart = 0
     }
 
     /** Übung an Position [j] jetzt machen; die aktuelle kommt direkt danach. */
@@ -213,6 +219,7 @@ class Run(val session: Session) {
         }
         val o = JSONObject().put("w", weight).put("r", reps)
         if (auto > 0) o.put("ar", auto)
+        if (it.timed) o.put("sec", 1)
         if (it.unilateral) o.put("l", reps).put("rr", reps)
         logs.getOrPut(it.id) { mutableListOf() }.add(o)
         if (setNo >= it.sets) next()

@@ -335,10 +335,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val step = it.step
             val wCount = (300.0 / step).roundToInt() + 1
             val wState = rememberPickerState(wCount, (r.weight / step).roundToInt().coerceIn(0, wCount - 1), repeatItems = false)
-            val rState = rememberPickerState(61, r.reps.coerceIn(0, 60), repeatItems = false)
+            val maxR = if (it.timed) 300 else 60
+            val rState = rememberPickerState(maxR + 1, r.reps.coerceIn(0, maxR), repeatItems = false)
             // Gezählte Wiederholungen ins Rad übernehmen, bis du es selbst verstellst
             val counted by Motion.count.collectAsState()
-            val counts = Motion.supports(it.id)
+            val counts = Motion.supports(it.id) && !it.timed
             var auto by remember { mutableIntStateOf(-1) }
             var manual by remember { mutableStateOf(false) }
             LaunchedEffect(counted) {
@@ -392,6 +393,33 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     style = MaterialTheme.typography.caption3,
                     color = if (r.inWarmSet) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface,
                 )
+                if (it.timed) {
+                    // Stoppuhr: läuft bis zum zweiten Tippen, vibriert beim Erreichen des Ziels
+                    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                    val goal = targetReps(it.reps)
+                    LaunchedEffect(r.holdStart) {
+                        var buzzed = false
+                        while (r.holdStart > 0) {
+                            now = System.currentTimeMillis()
+                            if (!buzzed && (now - r.holdStart) / 1000 >= goal) { buzzed = true; vibrate() }
+                            delay(250)
+                        }
+                    }
+                    val sec = if (r.holdStart > 0) ((now - r.holdStart) / 1000).toInt().coerceAtLeast(0) else 0
+                    CompactChip(
+                        onClick = {
+                            if (r.holdStart == 0L) { r.holdStart = System.currentTimeMillis(); now = r.holdStart; tick() }
+                            else {
+                                val done = ((System.currentTimeMillis() - r.holdStart) / 1000).toInt().coerceIn(1, maxR)
+                                r.holdStart = 0
+                                scope.launch { rState.scrollToOption(done) }
+                                tick()
+                            }
+                        },
+                        label = { Text(if (r.holdStart > 0) "■ $sec s / $goal s" else "▶ Stoppuhr") },
+                        colors = if (r.holdStart > 0) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    )
+                }
                 if (counts) Text(
                     if (counted >= 2) "⟲ $counted gezählt" + (if (manual) " · von dir geändert" else "") else "⟲ zählt mit",
                     style = MaterialTheme.typography.caption3,
@@ -402,8 +430,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PickerBox(if (it.bodyweight) "+ kg" else "kg", wState, active == 0, small, { active = 0; runCatching { focus.requestFocus() } }) { i -> formatKg(i * step) }
-                    PickerBox(if (it.unilateral) "Wdh./Seite" else "Wdh.", rState, active == 1, small, { active = 1; runCatching { focus.requestFocus() } }) { i -> i.toString() }
+                    PickerBox(if (it.bodyweight || it.timed) "+ kg" else "kg", wState, active == 0, small, { active = 0; runCatching { focus.requestFocus() } }) { i -> formatKg(i * step) }
+                    PickerBox(if (it.timed) (if (it.unilateral) "Sek./Seite" else "Sek.") else if (it.unilateral) "Wdh./Seite" else "Wdh.", rState, active == 1, small, { active = 1; runCatching { focus.requestFocus() } }) { i -> i.toString() }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -418,6 +446,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     ) { Text("‹") }
                     Button(
                         onClick = {
+                            r.holdStart = 0
                             r.weight = wState.selectedOption * step
                             r.reps = rState.selectedOption
                             val ar = if (r.inWarmSet) 0 else Motion.finishSet(this@WatchActivity, it.id, r.reps, r.weight)
