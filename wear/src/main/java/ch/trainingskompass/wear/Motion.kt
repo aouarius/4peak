@@ -28,7 +28,7 @@ object Motion : SensorEventListener {
     private val NO_COUNT = setOf(
         "legpress", "legext", "legcurl", "seatedcurl", "calf", "seatedcalf", "legpresscalf", "hipabd",
         "plank", "sideplank", "deadbug", "hollow", "lsit", "copenhagen", "supporthold", "deadhang",
-        "tuckfl", "birddog", "clamshell", "pallof", "farmer", "cablekick", "tibraise",
+        "tuckfl", "birddog", "clamshell", "pallof", "farmer", "cablekick", "tibraise", "rotarycalf",
     )
 
     fun supports(id: String) = id !in NO_COUNT
