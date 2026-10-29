@@ -682,11 +682,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         // Der Ring am Rand läuft mit der Pause ab
         if (r.restLen > 0) EdgeProgress((r.restUntil - now).toFloat() / r.restLen)
         Column(
-            modifier = Modifier.fillMaxSize().padding(top = 22.dp, bottom = 8.dp, start = 24.dp, end = 24.dp),
+            modifier = Modifier.fillMaxSize().padding(top = 20.dp, bottom = 22.dp, start = 24.dp, end = 24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("%d:%02d".format(left / 60, left % 60), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 46.sp)
+            Text("%d:%02d".format(left / 60, left % 60), fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 42.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tile("Puls", if (hr > 0) "$hr" else "–", Modifier.weight(1f), valueColor = if (hr > 0) zoneColor(hrZone(hr, plan)) else Color.White, big = false)
                 Tile("Kalorien", "$kcal", Modifier.weight(1f), big = false)
