@@ -450,7 +450,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                             r.weight = wState.selectedOption * step
                             r.reps = rState.selectedOption
                             val ar = if (r.inWarmSet) 0 else Motion.finishSet(this@WatchActivity, it.id, r.reps, r.weight)
-                            r.logSet(ar)
+                            r.logSet(ar, if (ar > 0) Motion.lastTempo else 0.0, if (ar > 0) Motion.lastSlow else 0, WorkoutService.hr.value)
                             tick()
                         },
                         modifier = Modifier.size(if (small) ButtonDefaults.SmallButtonSize else ButtonDefaults.DefaultButtonSize),

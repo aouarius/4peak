@@ -708,7 +708,7 @@ const isoWd=d=>(d.getDay()+6)%7; // 0=Mo
 function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-isoWd(x));return x}
 const TODAY=new Date(); const todayIso=iso(TODAY);
 
-const COACH_DEF=()=>({on:false,ai:true,aiRes:null,kcalAdj:0,hide:{},wNext:{},deload:null,chat:[],ready:{},feel:{},skip:{},readyRes:null,block:null});
+const COACH_DEF=()=>({on:false,ai:true,aiRes:null,kcalAdj:0,hide:{},wNext:{},deload:null,chat:[],ready:{},feel:{},skip:{},readyRes:null,block:null,mem:[]});
 function defaults(){return{remind:REMIND_DEF(),coach:COACH_DEF(),
   profile:{goal:"hyper",level:"anf",weekdays:[0,2,4],len:60,equip:"gym",split:"auto",bar:20,weight:75,height:178,sex:"m",age:30,restHr:60,start:iso(mondayOf(TODAY)),example:true},
   done:{},supps:{},mySupps:["kreatin","protein"],acts:[],bw:[],food:{},custom:{},myProducts:[],customProducts:[],fav:[],block:[],notes:{},customEx:{}}}
@@ -813,7 +813,7 @@ window.onWatchSessions=function(arr){
   for(const x of arr||[]){
     if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date)||!x.sets||typeof x.sets!=="object") continue;
     const prev=state.done[x.date]; if(prev&&prev.at===x.at) continue;
-    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; if(v.t==="w") o.t="w"; if(v.ar>0) o.ar=Number(v.ar)||0; if(v.sec) o.sec=1; return o});
+    const sets={}; for(const [id,a] of Object.entries(x.sets)) if(EX[id]&&Array.isArray(a)) sets[id]=a.map(v=>{const o={w:Number(v.w)||0,r:Number(v.r)||0}; if(v.l!=null){o.l=Number(v.l)||0;o.rr=Number(v.rr)||0} if(v.min!=null) o.min=Number(v.min)||0; if(v.t==="w") o.t="w"; if(v.ar>0) o.ar=Number(v.ar)||0; if(v.sec) o.sec=1; for(const k of ["tp","sl","hr","ps"]) if(Number(v[k])) o[k]=Number(v[k]); return o});
     state.done[x.date]={rpe:prev&&prev.rpe||null,at:String(x.at||new Date().toISOString()),sets,min:Number(x.min)||null,hr:x.hr&&{avg:Number(x.hr.avg)||0,max:Number(x.hr.max)||0},kcal:Number(x.kcal)||null,warm:Number(x.warm)||null,src:"uhr"}; n++;
   }
   if(n){save(); render()} return n;
@@ -1516,9 +1516,10 @@ function coachSettingsHtml(){
     <label class="checkline" style="margin:0"><input type="checkbox" data-coachtoggle="1" ${c.on?"checked":""}> Trainer-Modus einschalten</label>
     <div class="small">Der Trainer prüft nach jedem Training deine Werte und meldet sich im Kalender: Gewicht senken, wenn die Wiederholungen nicht reichen, grössere Sprünge, wenn es zu leicht ist, eine andere Übung bei Stillstand, eine leichtere Woche bei Übermüdung, und Hinweise, wenn Trainings ausfallen. Bei der Ernährung erinnert er an fehlende Einträge, achtet aufs Protein und passt die Kalorien an deinen Gewichtsverlauf an. Nichts ändert sich ohne dein „Übernehmen“.</div>
     <label class="checkline" style="margin:0"><input type="checkbox" data-coachai="1" ${c.ai!==false?"checked":""} ${c.on?"":"disabled"}> KI-Einschätzung (Claude)</label>
-    <div class="small muted">Die KI bekommt bei jeder neuen Eintragung eine Zusammenfassung deiner Trainings, deines Gewichts und deiner Ernährung, ohne Namen, und schreibt eine Einschätzung mit Vorschlägen. Die festen Regeln laufen immer mit, auch ohne Internet.</div>
+    <div class="small muted">Die KI bekommt bei jeder neuen Eintragung alle deine Daten ohne Namen: Trainings mit den Messwerten der Uhr (gezählte Wiederholungen, Tempo, Puls, Pausen), Schlaf, HRV, Ruhepuls, andere Sportarten, Gewicht, Ernährung und was du ihr im Chat erzählt hast, und schreibt eine Einschätzung mit Vorschlägen. Die festen Regeln laufen immer mit, auch ohne Internet.</div>
     ${NATIVE&&NATIVE.aiAsk?`<label class="small">Anthropic API-Schlüssel (nur auf diesem Handy gespeichert)<input type="password" id="aikey" autocomplete="off" placeholder="sk-ant-…" value="${esc(aiKey())}"></label>
     <div class="small muted">In der Handy-App läuft die KI über deinen eigenen Schlüssel von console.anthropic.com. Eine Einschätzung kostet ungefähr 2–5 Rappen.</div>`:""}
+    ${(c.mem||[]).length?`<div class="small"><b>Das merkt sich der Trainer:</b>${c.mem.map((m,i)=>`<div class="row" style="justify-content:space-between;gap:6px"><span>${esc(m.t)} <span class="muted">(${parseIso(m.d).getDate()}.${parseIso(m.d).getMonth()+1}.)</span></span><button class="linkbtn" data-memdel="${i}" aria-label="Vergessen">✕</button></div>`).join("")}</div>`:""}
     <div class="small">Trainingsblock ${blockOf().n} seit ${parseIso(blockOf().start).getDate()}.${parseIso(blockOf().start).getMonth()+1}. (${blockWeeks()} Wochen)${blockOf().title?`: ${esc(blockOf().title)}, Hauptübungen ${esc(blockOf().main)}, Ergänzungen ${esc(blockOf().acc)} Wdh`:""} · <button class="linkbtn" data-blockdo="plan">Neuen Block planen</button></div>
     ${blockHtml()}
     ${c.kcalAdj?`<div class="small">Kalorien vom Trainer angepasst: ${c.kcalAdj>0?"+":"−"}${Math.abs(c.kcalAdj)} kcal pro Tag · <button class="linkbtn" data-coach="kcalreset">Zurücksetzen</button></div>`:""}
@@ -1531,29 +1532,50 @@ function coachSettingsHtml(){
 const AI_KEY_LS="tk_ai_key";
 const aiKey=()=>{try{return localStorage.getItem(AI_KEY_LS)||""}catch(e){return ""}};
 let aiBusy=false, aiErr="", aiTried=0;
+/* Ein Satz für die KI, mit allem, was die Uhr dazu gemessen hat */
+function setAi(v){
+  let t=setTxt(v); const x=[];
+  if(v.ar>0) x.push(`Uhr zählte ${v.ar}`); if(v.tp>0) x.push(`${v.tp} s/Wdh`); if(v.sl) x.push(`am Ende ${v.sl} % langsamer`);
+  if(v.hr>0) x.push(`Puls ${v.hr}`); if(v.ps>0) x.push(`Pause davor ${v.ps} s`);
+  return x.length?`${t} (${x.join(", ")})`:t;
+}
 function coachData(){
-  const p=state.profile, T=targets(p), ids=planIds(), h=history().filter(([d])=>daysAgo(d)<=42);
+  const p=state.profile, T=targets(p), ids=planIds(), h=history().filter(([d])=>daysAgo(d)<=56), c=C();
   const ex={};
-  for(const [id,it] of ids){const rows=h.filter(([d,x])=>x.sets&&work(x.sets[id]).length).slice(-4).map(([d,x])=>`${d}: ${work(x.sets[id]).map(setTxt).join(", ")}`);
-    ex[id]={n:EX[id].n,ziel:`${it.sets}×${it.reps}`,gewicht_naechstes_mal:(state.coach.wNext[id]||{}).w||null,verlauf:rows}}
-  const days=[];for(let i=1;i<=7;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()-i)),f=foodDay(k);days.push({d:k,eintraege:f.n,kcal:Math.round(f.k),prot:Math.round(f.p)})}
-  const trainings=h.map(([d,x])=>({d,dauer_min:x.min||null,anstrengung:x.rpe||null,uebungen:Object.keys(x.sets||{}).length}));
-  const geplant=[];for(let i=1;i<=21;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()-i)); if(k<p.start) break; const s=sessionFor(k); if(s) geplant.push({d:k,einheit:s.name,erledigt:!!state.done[k]})}
+  for(const [id,it] of ids){const hh=h.filter(([d,x])=>x.sets&&work(x.sets[id]).length);
+    ex[id]={n:EX[id].n,rolle:it.role,ziel:`${it.sets}×${it.reps}`,gewicht_naechstes_mal:(c.wNext[id]||{}).w||null,
+      verlauf:hh.slice(-6).map(([d,x])=>`${d}: ${work(x.sets[id]).map(setAi).join("; ")}`),
+      e1rm_verlauf:hh.slice(-8).map(([d,x])=>Math.round(exBest(id,x.sets[id]))).filter(v=>v>0),
+      notiz:(state.notes||{})[id]||undefined, favorit:(state.fav||[]).includes(id)||undefined}}
+  const days=[];for(let i=1;i<=14;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()-i)),f=foodDay(k);days.push({d:k,eintraege:f.n,kcal:Math.round(f.k),prot:Math.round(f.p)})}
+  const trainings=h.map(([d,x])=>({d,dauer_min:x.min||null,anstrengung:x.rpe||null,quelle:x.src==="uhr"?"Uhr":"Handy",puls:x.hr&&x.hr.avg?`Ø ${x.hr.avg}, max ${x.hr.max}`:undefined,kcal:x.kcal||undefined,aufwaermen_s:x.warm||undefined,
+    saetze:Object.values(x.sets||{}).reduce((a,s)=>a+work(s).length,0),gefuehl_vorher:(c.feel||{})[d]||undefined,tagesform:(c.ready||{})[d]||undefined}));
+  const geplant=[];for(let i=1;i<=28;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()-i)); if(k<p.start) break; const s=sessionFor(k); if(s) geplant.push({d:k,einheit:s.name,erledigt:!!state.done[k]})}
   const u=upcoming(), alt={};
   for(const id of ids.keys()){const a=Object.entries(EX).filter(([j,x])=>j!==id&&!x.del&&!x.cardio&&!ids.has(j)&&MUS[j]&&MUS[id]&&MUS[j][0].some(m=>MUS[id][0].includes(m))&&EQ_RANK[x.e]<=EQ_RANK[p.equip]&&gearOk(j)&&!(state.block||[]).includes(j)).slice(0,5).map(([j])=>j); if(a.length) alt[id]=a}
+  const hl=state.health&&!state.health.error?state.health:null, mw=muscleWeek();
+  const cnt=Object.values(state.done).flatMap(x=>Object.values(x.sets||{}).flat()).filter(v=>v&&v.ar>0);
+  const b=blockOf();
   return {heute:todayIso,wochentag:TODAY.toLocaleDateString("de-CH",{weekday:"long"}),
-    profil:{ziel:GOALS[p.goal].n,niveau:LEVELS[p.level],tage_pro_woche:p.weekdays.length,minuten:p.len,split:splitFor(p).n||p.split,gewicht_kg:p.weight,groesse_cm:p.height,alter:p.age,geschlecht:p.sex},
-    ziele_ernaehrung:{kcal:T.kcal,protein_g:T.prot,kh_g:T.carbs,fett_g:T.fat,trainer_kcal_anpassung:state.coach.kcalAdj||0},
+    profil:{ziel:GOALS[p.goal].n,niveau:LEVELS[p.level],tage_pro_woche:p.weekdays.length,minuten:p.len,split:splitFor(p).n||p.split,ausruestung:p.equip,ohne_geraete:p.noGear||[],gewicht_kg:p.weight,groesse_cm:p.height,alter:p.age,geschlecht:p.sex,ruhepuls:p.restHr},
+    trainer_notizen:(c.mem||[]).map(m=>`${m.d}: ${m.t}`),
+    trainingsblock:{nr:b.n,seit:b.start,wochen:blockWeeks(),titel:b.title||null,haupt_wdh:b.main||null,ergaenzung_wdh:b.acc||null},
+    ziele_ernaehrung:{kcal:T.kcal,protein_g:T.prot,kh_g:T.carbs,fett_g:T.fat,trainer_kcal_anpassung:c.kcalAdj||0},
     ernaehrung_heute:(f=>({eintraege:f.n,kcal:Math.round(f.k),prot:Math.round(f.p)}))(foodDay(todayIso)),
-    ernaehrung_7_tage:days,
-    koerpergewicht:[...state.bw].sort((a,b)=>a.d<b.d?-1:1).filter(x=>daysAgo(x.d)<=56).map(x=>`${x.d}: ${x.v} kg`),
-    trainings_6_wochen:trainings, plan_letzte_3_wochen:geplant,
-    naechstes_training:u?{d:u.date,einheit:u.s.name,uebungen:u.s.items.filter(i=>i.role!=="cardio").map(i=>i.id)}:null,
-    deload_geplant_ab:state.coach.deload||null,
+    ernaehrung_14_tage:days,
+    koerpergewicht:[...state.bw].sort((a,b)=>a.d<b.d?-1:1).filter(x=>daysAgo(x.d)<=84).map(x=>`${x.d}: ${x.v} kg`),
+    gesundheit_14_tage:hl?{schlaf_min:hl.sleep.slice(-14).map(x=>`${x.d}: ${x.min}`),hrv_ms:hl.hrv.slice(-14).map(x=>`${x.d}: ${Math.round(x.v)}`),ruhepuls:hl.rest.slice(-14).map(x=>`${x.d}: ${Math.round(x.v)}`)}:"nicht verbunden",
+    andere_aktivitaeten_4_wochen:(state.acts||[]).filter(a=>daysAgo(a.date)<=28).map(a=>`${a.date}: ${a.name||a.kind||"Cardio"} ${a.dur} min${a.avg?`, Puls Ø ${a.avg}`:""}`),
+    muskel_saetze_diese_woche:Object.fromEntries(Object.keys(MUS_N).map(k=>[MUS_N[k],{erledigt:Math.round((mw.done[k]||0)*10)/10,geplant:Math.round((mw.plan[k]||0)*10)/10}])),
+    trainings_8_wochen:trainings, plan_letzte_4_wochen:geplant,
+    naechstes_training:u?{d:u.date,einheit:u.s.name,tagesform:u.s.ready||null,uebungen:u.s.items.filter(i=>i.role!=="cardio").map(i=>`${i.id} ${i.sets}×${i.reps}`)}:null,
+    deload_geplant_ab:c.deload||null, nope_uebungen:(state.block||[]).map(id=>EX[id]&&EX[id].n).filter(Boolean),
+    uhr_zaehler:cnt.length?{saetze:cnt.length,genau:cnt.filter(v=>v.ar===v.r).length}:null,
     uebungen:ex, moegliche_tauschuebungen:alt,
     regel_hinweise:coachTips().map(t=>t.t)};
 }
-const AI_SYS=`Du bist der persönliche Trainer in der Fitness-App 4peak. Du bekommst die aktuellen Daten der Person als JSON: Profil, Ziele, Trainingsverlauf pro Übung (Sätze als "kg × Wdh"), Anstrengung (1–10), Körpergewicht, Ernährungseinträge und Hinweise der festen App-Regeln.
+const AI_SYS=`Du bist der persönliche Trainer in der Fitness-App 4peak. Du bekommst alle aktuellen Daten der Person als JSON: Profil, Ziele, Trainingsverlauf pro Übung (Sätze als "kg × Wdh"), Anstrengung (1–10), Körpergewicht, Ernährung, Gesundheitsdaten und Hinweise der festen App-Regeln.
+Daten der Uhr pro Satz: von der Uhr gezählte Wiederholungen, Tempo in s/Wdh, wie viel langsamer die letzten Wiederholungen waren (ab etwa 20 % war der Satz nah am Muskelversagen), Puls am Satzende und die tatsächliche Pause davor. Nutze sie, um die echte Anstrengung, zu kurze Pausen oder Ermüdung über die Sätze zu erkennen. Beziehe auch Schlaf, HRV, Ruhepuls, andere Sportarten, Wochensätze pro Muskel, den Trainingsblock und die trainer_notizen (z. B. Schmerzen) in deine Planung ein.
 Schau sie dir an wie ein guter Personal Trainer: Was läuft gut, wo hakt es, was sollte als Nächstes passieren? Begründe mit den Zahlen aus den Daten und halte dich an anerkannte Trainingspraxis (Doppelprogression, 10–20 Sätze pro Muskel und Woche, Deload bei Übermüdung, 1,6–2,2 g Protein pro kg). Erfinde keine Werte, die nicht in den Daten stehen. Fehlen Daten, sag das.
 Fehlende Ernährungseinträge von gestern und heute meldet die App selbst; wiederhole sie nicht.
 Schreib auf Deutsch (Schweiz, ohne ß), per du, kurz und konkret.
@@ -1562,12 +1584,13 @@ Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach:
 Höchstens 4 Tipps, das Wichtigste zuerst. AKTION ist genau eine von:
 {"type":"weight","ex":"<übungs-id>","kg":<Zahl>} Gewicht fürs nächste Mal
 {"type":"swap","from":"<übungs-id im Plan>","to":"<id aus moegliche_tauschuebungen>"}
+{"type":"sets","ex":"<übungs-id im Plan>","sets":<1–6>} Satzzahl dauerhaft ändern
 {"type":"deload"} nächste Woche leichter
 {"type":"kcal","delta":<-300 bis 300>} Kalorienziel anpassen
 {"type":"goto","tab":"ernaehrung"|"profil"|"fortschritt"|"plan"} zur passenden Seite
 Verwende nur Übungs-IDs aus den Daten.`;
 function aiSig(){const h=history(), last=h[h.length-1], bw=state.bw.length?[...state.bw].sort((a,b)=>a.d<b.d?-1:1).pop():null, f=foodDay(todayIso);
-  return JSON.stringify([todayIso,h.length,last&&last[0],last&&last[1].rpe,bw&&bw.d,bw&&bw.v,Math.floor(f.k/400),state.profile.goal,state.profile.weekdays.length,state.profile.len,state.coach.kcalAdj,state.coach.deload])}
+  return JSON.stringify([todayIso,h.length,last&&last[0],last&&last[1].rpe,bw&&bw.d,bw&&bw.v,Math.floor(f.k/400),state.profile.goal,state.profile.weekdays.length,state.profile.len,state.coach.kcalAdj,state.coach.deload,(state.coach.mem||[]).length,(state.acts||[]).length,state.health&&state.health.at&&state.health.at.slice(0,10)])}
 function aiAvail(){return !!(window.claude&&window.claude.use)||!!(NATIVE&&NATIVE.aiAsk&&aiKey())}
 const aiWait={};
 window.onAiResult=(id,json)=>{const w=aiWait[id]; if(!w) return; delete aiWait[id]; let o; try{o=typeof json==="string"?JSON.parse(json):json}catch(e){o={error:"Antwort unlesbar."}} w(o)};
@@ -1593,6 +1616,7 @@ function aiAction(a){
     if(last>0&&Math.abs(a.kg-last)/last>0.25) return null;
     const kg=Math.round(a.kg*2)/2, ld=h.length?h[h.length-1][0]:todayIso; return {l:`Nächstes Mal ${fmt(kg,1)} kg`,f:()=>{c.wNext[a.ex]={w:kg,after:ld}}}}
   if(a.type==="swap"&&ids.has(a.from)&&EX[a.to]&&!EX[a.to].del&&!ids.has(a.to)&&gearOk(a.to)) return {l:`Gegen ${EX[a.to].n} tauschen`,f:()=>coachSwap(a.from,a.to)};
+  if(a.type==="sets"&&ids.has(a.ex)&&a.sets>=1&&a.sets<=6) return {l:`${EX[a.ex].n}: ${Math.round(a.sets)} Sätze`,f:()=>{for(const k of new Set(splitFor(state.profile).seq)){if(!buildSession(k,state.profile,false).items.some(i=>i.id===a.ex)) continue; materialize(k).forEach(x=>{if(x.id===a.ex) x.sets=Math.round(a.sets)})}}};
   if(a.type==="deload"){const nm=iso(new Date(mondayOf(TODAY).getTime()+7*DAY+3600000)); if(c.deload===nm) return null; return {l:"Deload-Woche einplanen",f:()=>{c.deload=nm}}}
   if(a.type==="kcal"){const d=Math.round(Math.max(-300,Math.min(300,+a.delta||0))/50)*50; if(!d||Math.abs((c.kcalAdj||0)+d)>600) return null; return {l:`${d>0?"+":"−"}${Math.abs(d)} kcal pro Tag`,f:()=>{c.kcalAdj=(c.kcalAdj||0)+d}}}
   const u=upcoming();
@@ -1626,13 +1650,17 @@ function coachList(){
 }
 /* ---------- Trainer fragen (Chat) ---------- */
 const CHAT_SYS=`Du bist der persönliche Trainer in der Fitness-App 4peak und chattest mit der Person. Du bekommst ihre aktuellen Daten als JSON (Profil, Ziele, Verlauf pro Übung, Gewicht, Ernährung, nächstes Training), den bisherigen Chat und die neue Nachricht.
-Antworte wie ein guter Personal Trainer: konkret, mit Bezug auf ihre Zahlen, nach anerkannter Trainingspraxis. Bei Schmerzen: Übung weglassen oder ersetzen, nichts durchdrücken, bei starken, anhaltenden oder ausstrahlenden Schmerzen zum Arzt oder zur Physiotherapie. Keine Diagnosen.
+Antworte wie ein guter Personal Trainer: konkret, mit Bezug auf ihre Zahlen, nach anerkannter Trainingspraxis.
+Daten der Uhr pro Satz: von der Uhr gezählte Wiederholungen, Tempo in s/Wdh, wie viel langsamer die letzten Wiederholungen waren (ab etwa 20 % war der Satz nah am Muskelversagen), Puls am Satzende und die tatsächliche Pause davor. Nutze sie, um die echte Anstrengung, zu kurze Pausen oder Ermüdung über die Sätze zu erkennen. Beziehe auch Schlaf, HRV, Ruhepuls, andere Sportarten, Wochensätze pro Muskel, den Trainingsblock und die trainer_notizen (z. B. Schmerzen) in deine Planung ein.
+Erzählt die Person etwas, das du dir für später merken solltest (Schmerzen, Verletzung, Vorlieben, Zeitmangel, Ziele, Material), gib zusätzlich {"type":"note","text":"kurz, max. 100 Zeichen"} zurück; die App merkt es sich automatisch. Ist eine Notiz erledigt (z. B. Knie wieder gut), gib {"type":"unnote","text":"<Notiz wie in trainer_notizen ohne Datum>"} zurück. Bei Schmerzen: Übung weglassen oder ersetzen, nichts durchdrücken, bei starken, anhaltenden oder ausstrahlenden Schmerzen zum Arzt oder zur Physiotherapie. Keine Diagnosen.
 Deutsch (Schweiz, ohne ß), per du, kurz: höchstens 5 Sätze.
-Antworte nur mit einem JSON-Objekt: {"text":"deine Antwort","actions":[AKTION, …]} mit höchstens 3 Aktionen, nur wenn sie zur Frage passen, sonst [].
+Antworte nur mit einem JSON-Objekt: {"text":"deine Antwort","actions":[AKTION, …]} mit höchstens 4 Aktionen, nur wenn sie zur Frage passen, sonst [].
 AKTION ist genau eine von:
 {"type":"weight","ex":"<übungs-id>","kg":<Zahl>} Gewicht fürs nächste Mal
 {"type":"swap","from":"<übungs-id im Plan>","to":"<id aus moegliche_tauschuebungen>"} dauerhaft tauschen
+{"type":"sets","ex":"<übungs-id im Plan>","sets":<1–6>} Satzzahl dauerhaft ändern
 {"type":"skip","ex":"<übungs-id aus naechstes_training>"} nur im nächsten Training weglassen
+{"type":"note","text":"…"} / {"type":"unnote","text":"…"} merken / vergessen (ohne Knopf)
 {"type":"ready","mode":"light"|"normal"|"hard"} nächstes Training leichter (1 Satz weniger bei Übungen mit 3+ Sätzen, mehr Reserve), normal oder härter (1 Satz mehr bei Hauptübungen)
 {"type":"deload"} nächste Woche leichter
 {"type":"kcal","delta":<-300 bis 300>} Kalorienziel anpassen
@@ -1643,7 +1671,11 @@ async function chatSend(q){
   c.chat=(c.chat||[]).concat({r:"u",t:q,at:new Date().toISOString()}).slice(-30); ui.chatDraft=""; ui.chatBusy=true; ui.chatErr=""; save(); render();
   try{const r=await aiAsk(JSON.stringify({daten:coachData(),chat:c.chat.slice(-11,-1).map(m=>({von:m.r==="u"?"person":"trainer",text:m.t})),neue_nachricht:q}),CHAT_SYS);
     if(!r||typeof r.text!=="string") throw new Error("Antwort unlesbar.");
-    c.chat.push({r:"a",t:r.text.slice(0,1500),at:new Date().toISOString(),a:(Array.isArray(r.actions)?r.actions:[]).slice(0,3)}); c.chat=c.chat.slice(-30); save()}
+    const acts=Array.isArray(r.actions)?r.actions:[];
+    for(const a of acts){if(!a||!a.text) continue; const tx=String(a.text).slice(0,120);
+      if(a.type==="note") c.mem=(c.mem||[]).filter(m=>m.t!==tx).concat({d:todayIso,t:tx}).slice(-20);
+      if(a.type==="unnote") c.mem=(c.mem||[]).filter(m=>m.t!==tx&&!m.t.includes(tx))}
+    c.chat.push({r:"a",t:r.text.slice(0,1500),at:new Date().toISOString(),a:acts.filter(a=>a&&a.type!=="note"&&a.type!=="unnote").slice(0,3)}); c.chat=c.chat.slice(-30); save()}
   catch(e){ui.chatErr=e&&e.message==="nokey"?"Für den Chat braucht es die KI-Anbindung (im Profil).":(e&&e.message)||"Die KI hat nicht geantwortet."}
   ui.chatBusy=false; render();
   const box=document.getElementById("chatlog"); if(box) box.scrollTop=box.scrollHeight;
@@ -1691,7 +1723,7 @@ async function readyAsk(){
   const c=C(), o=readyData(), u=upcoming(); if(!u) return;
   const rule=readyRule(o); c.readyRes={d:u.date,...rule,src:"regel"}; ui.readyBusy=aiAvail()&&c.ai!==false; save(); render();
   if(!ui.readyBusy) return;
-  try{const r=await aiAsk(JSON.stringify({erholung:o,heute:{einheit:u.s.name,uebungen:u.s.items.filter(i=>i.role!=="cardio").map(i=>`${EX[i.id].n} ${i.sets}×${i.reps}`)},ziel:GOALS[state.profile.goal].n}),READY_SYS);
+  try{const r=await aiAsk(JSON.stringify({erholung:o,trainer_notizen:(c.mem||[]).map(m=>m.t),heute:{einheit:u.s.name,uebungen:u.s.items.filter(i=>i.role!=="cardio").map(i=>`${EX[i.id].n} ${i.sets}×${i.reps}`)},ziel:GOALS[state.profile.goal].n}),READY_SYS);
     if(r&&READY_N[r.mode]&&typeof r.text==="string") c.readyRes={d:u.date,mode:r.mode,text:r.text.slice(0,400),src:"ki"}}
   catch(e){}
   ui.readyBusy=false; save(); render();
@@ -2792,7 +2824,7 @@ function go(tab){if(tab==="wear") askWatch(); if(tab!==ui.tab){(ui.hist||(ui.his
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2830,6 +2862,7 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.askmeal){ui.chat=true; ui.chatDraft=`Ich habe ${ui.foodDay===todayIso?"heute":"am "+ui.foodDay} bisher ${Math.round(foodDay(ui.foodDay).k)} kcal und ${Math.round(foodDay(ui.foodDay).p)} g Protein. Was soll ich noch essen?`; go("kalender"); return}
   if(t.dataset.chat){ui.chat=!ui.chat; render(); if(ui.chat){const b=document.getElementById("chatlog"); if(b) b.scrollTop=b.scrollHeight}; return}
   if(t.dataset.chatsend){const i=document.getElementById("chatin"); chatSend(i&&i.value); return}
+  if(t.dataset.memdel){state.coach.mem.splice(Number(t.dataset.memdel),1); save(); render(); return}
   if(t.dataset.chatclear){state.coach.chat=[]; save(); render(); return}
   if(t.dataset.chatdo){const [mi,j]=t.dataset.chatdo.split(":").map(Number), m=state.coach.chat[mi], x=m&&m.a&&aiAction(m.a[j]); if(!x) return; ui.coachGo=null; x.f(); state.coach.hide[`chat:${m.at}:${j}`]=todayIso; save(); if(ui.coachGo) go(ui.coachGo); else render(); return}
   if(t.dataset.feel){const c=state.coach; c.feel[todayIso]=Number(t.dataset.feel); save(); readyAsk(); return}

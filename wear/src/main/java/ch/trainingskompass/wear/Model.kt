@@ -152,6 +152,8 @@ class Run(val session: Session) {
     /** Stoppuhr einer Halteübung: Startzeit, 0 = läuft nicht */
     var holdStart by mutableLongStateOf(0L)
     val startedAt = System.currentTimeMillis()
+    /** Ende des letzten Satzes, für die tatsächliche Pause */
+    private var lastSetEnd = 0L
     private var itemStartedAt = startedAt
     val logs = linkedMapOf<String, MutableList<JSONObject>>()
 
@@ -205,9 +207,16 @@ class Run(val session: Session) {
         prepare()
     }
 
-    /** [auto] = von der Uhr gezählte Wiederholungen (0 = keine), zum späteren Abgleich */
-    fun logSet(auto: Int = 0) {
+    /**
+     * [auto] = von der Uhr gezählte Wiederholungen (0 = keine), [tempo] Sekunden pro Wiederholung,
+     * [slow] wie viel langsamer die letzten Wiederholungen waren (%), [hr] Puls am Satzende.
+     * Für die Auswertung durch den Trainer in der Handy-App.
+     */
+    fun logSet(auto: Int = 0, tempo: Double = 0.0, slow: Int = 0, hr: Int = 0) {
         val it = item ?: return
+        val now = System.currentTimeMillis()
+        val pause = if (lastSetEnd > 0) (now - lastSetEnd) / 1000 else 0
+        lastSetEnd = now
         if (inWarmSet) {
             // Aufwärmsatz: zählt nicht als Arbeitssatz, keine Pause
             logs.getOrPut(it.id) { mutableListOf() }.add(JSONObject().put("w", weight).put("r", reps).put("t", "w"))
@@ -219,6 +228,10 @@ class Run(val session: Session) {
         }
         val o = JSONObject().put("w", weight).put("r", reps)
         if (auto > 0) o.put("ar", auto)
+        if (tempo > 0) o.put("tp", Math.round(tempo * 10) / 10.0)
+        if (slow != 0) o.put("sl", slow)
+        if (hr > 0) o.put("hr", hr)
+        if (pause in 1..900) o.put("ps", pause)
         if (it.timed) o.put("sec", 1)
         if (it.unilateral) o.put("l", reps).put("rr", reps)
         logs.getOrPut(it.id) { mutableListOf() }.add(o)

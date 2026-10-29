@@ -37,6 +37,11 @@ object Motion : SensorEventListener {
     val count = MutableStateFlow(0)
     /** Kurze Auswertung des letzten gespeicherten Satzes, z. B. "8 gezählt · Ø 2,6 s/Wdh." */
     val lastSummary = MutableStateFlow<String?>(null)
+    /** Letzter Satz: Sekunden pro Wiederholung und wie viel langsamer die letzten Wiederholungen waren (%) */
+    var lastTempo = 0.0
+        private set
+    var lastSlow = 0
+        private set
 
     private const val MAX = 50 * 60 * 3 // höchstens 3 Minuten bei 50 Hz
     private val t = LongArray(MAX)
@@ -231,6 +236,9 @@ object Motion : SensorEventListener {
         val times = repTimes
         count.value = 0
         lastSummary.value = if (counted >= 2) summary(counted, times) else null
+        val d = times.zipWithNext { x, y -> (y - x) / 1000.0 }
+        lastTempo = if (counted >= 2 && d.size >= 2) d.average() else 0.0
+        lastSlow = if (d.size >= 4) { val k = (d.size / 3).coerceAtLeast(1); ((d.takeLast(k).average() / d.take(k).average() - 1) * 100).toInt() } else 0
         val dir = File(ctx.filesDir, "motion")
         val stamp = System.currentTimeMillis()
         h.post { runCatching { writeCsv(dir, stamp, exId, logged, counted, weight) } }
