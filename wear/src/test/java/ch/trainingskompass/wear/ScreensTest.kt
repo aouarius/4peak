@@ -104,7 +104,7 @@ class ScreensTest {
     @Test fun cardio() = shot("09-cardio") { WorkoutService.hr.value = 131; it.run = runOf().apply { index = 6 } }
 
     @Test fun finish() = shot("10-fertig") {
-        WorkoutService.kcal.value = 312; WorkoutService.hrMax = 164
+        WorkoutService.kcal.value = 312
         it.run = runOf().apply { repeat(3) { logSet() }; index = items.size }
     }
 
