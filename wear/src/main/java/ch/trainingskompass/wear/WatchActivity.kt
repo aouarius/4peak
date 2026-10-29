@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ambient.AmbientLifecycleObserver
@@ -407,7 +408,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private fun HeartRateLine() {
         val hr by WorkoutService.hr.collectAsState()
         val kcal by WorkoutService.kcal.collectAsState()
-        if (hr <= 0) return
+        if (hr <= 0) {
+            // Platz halten, damit der Titel nicht nach oben in den schmalen Rand rutscht
+            Text("♥ –", style = MaterialTheme.typography.caption1, color = MaterialTheme.colors.onSurfaceVariant)
+            return
+        }
         val z = hrZone(hr, plan)
         // Wie bei Samsung Health: Pulszone als Farbe (1 grau, 2 blau, 3 grün, 4 orange, 5 rot)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -477,15 +482,16 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             ) {
                 HeartRateLine()
                 // Antippen öffnet die Reihenfolge (Gerät besetzt → andere Übung vorziehen)
+                val title = it.name + if (r.index < r.items.size - 1) " ⇅" else ""
                 Text(
-                    it.name + if (r.index < r.items.size - 1) " ⇅" else "",
-                    style = MaterialTheme.typography.title3,
+                    title,
+                    style = MaterialTheme.typography.title3.copy(fontSize = if (title.length > 22) 13.sp else if (title.length > 16) 15.sp else MaterialTheme.typography.title3.fontSize),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.onSurface,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
+                    modifier = Modifier.padding(horizontal = 6.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
                 Text(
                     if (r.inWarmSet) "Aufwärmsatz ${r.warmIdx + 1} von ${it.warmSets.size}" else "Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}",
@@ -520,10 +526,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     )
                 }
                 if (counts) Text(
-                    if (counted >= 2) "⟲ $counted gezählt" + (if (manual) " · von dir geändert" else "") else "⟲ zählt mit",
+                    if (counted >= 2) "⟲ $counted gezählt" + (if (manual) " · geändert" else "") else "⟲ zählt mit",
                     style = MaterialTheme.typography.caption3,
                     color = MaterialTheme.colors.secondary,
                 )
+                Spacer(Modifier.size(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -680,8 +687,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("PAUSE", style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.secondary, fontWeight = FontWeight.Bold)
-            Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display1, fontWeight = FontWeight.Bold)
+            // Kein eigener «Pause»-Titel: Ring und Zeit sagen es, und oben bleibt Platz für die Uhrzeit
+            Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.secondary)
             HeartRateLine()
             val sum by Motion.lastSummary.collectAsState()
             sum?.let { Text(it, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 18.dp)) }
@@ -695,7 +702,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     modifier = Modifier.padding(horizontal = 16.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
             }
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.size(6.dp))
             Row {
                 CompactChip(
                     onClick = { r.restUntil += 30_000; r.restLen += 30_000 },
@@ -707,9 +714,10 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
             CompactChip(
                 onClick = { r.end() },
-                label = { Text("Training beenden") },
-                colors = ChipDefaults.secondaryChipColors(),
+                label = { Text("Beenden", color = MaterialTheme.colors.onSurfaceVariant) },
+                colors = ChipDefaults.childChipColors(),
             )
+            Spacer(Modifier.size(14.dp))
         }
     }
 
