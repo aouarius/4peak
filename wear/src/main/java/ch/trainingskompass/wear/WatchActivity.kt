@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -298,6 +299,15 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         onSurfaceVariant = Color(0xFFB9AFC9),
     )
 
+    private fun zoneColor(z: Int): Color = when (z) {
+        1 -> Color(0xFF9AA4B2)
+        2 -> Color(0xFF3D9BFF)
+        3 -> Color(0xFF3DDC84)
+        4 -> Color(0xFFFF9F2E)
+        5 -> Color(0xFFFF4D5E)
+        else -> Color(0xFFB9AFC9)
+    }
+
     /** Ring am Displayrand, oben offen für die Uhrzeit */
     @Composable
     private fun EdgeRing(progress: Float, color: Color) {
@@ -376,6 +386,12 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     onClick = { startRun(s) },
                     label = { Text((if (i == 0) "▶ " else "") + s.name, fontWeight = FontWeight.Bold) },
                     secondaryLabel = { Text(Store.dayLabel(s.date) + " · ${s.items.size} Übungen" + if (s.deload) " · Deload" else "") },
+                    icon = {
+                        Box(
+                            Modifier.size(ChipDefaults.LargeIconSize).background(if (i == 0) Color.White.copy(alpha = 0.22f) else MaterialTheme.colors.primary.copy(alpha = 0.25f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) { Text("🏋", style = MaterialTheme.typography.caption1) }
+                    },
                     // Das nächste Training leuchtet, die späteren bleiben dunkel
                     colors = if (i == 0) ChipDefaults.gradientBackgroundChipColors(startBackgroundColor = MaterialTheme.colors.primaryVariant, endBackgroundColor = MaterialTheme.colors.primary)
                     else ChipDefaults.secondaryChipColors(),
@@ -391,11 +407,12 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         val kcal by WorkoutService.kcal.collectAsState()
         if (hr <= 0) return
         val z = hrZone(hr, plan)
-        Text(
-            "♥ $hr" + (if (z > 0) " · Zone $z" else "") + if (kcal > 0) " · $kcal kcal" else "",
-            style = MaterialTheme.typography.caption1,
-            color = MaterialTheme.colors.secondary,
-        )
+        // Wie bei Samsung Health: Pulszone als Farbe (1 grau, 2 blau, 3 grün, 4 orange, 5 rot)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("♥ $hr", style = MaterialTheme.typography.caption1, fontWeight = FontWeight.Bold, color = zoneColor(z))
+            if (z > 0) Text(" Z$z", style = MaterialTheme.typography.caption3, color = zoneColor(z))
+            if (kcal > 0) Text(" · $kcal kcal", style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.onSurfaceVariant)
+        }
     }
 
     @Composable
