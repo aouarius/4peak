@@ -886,7 +886,8 @@ function planFor(dateIso){
   const sp=splitFor(p);
   const week=Math.floor(Math.round((mondayOf(d)-mondayOf(start))/DAY)/7);
   const deload=p.level!=="anf" && (week+1)%5===0;
-  const s=buildSession(sp.seq[count%sp.seq.length],p,deload);
+  // rot verschiebt die Reihenfolge (z. B. mit Unterkörper statt Oberkörper beginnen)
+  const L=sp.seq.length, s=buildSession(sp.seq[(((count+(p.rot||0))%L)+L)%L],p,deload);
   s.week=week+1; return s;
 }
 
@@ -1014,6 +1015,7 @@ function viewPlan(){
         ${p.goal!=="ausd"?`<label class="f" for="planSplit" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 240px;min-width:0;max-width:100%">Aufteilung<select id="planSplit" style="flex:1 1 180px;min-width:0;max-width:100%">
           ${[["auto","Automatisch"],["gk","Ganzkörper"],["ul","Oberkörper/Unterkörper"],["ppl","Push/Pull/Beine"]].map(([v,t])=>`<option value="${v}"${(p.split||"auto")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:""}
       </div>
+      ${(u=>u&&uniq.length>1?`<label class="f" for="planNext" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;max-width:100%">Als Nächstes am ${WD[isoWd(parseIso(u.date))]}, ${parseIso(u.date).getDate()}.${parseIso(u.date).getMonth()+1}.<select id="planNext" style="flex:1 1 180px;min-width:0;max-width:100%">${uniq.map(k=>`<option value="${k}"${u.s.key===k?" selected":""}>${esc(T[k].n)}</option>`).join("")}</select></label>`:"")(upcoming())}
       ${p.split==="ppl"&&p.weekdays.length<6?`<p class="small muted" style="margin:0">Mit Push/Pull/Beine und weniger als 6 Tagen wird jeder Muskel seltener als zweimal pro Woche trainiert.</p>`:""}
       ${ui.editPlan?`<p class="small muted" style="margin:0">Tausche Übungen, ändere Sätze und Wiederholungen oder die Reihenfolge. Kalender und Trainingsmodus übernehmen die Änderungen sofort.</p>`:""}
       <div class="cards">${uniq.map(k=>{if(ui.editPlan) return editCardHtml(k); const s=buildSession(k,p,false);return `<div class="panel" style="background:var(--bg)">
@@ -1751,6 +1753,17 @@ function tick(){
 }
 function keepScroll(fn){const y=window.scrollY; fn(); window.scrollTo(0,y)}
 function startRest(sec){ui.run.restUntil=Date.now()+sec*1000; if(!timerInt) timerInt=setInterval(tick,250)}
+/* Nächster offener Trainingstag ab heute und welche Einheit dort liegt */
+function upcoming(){
+  for(let i=0;i<28;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)), s=sessionFor(k); if(s&&!state.done[k]) return {date:k,s}}
+  return null;
+}
+/* Reihenfolge so drehen, dass am nächsten Trainingstag die Einheit [key] dran ist */
+function setNextSession(key){
+  const L=splitFor(state.profile).seq.length;
+  for(let r=0;r<L;r++){state.profile.rot=r; const u=upcoming(); if(u&&u.s.key===key) return true}
+  state.profile.rot=0; return false;
+}
 function nextTrainingDate(){
   if(sessionFor(ui.sel)&&!state.done[ui.sel]) return ui.sel;
   for(let i=0;i<28;i++){const k=iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()+i)); if(sessionFor(k)&&!state.done[k]) return k}
@@ -2602,7 +2615,8 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(t.dataset.remindt){const k=t.dataset.remindt; if(/^\d\d:\d\d$/.test(t.value)){state.remind[k].t=t.value; save()}}
   else if(t.dataset.mysupp){const i=state.mySupps.indexOf(t.dataset.mysupp); if(t.checked&&i<0) state.mySupps.push(t.dataset.mysupp); if(!t.checked&&i>=0) state.mySupps.splice(i,1); save()}
   else if(t.dataset.pe&&t.tagName==="SELECT"){if(t.value) planEdit(t.dataset.pe,t.dataset.k,Number(t.dataset.i),t.value)}
-  else if(t.id==="planSplit"){state.profile.split=t.value; save(); render()}
+  else if(t.id==="planSplit"){state.profile.split=t.value; state.profile.rot=0; save(); render()}
+  else if(t.id==="planNext"){setNextSession(t.value); save(); render()}
   else if(t.dataset.sq){state.sq=Object.assign({},SQ_DEF,state.sq||{}); state.sq[t.dataset.sq]=t.dataset.sq==="coffee"?Number(t.value):t.value; save(); render()}
   else if(t.id==="exmus"){ui.exMus=t.value; render()}
   else if(t.id==="exmark"){ui.exMark=t.value; render()}
@@ -2655,10 +2669,13 @@ document.getElementById("view").addEventListener("submit",e=>{
   const msg=document.getElementById("pmsg");
   if(!wds.length){msg.textContent="Wähle mindestens einen Trainingstag."; return}
   const num=(v,lo,hi,d)=>{const n=Number(v); return isFinite(n)&&n>=lo&&n<=hi?n:d};
+  // Gewählte nächste Einheit nach dem Neuberechnen beibehalten, wenn die Aufteilung gleich bleibt
+  const keepNext=(u=>u&&u.s.key)(upcoming()), oldSeq=splitFor(state.profile).seq.join();
   state.profile={goal:g("goal"),level:g("level"),equip:g("equip"),len:Number(g("len")),
     bar:Number(g("bar"))||20,weight:num(g("weight"),35,250,75),height:num(g("height"),120,230,178),sex:g("sex"),age:num(g("age"),14,100,30),restHr:num(g("restHr"),30,110,60),
     start:g("start")||iso(mondayOf(TODAY)),weekdays:wds,example:false,noGear:Object.keys(GEAR).filter(k=>{const c=document.getElementById("ng-"+k); return c&&c.checked}),split:state.profile.split||"auto",spKraft:g("spKraft").trim().slice(0,300),spCardio:g("spCardio").trim().slice(0,300)};
   const rc=document.getElementById("resetCustom"); if(rc&&rc.checked) state.custom={};
+  if(keepNext&&splitFor(state.profile).seq.join()===oldSeq) setNextSession(keepNext);
   save(); ui.sel=todayIso; go("plan");
 });
 
