@@ -104,7 +104,7 @@ class TodayTile : TileService() {
         val purple = argb(0xFFB450FF.toInt())
         val col = LayoutElementBuilders.Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(text(if (s == null) "4peak" else Store.dayLabel(s.date), 14f, purple, bold = true))
+            .addContent(text(if (s == null) "4Peak" else Store.dayLabel(s.date), 14f, purple, bold = true))
             .addContent(spacer(4f))
             .addContent(text(s?.name ?: "Keine offenen Trainings", 18f, argb(0xFFFFFFFF.toInt()), bold = true, lines = 2))
             .addContent(spacer(4f))

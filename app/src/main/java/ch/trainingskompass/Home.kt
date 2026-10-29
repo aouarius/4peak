@@ -186,7 +186,7 @@ class TodayWidget : AppWidgetProvider() {
             var start: String? = null
             when {
                 data == null -> {
-                    v.setTextViewText(R.id.w_label, "4peak")
+                    v.setTextViewText(R.id.w_label, "4Peak")
                     v.setTextViewText(R.id.w_title, "Öffne die App einmal")
                     v.setTextViewText(R.id.w_sub, "Danach steht hier dein Training.")
                 }

@@ -1,5 +1,5 @@
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
-<title>4peak</title>
+<title>4Peak</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20108%20108%22%3E%3Crect%20width%3D%22108%22%20height%3D%22108%22%20rx%3D%2224%22%20fill%3D%22%2324282e%22/%3E%3Cpath%20d%3D%22M52.00%2C34.49%20L30.06%2C65.75%20L47.02%2C65.75%20L47.02%2C73.51%20L78.06%2C73.51%20Z%20M52.23%2C35.82%20L52.23%2C73.51%20M52.23%2C61.09%20L57.21%2C61.09%20L57.21%2C65.75%20L52.23%2C65.75%20M47.13%2C48.90%20L38.37%2C61.32%20L47.13%2C61.32%20Z%20M52.23%2C53.89%20L59.43%2C45.80%22%20fill%3D%22none%22%20stroke%3D%22%23b450ff%22%20stroke-width%3D%224%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -450,7 +450,7 @@ a.chip{text-decoration:none;color:var(--ink)}
     <div class="brand">
       <span class="logo" aria-hidden="true"><svg viewBox="26 26 56 56" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"><path d="M52.00,34.49 L30.06,65.75 L47.02,65.75 L47.02,73.51 L78.06,73.51 Z M52.23,35.82 L52.23,73.51 M52.23,61.09 L57.21,61.09 L57.21,65.75 L52.23,65.75 M47.13,48.90 L38.37,61.32 L47.13,61.32 Z M52.23,53.89 L59.43,45.80"/></svg></span>
       <div style="min-width:0">
-        <h1>4peak</h1>
+        <h1>4Peak</h1>
         <p class="sub">Plan, Training, Ernährung und Supplements an einem Ort.</p>
       </div>
     </div>
@@ -818,7 +818,7 @@ window.onNativeStart=function(d){
   if(!ui.run&&sessionFor(d)&&!state.done[d]){startRun(d); return}
   ui.sel=d; go("kalender");
 };
-window.onNotifyPermission=function(ok){ui.remMsg=ok?"":"Ohne Erlaubnis für Benachrichtigungen kann dich die App nicht erinnern. Du kannst sie in den Android-Einstellungen bei 4peak erlauben."; if(ui.tab==="profil") render()};
+window.onNotifyPermission=function(ok){ui.remMsg=ok?"":"Ohne Erlaubnis für Benachrichtigungen kann dich die App nicht erinnern. Du kannst sie in den Android-Einstellungen bei 4Peak erlauben."; if(ui.tab==="profil") render()};
 function pushWatch(force){if(!NATIVE) return; try{const j=JSON.stringify(watchPayload()); if(j===lastWatch&&!force) return; lastWatch=j; NATIVE.sendToWatch(j); try{localStorage.setItem(LS_KEY+".watchSent",String(Date.now()))}catch(e){}}catch(e){}}
 /* Verbundene Uhren vom Handy abfragen; Antwort kommt über onWatchStatus */
 function askWatch(){if(NATIVE&&typeof NATIVE.watchStatus==="function"){ui.watchBusy=true; try{NATIVE.watchStatus()}catch(e){ui.watchBusy=false}}}
@@ -832,7 +832,7 @@ function watchHtml(){
   const exact=cnt.filter(v=>v.ar===v.r).length, near=cnt.filter(v=>Math.abs(v.ar-v.r)<=1).length;
   const when=t=>new Date(t).toLocaleString("de-CH",{weekday:"short",day:"numeric",month:"numeric",hour:"2-digit",minute:"2-digit"});
   const rows=!L?`<p class="small muted" style="margin:0">${ui.watchBusy?"Suche Uhr …":"Status unbekannt."}</p>`
-    :L.length?L.map(w=>`<div class="row" style="gap:8px;align-items:center"><span style="font-size:1.3rem">⌚</span><span style="flex:1"><b>${esc(w.name||"Uhr")}</b><br><span class="small muted">${w.near?"verbunden":"verbunden über WLAN/Cloud"}${w.app?" · 4peak installiert":""}</span></span><span class="pill"><i class="dot c-green"></i>online</span></div>`).join("")
+    :L.length?L.map(w=>`<div class="row" style="gap:8px;align-items:center"><span style="font-size:1.3rem">⌚</span><span style="flex:1"><b>${esc(w.name||"Uhr")}</b><br><span class="small muted">${w.near?"verbunden":"verbunden über WLAN/Cloud"}${w.app?" · 4Peak installiert":""}</span></span><span class="pill"><i class="dot c-green"></i>online</span></div>`).join("")
     :`<p class="small" style="margin:0">Keine Uhr verbunden. Prüfe, ob die Uhr in der Galaxy-Wearable-App gekoppelt und Bluetooth an ist.</p>`;
   return `<section class="panel stack">
     <h2>Deine Uhr</h2>${rows}
@@ -1309,7 +1309,7 @@ function remindHtml(){
     ${row("supp","Supplements")}
     ${state.coach.on?row("food","Ernährung eintragen (Trainer)"):""}
     ${ui.remMsg?`<p class="small" style="margin:0">${esc(ui.remMsg)}</p>`:""}
-    <p class="small muted" style="margin:0">Die App erinnert dich nur, wenn heute ein Training geplant und noch nicht erledigt ist oder ein Supplement noch nicht abgehakt ist. Das Widget mit deinem heutigen Training findest du so: Startbildschirm lange gedrückt halten, Widgets, 4peak.</p>
+    <p class="small muted" style="margin:0">Die App erinnert dich nur, wenn heute ein Training geplant und noch nicht erledigt ist oder ein Supplement noch nicht abgehakt ist. Das Widget mit deinem heutigen Training findest du so: Startbildschirm lange gedrückt halten, Widgets, 4Peak.</p>
   </section>`;
 }
 function backupHtml(){
@@ -1318,7 +1318,7 @@ function backupHtml(){
   return `<section class="panel stack" id="backup" style="margin-top:14px"><h2>Daten sichern</h2>
     <p class="small muted" style="margin:0">Eine Datei mit allen Trainings, deinem Plan, Notizen, eigenen Übungen und der Ernährung. Damit holst du alles nach einem Handywechsel oder einer Neuinstallation zurück.${lb?` Letzte Sicherung: ${dt(lb)}.`:" Noch keine Sicherung."}</p>
     <div class="row"><button class="btn" data-backup="save">Sicherung speichern</button><button class="btn ghost" data-backup="load">Sicherung laden</button>${web?`<input type="file" id="bkfile" accept=".json,application/json,text/plain" hidden>`:""}<span id="bkmsg" class="small muted">${esc(ui.bkMsg||"")}</span></div>
-    ${R?(R.err?`<p class="small" style="margin:0">Diese Datei ist keine 4peak-Sicherung.</p>`
+    ${R?(R.err?`<p class="small" style="margin:0">Diese Datei ist keine 4Peak-Sicherung.</p>`
       :`<div class="panel stack" style="background:var(--bg)"><b>Sicherung${R.at?` vom ${dt(R.at)}`:""} mit ${R.n} ${R.n===1?"Training":"Trainings"} laden?</b>
         <span class="small muted">Deine aktuellen Daten auf diesem Gerät werden dadurch ersetzt.</span>
         <div class="row"><button class="btn" data-backup="apply">Ersetzen</button><button class="btn ghost" data-backup="cancel">Abbrechen</button></div></div>`):""}
@@ -1331,7 +1331,7 @@ async function backupAction(a){
   if(a==="apply"&&ui.restore&&ui.restore.st){state=normalize(ui.restore.st); applyCustomEx(); ui.restore=null; ui.run=null; ui.summary=null; ui.bkMsg="Sicherung geladen ✓"; save(); render(); return}
   if(a==="load"){ui.bkMsg=""; if(NATIVE&&NATIVE.openBackup) NATIVE.openBackup(); else {const f=document.getElementById("bkfile"); if(f) f.click()} return}
   if(a!=="save") return;
-  const name=`4peak-${todayIso}.json`;
+  const name=`4Peak-${todayIso}.json`;
   const data=JSON.stringify({app:"trainingskompass",v:1,at:new Date().toISOString(),state});
   if(NATIVE&&NATIVE.saveBackup){backupMsg("Speicherort wählen …"); NATIVE.saveBackup(name,data); return}
   try{const dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;
@@ -1607,7 +1607,7 @@ function coachData(){
     uebungen:ex, moegliche_tauschuebungen:alt,
     regel_hinweise:coachTips().map(t=>t.t)};
 }
-const AI_SYS=`Du bist der persönliche Trainer in der Fitness-App 4peak. Du bekommst alle aktuellen Daten der Person als JSON: Profil, Ziele, Trainingsverlauf pro Übung (Sätze als "kg × Wdh"), Anstrengung (1–10), Körpergewicht, Ernährung, Gesundheitsdaten und Hinweise der festen App-Regeln.
+const AI_SYS=`Du bist der persönliche Trainer in der Fitness-App 4Peak. Du bekommst alle aktuellen Daten der Person als JSON: Profil, Ziele, Trainingsverlauf pro Übung (Sätze als "kg × Wdh"), Anstrengung (1–10), Körpergewicht, Ernährung, Gesundheitsdaten und Hinweise der festen App-Regeln.
 Daten der Uhr pro Satz: von der Uhr gezählte Wiederholungen, Tempo in s/Wdh, wie viel langsamer die letzten Wiederholungen waren (ab etwa 20 % war der Satz nah am Muskelversagen), Puls am Satzende und die tatsächliche Pause davor. Nutze sie, um die echte Anstrengung, zu kurze Pausen oder Ermüdung über die Sätze zu erkennen. Beziehe auch Schlaf, HRV, Ruhepuls, andere Sportarten, Wochensätze pro Muskel, den Trainingsblock und die trainer_notizen (z. B. Schmerzen) in deine Planung ein.
 Schau sie dir an wie ein guter Personal Trainer: Was läuft gut, wo hakt es, was sollte als Nächstes passieren? Begründe mit den Zahlen aus den Daten und halte dich an anerkannte Trainingspraxis (Doppelprogression, 10–20 Sätze pro Muskel und Woche, Deload bei Übermüdung, 1,6–2,2 g Protein pro kg). Erfinde keine Werte, die nicht in den Daten stehen. Fehlen Daten, sag das.
 Fehlende Ernährungseinträge von gestern und heute meldet die App selbst; wiederhole sie nicht.
@@ -1682,7 +1682,7 @@ function coachList(){
   return [...gap,...ai];
 }
 /* ---------- Trainer fragen (Chat) ---------- */
-const CHAT_SYS=`Du bist der persönliche Trainer in der Fitness-App 4peak und chattest mit der Person. Du bekommst ihre aktuellen Daten als JSON (Profil, Ziele, Verlauf pro Übung, Gewicht, Ernährung, nächstes Training), den bisherigen Chat und die neue Nachricht.
+const CHAT_SYS=`Du bist der persönliche Trainer in der Fitness-App 4Peak und chattest mit der Person. Du bekommst ihre aktuellen Daten als JSON (Profil, Ziele, Verlauf pro Übung, Gewicht, Ernährung, nächstes Training), den bisherigen Chat und die neue Nachricht.
 Antworte wie ein guter Personal Trainer: konkret, mit Bezug auf ihre Zahlen, nach anerkannter Trainingspraxis.
 Daten der Uhr pro Satz: von der Uhr gezählte Wiederholungen, Tempo in s/Wdh, wie viel langsamer die letzten Wiederholungen waren (ab etwa 20 % war der Satz nah am Muskelversagen), Puls am Satzende und die tatsächliche Pause davor. Nutze sie, um die echte Anstrengung, zu kurze Pausen oder Ermüdung über die Sätze zu erkennen. Beziehe auch Schlaf, HRV, Ruhepuls, andere Sportarten, Wochensätze pro Muskel, den Trainingsblock und die trainer_notizen (z. B. Schmerzen) in deine Planung ein.
 Erzählt die Person etwas, das du dir für später merken solltest (Schmerzen, Verletzung, Vorlieben, Zeitmangel, Ziele, Material), gib zusätzlich {"type":"note","text":"kurz, max. 100 Zeichen"} zurück; die App merkt es sich automatisch. Ist eine Notiz erledigt (z. B. Knie wieder gut), gib {"type":"unnote","text":"<Notiz wie in trainer_notizen ohne Datum>"} zurück. Bei Schmerzen: Übung weglassen oder ersetzen, nichts durchdrücken, bei starken, anhaltenden oder ausstrahlenden Schmerzen zum Arzt oder zur Physiotherapie. Keine Diagnosen.
@@ -1750,7 +1750,7 @@ function readyRule(o){
   const mode=s<=-1.5?"light":s>=1.5?"hard":"normal";
   return {mode,text:mode==="light"?`Heute lieber leichter: ${why.join(", ")}. Ein Satz weniger bei den grossen Übungen und 3 Wiederholungen Reserve bringen trotzdem Fortschritt.`:mode==="hard"?"Du bist gut erholt. Wenn es sich gut anfühlt, darfst du heute bei den Hauptübungen einen Satz mehr machen.":`Alles im normalen Bereich${why.length?` (${why.join(", ")})`:""}. Trainier wie geplant.`};
 }
-const READY_SYS=`Du bist der persönliche Trainer in der App 4peak. Vor dem heutigen Training bekommst du Erholungsdaten (Schlaf, HRV, Ruhepuls, jeweils mit 7-Tage-Schnitt), wie sich die Person fühlt (1–5), das letzte Training und das heutige Training. Entscheide, ob heute leichter (light: 1 Satz weniger bei Übungen mit 3 oder mehr Sätzen, mehr Reserve), wie geplant (normal) oder härter (hard: 1 Satz mehr bei Hauptübungen) trainiert werden soll. Sei zurückhaltend mit "hard". Deutsch (Schweiz, ohne ß), per du, 1–2 Sätze, mit den Zahlen.
+const READY_SYS=`Du bist der persönliche Trainer in der App 4Peak. Vor dem heutigen Training bekommst du Erholungsdaten (Schlaf, HRV, Ruhepuls, jeweils mit 7-Tage-Schnitt), wie sich die Person fühlt (1–5), das letzte Training und das heutige Training. Entscheide, ob heute leichter (light: 1 Satz weniger bei Übungen mit 3 oder mehr Sätzen, mehr Reserve), wie geplant (normal) oder härter (hard: 1 Satz mehr bei Hauptübungen) trainiert werden soll. Sei zurückhaltend mit "hard". Deutsch (Schweiz, ohne ß), per du, 1–2 Sätze, mit den Zahlen.
 Antworte nur mit JSON: {"mode":"light"|"normal"|"hard","text":"…"}`;
 async function readyAsk(){
   const c=C(), o=readyData(), u=upcoming(); if(!u) return;
@@ -1799,7 +1799,7 @@ function blockRule(){
     const e=h.map(([d,x])=>exBest(id,x.sets[id])); if(e[e.length-1]<=e[0]*1.01){const to=altFor(id,used); if(to){used.add(to); swaps.push({from:id,to})}}}
   return {title:m==="4–6"||m==="2–4"||m==="3–5"?"Kraftblock":m==="8–12"||m==="10–15"?"Volumenblock":"Aufbaublock",why:`Neue Wiederholungsbereiche geben einen frischen Reiz: Hauptübungen ${m}, Ergänzungen ${a}.${swaps.length?" Übungen ohne Fortschritt im letzten Block werden getauscht.":""}`,main:m,acc:a,swaps};
 }
-const BLOCK_SYS=`Du bist der persönliche Trainer in der App 4peak und planst den nächsten Trainingsblock (6–8 Wochen). Du bekommst die Daten der Person (Profil, Verlauf pro Übung im letzten Block, mögliche Tauschübungen, aktueller Block mit Wiederholungsbereichen).
+const BLOCK_SYS=`Du bist der persönliche Trainer in der App 4Peak und planst den nächsten Trainingsblock (6–8 Wochen). Du bekommst die Daten der Person (Profil, Verlauf pro Übung im letzten Block, mögliche Tauschübungen, aktueller Block mit Wiederholungsbereichen).
 Wähle nach anerkannter Periodisierung neue Wiederholungsbereiche für Haupt- und Ergänzungsübungen (passend zum Ziel) und tausche höchstens 4 Übungen, vor allem solche ohne Fortschritt. Begründe kurz mit den Zahlen. Deutsch (Schweiz, ohne ß), per du.
 Antworte nur mit JSON: {"title":"kurzer Name des Blocks","why":"2–3 Sätze","main":"z.B. 4–6","acc":"z.B. 8–12","swaps":[{"from":"<id im Plan>","to":"<id aus moegliche_tauschuebungen>"}]}`;
 async function blockPlan(){

@@ -129,7 +129,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             setBackgroundColor(android.graphics.Color.BLACK)
         }
         col.addView(android.widget.TextView(this).apply {
-            text = "4peak ist abgestürzt. Bitte fotografieren und an Claude schicken:"
+            text = "4Peak ist abgestürzt. Bitte fotografieren und an Claude schicken:"
             setTextColor(android.graphics.Color.rgb(255, 200, 80)); textSize = 13f
         })
         col.addView(android.widget.TextView(this).apply {
@@ -369,7 +369,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         val p = plan
         val open = p?.sessions?.filter { it.date !in doneDates }.orEmpty()
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("4peak", style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary) }
+            item { Text("4Peak", style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary) }
             if (open.isEmpty()) {
                 item {
                     Text(

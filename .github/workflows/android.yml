@@ -23,9 +23,9 @@ jobs:
       - name: Dateien umbenennen
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/4peak-HANDY.apk
-          cp wear/build/outputs/apk/debug/wear-debug.apk out/4peak-UHR.apk
+          cp app/build/outputs/apk/debug/app-debug.apk out/4Peak-HANDY.apk
+          cp wear/build/outputs/apk/debug/wear-debug.apk out/4Peak-UHR.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: 4peak-apps
+          name: 4Peak-apps
           path: out/*.apk

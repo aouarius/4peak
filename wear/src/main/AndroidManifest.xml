@@ -50,7 +50,7 @@
         <service
             android:name=".TodayTile"
             android:exported="true"
-            android:label="4peak Training"
+            android:label="4Peak Training"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
@@ -63,7 +63,7 @@
             android:name=".NextComplication"
             android:exported="true"
             android:icon="@drawable/ic_notify"
-            android:label="4peak: nächstes Training"
+            android:label="4Peak: nächstes Training"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
