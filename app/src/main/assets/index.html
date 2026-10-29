@@ -145,6 +145,11 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mu
 .fwrap{position:relative;display:flex;flex-direction:column}
 .coach{border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
 .aibadge{font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;background:var(--accent);color:var(--accent-ink);vertical-align:middle}
+#chatin{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical}
+.chatlog{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto}
+.msg{padding:8px 10px;border-radius:12px;font-size:14px;line-height:1.4;max-width:88%;white-space:pre-wrap}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.msg.tr{align-self:flex-start;background:var(--soft)}
 .coachtip{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
 .coachtip:first-of-type{border-top:0;padding-top:0}
 .holdbtn{margin-left:6px;min-width:40px;height:34px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
@@ -688,7 +693,8 @@ function buildSession(key,p,deload){
     const pr=G[role]||G.acc;
     // Ab 75 Minuten je Ergänzungsübung ein Satz mehr (höchstens 4)
     const base=x.sets||(role==="acc"&&p.len>=75?Math.min(4,pr.s[li]+1):pr.s[li]);
-    out.push({id,role,sets:half(base),reps:x.reps||pr.r,rir:deload?"3–4":pr.rir,rest:pr.rest,...ss});
+    const br=state.coach&&state.coach.block&&state.coach.block[role==="main"?"main":"acc"];
+    out.push({id,role,sets:half(base),reps:x.reps||(br&&!isTimed(id,pr.r)&&!isTimed(id,EX[id].r||"")?br:pr.r),rir:deload?"3–4":pr.rir,rest:pr.rest,...ss});
   }
   if(!tmpl && G.finisher && t.c!=="green") out.push({id:"z2",role:"cardio",txt:G.finisher+" Zone 2 im Anschluss"});
   return {key,name:t.n,c:t.c,items:out,deload};
@@ -702,7 +708,7 @@ const isoWd=d=>(d.getDay()+6)%7; // 0=Mo
 function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-isoWd(x));return x}
 const TODAY=new Date(); const todayIso=iso(TODAY);
 
-const COACH_DEF=()=>({on:false,ai:true,aiRes:null,kcalAdj:0,hide:{},wNext:{},deload:null});
+const COACH_DEF=()=>({on:false,ai:true,aiRes:null,kcalAdj:0,hide:{},wNext:{},deload:null,chat:[],ready:{},feel:{},skip:{},readyRes:null,block:null});
 function defaults(){return{remind:REMIND_DEF(),coach:COACH_DEF(),
   profile:{goal:"hyper",level:"anf",weekdays:[0,2,4],len:60,equip:"gym",split:"auto",bar:20,weight:75,height:178,sex:"m",age:30,restHr:60,start:iso(mondayOf(TODAY)),example:true},
   done:{},supps:{},mySupps:["kreatin","protein"],acts:[],bw:[],food:{},custom:{},myProducts:[],customProducts:[],fav:[],block:[],notes:{},customEx:{}}}
@@ -894,7 +900,7 @@ function planFor(dateIso){
   const deload=(p.level!=="anf" && (week+1)%5===0)||(!!(state.coach&&state.coach.deload)&&iso(mondayOf(d))===state.coach.deload);
   // rot verschiebt die Reihenfolge (z. B. mit Unterkörper statt Oberkörper beginnen)
   const L=sp.seq.length, s=buildSession(sp.seq[(((count+(p.rot||0))%L)+L)%L],p,deload);
-  s.week=week+1; return s;
+  s.week=week+1; return adjustDay(s,dateIso);
 }
 
 /* ---------- Rendering ---------- */
@@ -1474,6 +1480,8 @@ function coachTips(){
       if(adj&&Math.abs(step+adj)<=600) tips.push({id:`kcal:${last.d}`,pr:2,t:`Kalorien um ${adj>0?"+":"−"}${Math.abs(adj)} kcal anpassen`,x:why,a:{l:`${adj>0?"+":"−"}${Math.abs(adj)} kcal pro Tag`,f:()=>{c.kcalAdj=step+adj}}});
     }
   }
+  // 6. Trainingsblock: nach 6 Wochen einen neuen planen
+  const bw6=blockWeeks(); if(bw6>=6&&state.done&&Object.keys(state.done).length>=6) tips.push({id:`block:${blockOf().start}:${Math.floor(bw6/2)}`,pr:3,t:`Seit ${bw6} Wochen derselbe Block`,x:"Nach 6–8 Wochen bringt ein neuer Block mit anderen Wiederholungsbereichen und einzelnen neuen Übungen wieder frischen Fortschritt.",a:{l:"Neuen Block planen",f:()=>{setTimeout(blockPlan,0)}}});
   return tips.filter(t=>!c.hide[t.id]).sort((a,b)=>a.pr-b.pr);
 }
 function coachSwap(from,to){
@@ -1492,11 +1500,13 @@ function coachHtml(onlyFood){
   return `<section class="panel stack coach">
     <div class="row" style="justify-content:space-between;align-items:center"><h3>Dein Trainer${useAi||r?` <span class="aibadge">KI</span>`:""}</h3>${onlyFood?"":`<button class="linkbtn small" data-coach="off">Ausschalten</button>`}</div>
     ${!onlyFood&&r?`<div class="small">${esc(r.summary)}</div>`:""}
+    ${onlyFood?"":readyHtml()+blockHtml()}
     ${!onlyFood&&aiBusy?`<div class="small muted">Ich schaue mir deine neusten Werte an …</div>`:""}
     ${list.length?list.map(t=>`<div class="coachtip"><b>${esc(t.t)}</b><div class="small">${esc(t.x)}</div>
       <div class="row" style="gap:6px">${t.a?`<button class="btn small" data-coachdo="${esc(t.id)}">${esc(t.a.l)}</button>`:""}<button class="btn ghost small" data-coachhide="${esc(t.id)}">Ausblenden</button></div></div>`).join("")
       :(r||aiBusy?"":`<div class="small">Alles im grünen Bereich: Deine Werte entwickeln sich wie geplant. Ich melde mich, sobald etwas auffällt.</div>`)}
     ${c.msg?`<div class="small" style="color:var(--green)">✓ ${esc(c.msg)}</div>`:""}
+    ${onlyFood?"":`<div class="coachtip"><button class="linkbtn" data-chat="toggle" style="align-self:flex-start"><b>${ui.chat?"▾":"▸"} Trainer fragen</b></button>${ui.chat?chatHtml():""}</div>`}
     ${onlyFood?"":`<div class="small muted">${useAi?`${stand?`KI-Einschätzung von ${stand.toLocaleDateString("de-CH",{day:"numeric",month:"numeric"})}, ${stand.toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"})} · `:""}<button class="linkbtn" data-coach="airefresh" ${aiBusy?"disabled":""}>Neu einschätzen</button>`:(c.ai!==false?`Feste Trainer-Regeln aktiv. ${NATIVE&&NATIVE.aiAsk?`Für die KI-Einschätzung im Profil einen API-Schlüssel eintragen.`:""}`:"Feste Trainer-Regeln aktiv.")}${aiErr?` <span style="color:var(--red)">${esc(aiErr)}</span>`:""}</div>`}
   </section>`;
 }
@@ -1509,6 +1519,8 @@ function coachSettingsHtml(){
     <div class="small muted">Die KI bekommt bei jeder neuen Eintragung eine Zusammenfassung deiner Trainings, deines Gewichts und deiner Ernährung, ohne Namen, und schreibt eine Einschätzung mit Vorschlägen. Die festen Regeln laufen immer mit, auch ohne Internet.</div>
     ${NATIVE&&NATIVE.aiAsk?`<label class="small">Anthropic API-Schlüssel (nur auf diesem Handy gespeichert)<input type="password" id="aikey" autocomplete="off" placeholder="sk-ant-…" value="${esc(aiKey())}"></label>
     <div class="small muted">In der Handy-App läuft die KI über deinen eigenen Schlüssel von console.anthropic.com. Eine Einschätzung kostet ungefähr 2–5 Rappen.</div>`:""}
+    <div class="small">Trainingsblock ${blockOf().n} seit ${parseIso(blockOf().start).getDate()}.${parseIso(blockOf().start).getMonth()+1}. (${blockWeeks()} Wochen)${blockOf().title?`: ${esc(blockOf().title)}, Hauptübungen ${esc(blockOf().main)}, Ergänzungen ${esc(blockOf().acc)} Wdh`:""} · <button class="linkbtn" data-blockdo="plan">Neuen Block planen</button></div>
+    ${blockHtml()}
     ${c.kcalAdj?`<div class="small">Kalorien vom Trainer angepasst: ${c.kcalAdj>0?"+":"−"}${Math.abs(c.kcalAdj)} kcal pro Tag · <button class="linkbtn" data-coach="kcalreset">Zurücksetzen</button></div>`:""}
     ${c.deload?`<div class="small">Deload-Woche ab ${parseIso(c.deload).getDate()}.${parseIso(c.deload).getMonth()+1}. eingeplant · <button class="linkbtn" data-coach="deloadreset">Entfernen</button></div>`:""}
   </section>`;
@@ -1559,15 +1571,15 @@ function aiSig(){const h=history(), last=h[h.length-1], bw=state.bw.length?[...s
 function aiAvail(){return !!(window.claude&&window.claude.use)||!!(NATIVE&&NATIVE.aiAsk&&aiKey())}
 const aiWait={};
 window.onAiResult=(id,json)=>{const w=aiWait[id]; if(!w) return; delete aiWait[id]; let o; try{o=typeof json==="string"?JSON.parse(json):json}catch(e){o={error:"Antwort unlesbar."}} w(o)};
-async function aiAsk(user){
+async function aiAsk(user,sys=AI_SYS){
   if(window.claude&&window.claude.use){
     const sample=await window.claude.use("sample");
-    if(sample){try{return await sample.json([{role:"user",content:AI_SYS+"\n\nDaten:\n"+user}],{modelTier:"default",cache:false})}
+    if(sample){try{return await sample.json([{role:"user",content:sys+"\n\nDaten:\n"+user}],{modelTier:"default",cache:false})}
       catch(e){throw new Error(e&&e.code==="not_granted"?"Du hast der App den Zugriff auf Claude nicht erlaubt.":e&&e.code==="rate_limited"?"Gerade zu viele Anfragen, später nochmals.":"Die KI hat nicht geantwortet.")}}
   }
   if(NATIVE&&NATIVE.aiAsk&&aiKey()){
     const id=String(Date.now())+Math.random().toString(36).slice(2,6);
-    const o=await new Promise(res=>{aiWait[id]=res; NATIVE.aiAsk(id,aiKey(),AI_SYS,user); setTimeout(()=>{if(aiWait[id]){delete aiWait[id]; res({error:"Keine Antwort in 2 Minuten."})}},120000)});
+    const o=await new Promise(res=>{aiWait[id]=res; NATIVE.aiAsk(id,aiKey(),sys,user); setTimeout(()=>{if(aiWait[id]){delete aiWait[id]; res({error:"Keine Antwort in 2 Minuten."})}},120000)});
     if(o.error) throw new Error(o.error);
     const m=String(o.text||"").match(/\{[\s\S]*\}/); if(!m) throw new Error("Antwort unlesbar.");
     return JSON.parse(m[0]);
@@ -1583,6 +1595,10 @@ function aiAction(a){
   if(a.type==="swap"&&ids.has(a.from)&&EX[a.to]&&!EX[a.to].del&&!ids.has(a.to)&&gearOk(a.to)) return {l:`Gegen ${EX[a.to].n} tauschen`,f:()=>coachSwap(a.from,a.to)};
   if(a.type==="deload"){const nm=iso(new Date(mondayOf(TODAY).getTime()+7*DAY+3600000)); if(c.deload===nm) return null; return {l:"Deload-Woche einplanen",f:()=>{c.deload=nm}}}
   if(a.type==="kcal"){const d=Math.round(Math.max(-300,Math.min(300,+a.delta||0))/50)*50; if(!d||Math.abs((c.kcalAdj||0)+d)>600) return null; return {l:`${d>0?"+":"−"}${Math.abs(d)} kcal pro Tag`,f:()=>{c.kcalAdj=(c.kcalAdj||0)+d}}}
+  const u=upcoming();
+  if(a.type==="skip"&&u&&u.s.items.some(i=>i.id===a.ex)) return {l:`${EX[a.ex].n} nächstes Mal weglassen`,f:()=>{(c.skip[u.date]=c.skip[u.date]||[]).push(a.ex)}};
+  if(a.type==="ready"&&u&&READY_N[a.mode]) return {l:`Nächstes Training: ${READY_N[a.mode]}`,f:()=>{if(a.mode==="normal") delete c.ready[u.date]; else c.ready[u.date]=a.mode}};
+  if(a.type==="block") return {l:"Neuen Block planen",f:()=>{setTimeout(blockPlan,0)}};
   const tabs={ernaehrung:"Zur Ernährung",profil:"Zum Profil",fortschritt:"Zum Fortschritt",plan:"Zum Plan"};
   if(a.type==="goto"&&tabs[a.tab]) return {l:tabs[a.tab],f:()=>{if(a.tab==="ernaehrung") ui.foodDay=todayIso; ui.coachGo=a.tab}};
   return null;
@@ -1604,9 +1620,147 @@ async function aiRefresh(force){
 function coachList(){
   const c=C(), rules=coachTips(), r=c.ai!==false&&c.aiRes;
   if(!r) return rules;
-  const gap=rules.filter(t=>/^(yday|today):/.test(t.id));
+  const gap=rules.filter(t=>/^(yday|today|block):/.test(t.id));
   const ai=r.tips.filter(t=>!c.hide[t.id]).map(t=>({id:t.id,pr:2,ai:1,t:t.t,x:t.x,a:aiAction(t.a)}));
   return [...gap,...ai];
+}
+/* ---------- Trainer fragen (Chat) ---------- */
+const CHAT_SYS=`Du bist der persönliche Trainer in der Fitness-App 4peak und chattest mit der Person. Du bekommst ihre aktuellen Daten als JSON (Profil, Ziele, Verlauf pro Übung, Gewicht, Ernährung, nächstes Training), den bisherigen Chat und die neue Nachricht.
+Antworte wie ein guter Personal Trainer: konkret, mit Bezug auf ihre Zahlen, nach anerkannter Trainingspraxis. Bei Schmerzen: Übung weglassen oder ersetzen, nichts durchdrücken, bei starken, anhaltenden oder ausstrahlenden Schmerzen zum Arzt oder zur Physiotherapie. Keine Diagnosen.
+Deutsch (Schweiz, ohne ß), per du, kurz: höchstens 5 Sätze.
+Antworte nur mit einem JSON-Objekt: {"text":"deine Antwort","actions":[AKTION, …]} mit höchstens 3 Aktionen, nur wenn sie zur Frage passen, sonst [].
+AKTION ist genau eine von:
+{"type":"weight","ex":"<übungs-id>","kg":<Zahl>} Gewicht fürs nächste Mal
+{"type":"swap","from":"<übungs-id im Plan>","to":"<id aus moegliche_tauschuebungen>"} dauerhaft tauschen
+{"type":"skip","ex":"<übungs-id aus naechstes_training>"} nur im nächsten Training weglassen
+{"type":"ready","mode":"light"|"normal"|"hard"} nächstes Training leichter (1 Satz weniger bei Übungen mit 3+ Sätzen, mehr Reserve), normal oder härter (1 Satz mehr bei Hauptübungen)
+{"type":"deload"} nächste Woche leichter
+{"type":"kcal","delta":<-300 bis 300>} Kalorienziel anpassen
+{"type":"block"} neuen Trainingsblock planen
+Verwende nur Übungs-IDs aus den Daten.`;
+async function chatSend(q){
+  const c=C(); q=String(q||"").trim().slice(0,800); if(!q||ui.chatBusy) return;
+  c.chat=(c.chat||[]).concat({r:"u",t:q,at:new Date().toISOString()}).slice(-30); ui.chatDraft=""; ui.chatBusy=true; ui.chatErr=""; save(); render();
+  try{const r=await aiAsk(JSON.stringify({daten:coachData(),chat:c.chat.slice(-11,-1).map(m=>({von:m.r==="u"?"person":"trainer",text:m.t})),neue_nachricht:q}),CHAT_SYS);
+    if(!r||typeof r.text!=="string") throw new Error("Antwort unlesbar.");
+    c.chat.push({r:"a",t:r.text.slice(0,1500),at:new Date().toISOString(),a:(Array.isArray(r.actions)?r.actions:[]).slice(0,3)}); c.chat=c.chat.slice(-30); save()}
+  catch(e){ui.chatErr=e&&e.message==="nokey"?"Für den Chat braucht es die KI-Anbindung (im Profil).":(e&&e.message)||"Die KI hat nicht geantwortet."}
+  ui.chatBusy=false; render();
+  const box=document.getElementById("chatlog"); if(box) box.scrollTop=box.scrollHeight;
+}
+function chatHtml(){
+  const c=C(), msgs=(c.chat||[]).slice(-12);
+  return `<div class="chat stack" style="gap:8px">
+    <div id="chatlog" class="chatlog">${msgs.length?msgs.map((m,i)=>{const idx=(c.chat.length-msgs.length)+i;
+      return `<div class="msg ${m.r==="u"?"me":"tr"}">${esc(m.t)}${m.r==="a"&&m.a&&m.a.length?`<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">${m.a.map((a,j)=>{const k=`chat:${m.at}:${j}`; if(c.hide[k]) return `<span class="small muted">✓ Übernommen</span>`; const x=aiAction(a); if(!x) return ""; return `<button class="btn small" data-chatdo="${idx}:${j}">${esc(x.l)}</button>`}).join("")}</div>`:""}</div>`}).join("")
+      :`<div class="small muted">Frag mich zum Beispiel: „Mein Knie zwickt bei Kniebeugen, was nun?“, „Ich habe heute nur 40 Minuten“ oder „Warum geht es beim Bankdrücken nicht weiter?“</div>`}
+    ${ui.chatBusy?`<div class="msg tr muted">…</div>`:""}</div>
+    ${ui.chatErr?`<div class="small" style="color:var(--red)">${esc(ui.chatErr)}</div>`:""}
+    <div class="row" style="gap:6px;align-items:flex-end"><textarea id="chatin" rows="2" placeholder="Nachricht an deinen Trainer" style="flex:1">${esc(ui.chatDraft||"")}</textarea><button class="btn" data-chatsend="1" ${ui.chatBusy?"disabled":""}>Senden</button></div>
+    ${(c.chat||[]).length?`<button class="linkbtn small" data-chatclear="1" style="align-self:flex-start">Verlauf löschen</button>`:""}
+  </div>`;
+}
+
+/* ---------- Check vor dem Training: Schlaf, HRV, Ruhepuls, Gefühl ---------- */
+const READY_N={light:"Leichter",normal:"Wie geplant",hard:"Härter"};
+function readyData(){
+  const h=state.health, avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null, last=a=>a&&a.length?a[a.length-1]:null;
+  const o={};
+  if(h&&!h.error){
+    const sl=last(h.sleep); if(sl&&daysAgo(sl.d)<=0) o.schlaf_min=sl.min; const sa=avg(h.sleep.slice(-8,-1).map(x=>x.min)); if(sa) o.schlaf_schnitt_min=Math.round(sa);
+    const hv=last(h.hrv); if(hv&&daysAgo(hv.d)<=1){o.hrv_ms=Math.round(hv.v); const a=avg(h.hrv.slice(-8,-1).map(x=>x.v)); if(a) o.hrv_schnitt_ms=Math.round(a)}
+    const rs=last(h.rest); if(rs&&daysAgo(rs.d)<=1){o.ruhepuls=Math.round(rs.v); const a=avg(h.rest.slice(-8,-1).map(x=>x.v)); if(a) o.ruhepuls_schnitt=Math.round(a)}
+  }
+  const f=(C().feel||{})[todayIso]; if(f) o.gefuehl_1_bis_5=f;
+  const prev=history().filter(([d])=>d<todayIso).pop(); if(prev) o.letztes_training={vor_tagen:daysAgo(prev[0]),anstrengung:prev[1].rpe||null};
+  return o;
+}
+function readyRule(o){
+  let s=0; const why=[];
+  if(o.schlaf_min!=null){if(o.schlaf_min<300){s-=2;why.push(`nur ${Math.floor(o.schlaf_min/60)} h ${o.schlaf_min%60} min geschlafen`)} else if(o.schlaf_min<360){s-=1;why.push("wenig geschlafen")} else if(o.schlaf_min>=450) s+=0.5}
+  if(o.hrv_ms&&o.hrv_schnitt_ms){if(o.hrv_ms<o.hrv_schnitt_ms*0.9){s-=1;why.push("HRV unter deinem Schnitt")} else if(o.hrv_ms>o.hrv_schnitt_ms*1.05) s+=0.5}
+  if(o.ruhepuls&&o.ruhepuls_schnitt&&o.ruhepuls>o.ruhepuls_schnitt+5){s-=1;why.push("Ruhepuls erhöht")}
+  if(o.gefuehl_1_bis_5){s+={1:-2,2:-1,3:0,4:0.5,5:1}[o.gefuehl_1_bis_5]; if(o.gefuehl_1_bis_5<=2) why.push("du fühlst dich müde")}
+  if(o.letztes_training&&o.letztes_training.vor_tagen<=2&&o.letztes_training.anstrengung>=9){s-=0.5;why.push("letztes Training war sehr hart")}
+  const mode=s<=-1.5?"light":s>=1.5?"hard":"normal";
+  return {mode,text:mode==="light"?`Heute lieber leichter: ${why.join(", ")}. Ein Satz weniger bei den grossen Übungen und 3 Wiederholungen Reserve bringen trotzdem Fortschritt.`:mode==="hard"?"Du bist gut erholt. Wenn es sich gut anfühlt, darfst du heute bei den Hauptübungen einen Satz mehr machen.":`Alles im normalen Bereich${why.length?` (${why.join(", ")})`:""}. Trainier wie geplant.`};
+}
+const READY_SYS=`Du bist der persönliche Trainer in der App 4peak. Vor dem heutigen Training bekommst du Erholungsdaten (Schlaf, HRV, Ruhepuls, jeweils mit 7-Tage-Schnitt), wie sich die Person fühlt (1–5), das letzte Training und das heutige Training. Entscheide, ob heute leichter (light: 1 Satz weniger bei Übungen mit 3 oder mehr Sätzen, mehr Reserve), wie geplant (normal) oder härter (hard: 1 Satz mehr bei Hauptübungen) trainiert werden soll. Sei zurückhaltend mit "hard". Deutsch (Schweiz, ohne ß), per du, 1–2 Sätze, mit den Zahlen.
+Antworte nur mit JSON: {"mode":"light"|"normal"|"hard","text":"…"}`;
+async function readyAsk(){
+  const c=C(), o=readyData(), u=upcoming(); if(!u) return;
+  const rule=readyRule(o); c.readyRes={d:u.date,...rule,src:"regel"}; ui.readyBusy=aiAvail()&&c.ai!==false; save(); render();
+  if(!ui.readyBusy) return;
+  try{const r=await aiAsk(JSON.stringify({erholung:o,heute:{einheit:u.s.name,uebungen:u.s.items.filter(i=>i.role!=="cardio").map(i=>`${EX[i.id].n} ${i.sets}×${i.reps}`)},ziel:GOALS[state.profile.goal].n}),READY_SYS);
+    if(r&&READY_N[r.mode]&&typeof r.text==="string") c.readyRes={d:u.date,mode:r.mode,text:r.text.slice(0,400),src:"ki"}}
+  catch(e){}
+  ui.readyBusy=false; save(); render();
+}
+function readyHtml(){
+  const c=C(), u=upcoming(); if(!u||u.date!==todayIso) return "";
+  const cur=(c.ready||{})[todayIso], res=c.readyRes&&c.readyRes.d===todayIso?c.readyRes:null, feel=(c.feel||{})[todayIso];
+  const hd=state.health&&!state.health.error&&(state.health.sleep.length||state.health.hrv.length);
+  return `<div class="coachtip"><b>Check vor dem Training</b>
+    ${cur?`<div class="small">Heute: <b>${READY_N[cur]}</b>${cur==="light"?" (1 Satz weniger bei Übungen mit 3+ Sätzen)":cur==="hard"?" (1 Satz mehr bei den Hauptübungen)":""} · <button class="linkbtn" data-ready="reset">Ändern</button></div>`:`
+    <div class="small">Wie fühlst du dich heute?</div>
+    <div class="row" style="gap:6px">${[1,2,3,4,5].map(n=>`<button class="btn small ${feel===n?"":"ghost"}" data-feel="${n}" aria-label="${["","sehr müde","müde","normal","gut","top"][n]}">${["","😫","🥱","😐","🙂","💪"][n]}</button>`).join("")}</div>
+    ${!hd&&NATIVE&&NATIVE.requestHealth?`<div class="small muted">Mit Schlaf und Ruhepuls aus Samsung Health wird der Check genauer: <button class="linkbtn" data-health="1">Health Connect verbinden</button></div>`:""}
+    ${ui.readyBusy?`<div class="small muted">Ich schaue mir deine Erholung an …</div>`:""}
+    ${res?`<div class="small">${esc(res.text)}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">${["light","normal","hard"].map(m=>`<button class="btn small ${m===res.mode?"":"ghost"}" data-ready="${m}">${READY_N[m]}${m===res.mode?" ✓":""}</button>`).join("")}</div>`:""}`}
+  </div>`;
+}
+/* Anpassung eines einzelnen Trainingstags (Check vor dem Training, Chat) */
+function adjustDay(s,dateIso){
+  const c=state.coach; if(!s||!c) return s;
+  const mode=(c.ready||{})[dateIso], skip=(c.skip||{})[dateIso]||[];
+  if(skip.length) s.items=s.items.filter(it=>!skip.includes(it.id));
+  if(mode==="light") s.items=s.items.map(it=>it.role==="cardio"?it:{...it,sets:it.sets>=3?it.sets-1:it.sets,rir:it.role==="core"?it.rir:"3"});
+  if(mode==="hard") s.items=s.items.map(it=>it.role==="main"?{...it,sets:Math.min(6,it.sets+1)}:it);
+  if(mode) s.ready=mode;
+  return s;
+}
+
+/* ---------- Trainingsblöcke: alle 6–8 Wochen neue Wiederholungsbereiche und Übungen ---------- */
+const BLOCK_REPS={hyper:[["6–10","10–15"],["4–6","8–12"],["8–12","12–20"]],kraft:[["3–5","6–10"],["2–4","5–8"],["4–6","8–12"]],
+  fett:[["6–10","10–15"],["8–12","12–15"],["5–8","10–12"]],ausd:[["5–8","10–15"],["8–12","15–20"],["4–6","10–12"]],fit:[["8–12","10–15"],["6–10","12–15"],["10–15","15–20"]]};
+const blockOf=()=>C().block||{n:1,start:state.profile.start};
+const okReps=r=>{const m=/^(\d{1,2})–(\d{1,2})$/.exec(String(r||"")); return m&&+m[1]>=2&&+m[2]<=30&&+m[1]<+m[2]};
+function blockWeeks(){return Math.floor(daysAgo(blockOf().start)/7)}
+function blockRule(){
+  const p=state.profile, b=blockOf(), L=BLOCK_REPS[p.goal]||BLOCK_REPS.hyper, [m,a]=L[b.n%L.length], ids=planIds(), used=new Set(ids.keys()), swaps=[];
+  // Übungen ohne Fortschritt über den Block gegen ähnliche tauschen
+  for(const [id] of ids){if(swaps.length>=3) break; const h=exHist(id).filter(([d])=>d>=b.start); if(h.length<3) continue;
+    const e=h.map(([d,x])=>exBest(id,x.sets[id])); if(e[e.length-1]<=e[0]*1.01){const to=altFor(id,used); if(to){used.add(to); swaps.push({from:id,to})}}}
+  return {title:m==="4–6"||m==="2–4"||m==="3–5"?"Kraftblock":m==="8–12"||m==="10–15"?"Volumenblock":"Aufbaublock",why:`Neue Wiederholungsbereiche geben einen frischen Reiz: Hauptübungen ${m}, Ergänzungen ${a}.${swaps.length?" Übungen ohne Fortschritt im letzten Block werden getauscht.":""}`,main:m,acc:a,swaps};
+}
+const BLOCK_SYS=`Du bist der persönliche Trainer in der App 4peak und planst den nächsten Trainingsblock (6–8 Wochen). Du bekommst die Daten der Person (Profil, Verlauf pro Übung im letzten Block, mögliche Tauschübungen, aktueller Block mit Wiederholungsbereichen).
+Wähle nach anerkannter Periodisierung neue Wiederholungsbereiche für Haupt- und Ergänzungsübungen (passend zum Ziel) und tausche höchstens 4 Übungen, vor allem solche ohne Fortschritt. Begründe kurz mit den Zahlen. Deutsch (Schweiz, ohne ß), per du.
+Antworte nur mit JSON: {"title":"kurzer Name des Blocks","why":"2–3 Sätze","main":"z.B. 4–6","acc":"z.B. 8–12","swaps":[{"from":"<id im Plan>","to":"<id aus moegliche_tauschuebungen>"}]}`;
+async function blockPlan(){
+  const c=C(); ui.blockProp={...blockRule(),src:"regel"}; ui.blockBusy=c.on&&c.ai!==false&&aiAvail(); render();
+  if(!ui.blockBusy) return;
+  try{const b=blockOf(), d=coachData(); d.aktueller_block={nr:b.n,seit:b.start,wochen:blockWeeks(),haupt:b.main||null,ergaenzung:b.acc||null,titel:b.title||null};
+    const r=await aiAsk(JSON.stringify(d),BLOCK_SYS), ids=planIds();
+    if(r&&okReps(r.main)&&okReps(r.acc)){const used=new Set(ids.keys());
+      const swaps=(Array.isArray(r.swaps)?r.swaps:[]).filter(s=>s&&ids.has(s.from)&&EX[s.to]&&!EX[s.to].del&&!used.has(s.to)&&gearOk(s.to)&&(used.add(s.to),true)).slice(0,4);
+      ui.blockProp={title:String(r.title||"Neuer Block").slice(0,60),why:String(r.why||"").slice(0,500),main:r.main,acc:r.acc,swaps,src:"ki"}}}
+  catch(e){}
+  ui.blockBusy=false; render();
+}
+function blockApply(){
+  const c=C(), pr=ui.blockProp, b=blockOf(); if(!pr) return;
+  for(const s of pr.swaps) coachSwap(s.from,s.to);
+  for(const k of Object.keys(state.custom||{})) for(const x of state.custom[k]) if(x.role==="main"||x.role==="acc"){if(!isTimed(x.id,x.reps)) x.reps=x.role==="main"?pr.main:pr.acc}
+  c.block={n:(b.n||1)+1,start:todayIso,title:pr.title,main:pr.main,acc:pr.acc,why:pr.why};
+  ui.blockProp=null; c.msg=`Neuer Block gestartet: ${pr.title}`;
+}
+function blockHtml(){
+  const pr=ui.blockProp; if(!pr&&!ui.blockBusy) return "";
+  return `<div class="coachtip"><b>${ui.blockBusy?"Ich plane deinen nächsten Block …":`Vorschlag: ${esc(pr.title)}`}</b>
+    ${pr&&!ui.blockBusy?`<div class="small">${esc(pr.why)}</div>
+    <div class="small">Hauptübungen <b>${esc(pr.main)}</b> Wdh · Ergänzungen <b>${esc(pr.acc)}</b> Wdh${pr.swaps.length?`<br>Tausch: ${pr.swaps.map(s=>`${esc(EX[s.from].n)} → ${esc(EX[s.to].n)}`).join(", ")}`:""}</div>
+    <div class="row" style="gap:6px"><button class="btn small" data-blockdo="apply">Block starten</button><button class="btn ghost small" data-blockdo="cancel">Verwerfen</button></div>`:""}</div>`;
 }
 function exOptions(cur,cardio){
   const p=state.profile, prim=MUS[cur]?MUS[cur][0]:[];
@@ -2456,94 +2610,6 @@ function meter(label,val,goal,unit){
   return `<div class="stack" style="gap:4px"><div class="row" style="justify-content:space-between"><b>${label}</b><span class="mono">${fmt(val)} / ${fmt(goal)} ${unit}</span></div>
     <div class="progress"><span style="width:${pct}%"></span></div><div class="small muted">${goal-val>=0?`Noch ${fmt(goal-val)} ${unit}`:`${fmt(val-goal)} ${unit} über dem Ziel`}</div></div>`;
 }
-/* Essensvorschläge: Gerichte, die in Foren (team-andro, muscle-corps, r/gainitmeals u. a.) für Protein- und Kalorienziele empfohlen werden.
-   Nährwerte pro Portion aus Referenzwerten berechnet (k ≈ 4p + 4kh + 9f). */
-const MEALS=[
-{"id": "skyr-beeren", "n": "Skyr nature mit Beeren", "portion": "200 g Skyr nature + 100 g Beeren (TK)", "k": 170, "p": 23, "type": "snack", "veg": true, "hot": false, "min": 2, "tip": "Gefrorene Beeren einrühren – wird cremig wie Glace und hat kaum Kalorien.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "magerquark-beeren", "n": "Magerquark mit Beeren", "portion": "250 g Magerquark + 100 g Beeren + Süssstoff", "k": 210, "p": 31, "type": "snack", "veg": true, "hot": false, "min": 3, "tip": "Mit etwas Wasser oder Milch glatt rühren, dann schmeckt er fast wie Skyr und ist günstiger.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "huettenkaese-honig", "n": "Hüttenkäse mit Honig und Zimt", "portion": "200 g Hüttenkäse + 10 g Honig + Zimt", "k": 225, "p": 22, "type": "snack", "veg": true, "hot": false, "min": 1, "tip": "Forum-Klassiker direkt aus dem Becher, mit Zimt oder Kakao variieren.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "reiswaffeln-huettenkaese-schinken", "n": "Reiswaffeln mit Hüttenkäse und Schinken", "portion": "2 Reiswaffeln (16 g) + 150 g Hüttenkäse + 30 g Kochschinken", "k": 240, "p": 24, "type": "snack", "veg": false, "hot": false, "min": 3, "tip": "Knuspriger Bürosnack; Hüttenkäse erst kurz vor dem Essen daraufstreichen.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "thon-reiswaffeln", "n": "Thon auf Reiswaffeln", "portion": "130 g Thon im eigenen Saft (abgetropft) + 3 Reiswaffeln (24 g) + Senf", "k": 235, "p": 36, "type": "snack", "veg": false, "hot": false, "min": 3, "tip": "Thon im eigenen Saft statt in Öl spart rund 150 kcal pro Dose.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "gekochte-eier", "n": "Hartgekochte Eier", "portion": "3 Eier Grösse M (ca. 165 g essbar)", "k": 235, "p": 21, "type": "snack", "veg": true, "hot": false, "min": 12, "tip": "Auf Vorrat kochen; mit Salz, Pfeffer oder Sriracha ein idealer Snack für unterwegs.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "proteinpudding", "n": "Proteinpudding", "portion": "1 Becher à 200 g (Kühlregal)", "k": 155, "p": 20, "type": "snack", "veg": true, "hot": false, "min": 0, "tip": "Fertig aus dem Kühlregal oder selbst aus Whey und Magerquark angerührt.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "trockenfleisch", "n": "Trockenfleisch (Bündnerfleisch oder Beef Jerky)", "portion": "50 g", "k": 95, "p": 19, "type": "snack", "veg": false, "hot": false, "min": 0, "tip": "Fast reines Protein ohne Kühlung, ideal für den Rucksack; Jerky enthält oft mehr Zucker.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "edamame", "n": "Edamame mit Meersalz", "portion": "150 g geschälte Edamame (TK), gekocht", "k": 185, "p": 18, "type": "snack", "veg": true, "hot": true, "min": 5, "tip": "Aus dem Tiefkühler kurz kochen und salzen; sättigt dank Nahrungsfasern lange.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "whey-shake-milch", "n": "Whey-Shake mit Milch", "portion": "30 g Whey + 250 ml Milch (1.5 %)", "k": 240, "p": 32, "type": "snack", "veg": true, "hot": false, "min": 1, "tip": "Die einfachste Art, am Abend die Proteinlücke zu schliessen.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "kraeuterquark-gemuesesticks", "n": "Kräuterquark-Dip mit Gemüsesticks", "portion": "200 g Magerquark mit Kräutern + 200 g Rüebli, Peperoni, Gurke", "k": 185, "p": 26, "type": "snack", "veg": true, "hot": false, "min": 7, "tip": "Quark mit Schnittlauch, Salz und Knoblauch würzen; knackig und mit viel Volumen.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "poulet-aufschnitt-roellchen", "n": "Pouletbrust-Röllchen mit Gurke", "portion": "100 g Pouletbrust-Aufschnitt + 100 g Gurke", "k": 120, "p": 22, "type": "snack", "veg": false, "hot": false, "min": 3, "tip": "Aufschnitt um Gurkenstreifen wickeln; viel Protein für sehr wenig Kalorien.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "proteinriegel", "n": "Proteinriegel", "portion": "1 Riegel (60 g)", "k": 215, "p": 20, "type": "snack", "veg": true, "hot": false, "min": 0, "tip": "Praktischer Notfall-Snack; selbstgebackene Riegel sind laut Forum deutlich günstiger.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "raeucherlachs-knaeckebrot", "n": "Räucherlachs auf Knäckebrot", "portion": "50 g Räucherlachs + 2 Scheiben Knäckebrot (20 g) + 20 g Frischkäse light", "k": 185, "p": 15, "type": "snack", "veg": false, "hot": false, "min": 3, "tip": "Liefert Omega-3 und Protein, schnell gemacht und sättigend.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "mozzarella-light-tomate", "n": "Mozzarella light mit Tomaten", "portion": "125 g Mozzarella light + 150 g Tomaten + Basilikum", "k": 225, "p": 24, "type": "snack", "veg": true, "hot": false, "min": 3, "tip": "Leichte Caprese: Light-Mozzarella hat fast doppelt so viel Protein wie Fett.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "erdnussbutter-bananen-shake", "n": "Erdnussbutter-Bananen-Shake", "portion": "400 ml Vollmilch + 1 Banane (120 g) + 30 g Erdnussbutter + 30 g Whey + 40 g Haferflocken", "k": 815, "p": 51, "type": "snack", "veg": true, "hot": false, "min": 3, "tip": "Flüssige Kalorien sind beim Zunehmen am einfachsten; mit mehr Milch wird er dünner.", "src": "https://lr.us.psf.lt/r/gainitmeals/comments/1hxnvs3/smooth_gainer_shake"},
-{"id": "studentenfutter", "n": "Studentenfutter", "portion": "60 g Nussmischung + 30 g Rosinen", "k": 455, "p": 13, "type": "snack", "veg": true, "hot": false, "min": 0, "tip": "Kaloriendicht und ohne Zubereitung; gut zum Zunehmen, in der Diät klein portionieren.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "overnight-oats-whey", "n": "Overnight Oats mit Whey", "portion": "60 g Haferflocken + 30 g Whey + 200 ml Milch (1.5 %) + 10 g Chiasamen + 80 g Beeren", "k": 520, "p": 42, "type": "breakfast", "veg": true, "hot": false, "min": 5, "tip": "Am Vorabend ins Glas schichten, morgens nur noch mitnehmen.", "src": "https://www.teamblind.com/post/share-your-high-protein-meal-prep-recipes-v4h8auog"},
-{"id": "quark-bowl", "n": "Quark-Bowl mit Haferflocken, Beeren und Mandeln", "portion": "250 g Magerquark + 40 g Haferflocken + 100 g Beeren + 15 g Mandeln", "k": 450, "p": 39, "type": "breakfast", "veg": true, "hot": false, "min": 5, "tip": "Süsses Budget-Frühstück mit fast 40 g Protein, in fünf Minuten bereit.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "ruehrei-schinken-vollkornbrot", "n": "Rührei mit Gemüse, Schinken und Vollkornbrot", "portion": "3 Eier + 50 g Kochschinken + 100 g Tomaten/Champignons + 1 Scheibe Vollkornbrot (50 g)", "k": 420, "p": 37, "type": "breakfast", "veg": false, "hot": true, "min": 10, "tip": "In beschichteter Pfanne ohne Öl braten, das spart Kalorien.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "eiweiss-omelett-spinat", "n": "Eiweiss-Omelett mit Spinat", "portion": "250 g Eiklar (Packung) + 1 Ei + 100 g Spinat/Peperoni + 30 g Hüttenkäse", "k": 250, "p": 39, "type": "breakfast", "veg": true, "hot": true, "min": 10, "tip": "Flüssiges Eiklar plus ein ganzes Ei für den Geschmack: viel Volumen, wenig Kalorien.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "protein-pancakes", "n": "Protein-Pancakes mit Haferflocken", "portion": "50 g Haferflocken + 150 g Eiklar + 15 g Whey + Zimt + 100 g TK-Beeren", "k": 365, "p": 36, "type": "breakfast", "veg": true, "hot": true, "min": 15, "tip": "Haferflocken mit Eiklar mixen, kleine Pancakes braten und mit warmen Beeren toppen.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "protein-porridge-banane", "n": "Protein-Porridge mit Banane", "portion": "60 g Haferflocken + 250 ml Milch (1.5 %) + 30 g Whey + 1 Banane (100 g)", "k": 550, "p": 42, "type": "breakfast", "veg": true, "hot": true, "min": 7, "tip": "Whey erst nach dem Kochen einrühren, sonst klumpt es.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "vollkornbrot-huettenkaese-lachs", "n": "Vollkornbrot mit Hüttenkäse und Räucherlachs", "portion": "2 Scheiben Vollkornbrot (100 g) + 100 g Hüttenkäse + 50 g Räucherlachs", "k": 405, "p": 30, "type": "breakfast", "veg": false, "hot": false, "min": 5, "tip": "Hüttenkäse statt Butter als Aufstrich spart Fett und bringt Protein.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "skyr-birchermueesli", "n": "Skyr-Birchermüesli", "portion": "200 g Skyr + 40 g ungezuckertes Müesli + 1 Apfel (150 g), geraffelt", "k": 355, "p": 26, "type": "breakfast", "veg": true, "hot": false, "min": 5, "tip": "Schweizer Klassiker in Proteinversion: über Nacht quellen lassen, Apfel frisch raffeln.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "breakfast-burrito", "n": "Breakfast-Burrito mit Ei und Salsa", "portion": "1 Weizentortilla (60 g) + 2 Eier + 100 g Eiklar + 20 g geriebener Mozzarella + 30 g Salsa", "k": 465, "p": 35, "type": "breakfast", "veg": true, "hot": true, "min": 10, "tip": "Auf Vorrat rollen und einfrieren, morgens nur aufwärmen.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "haferbrei-erdnussbutter-banane", "n": "Haferbrei mit Erdnussbutter und Banane", "portion": "80 g Haferflocken + 300 ml Vollmilch + 20 g Erdnussbutter + 1 Banane (120 g)", "k": 720, "p": 27, "type": "breakfast", "veg": true, "hot": true, "min": 7, "tip": "Kaloriendichtes Zunehm-Frühstück; Erdnussbutter erst am Schluss einrühren.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "ei-muffins", "n": "Ei-Muffins mit Gemüse und Schinken", "portion": "4 Eier + 100 g Eiklar + 150 g Gemüse + 30 g Kochschinken (ergibt 6 Muffins)", "k": 430, "p": 47, "type": "breakfast", "veg": false, "hot": true, "min": 30, "tip": "Im Muffinblech backen und für mehrere Tage vorbereiten; kalt oder aufgewärmt essen.", "src": "https://forums.anandtech.com/threads/high-protein-breakfast-and-snack-ideas.2352584"},
-{"id": "poulet-reis-broccoli", "n": "Poulet mit Reis und Broccoli", "portion": "150 g Pouletbrust (roh) + 75 g Reis (roh) + 200 g Broccoli + 5 g Öl", "k": 545, "p": 46, "type": "meal", "veg": false, "hot": true, "min": 25, "tip": "Der Meal-Prep-Klassiker; mit Gewürzen und Saucen variieren, damit er nicht langweilig wird.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "truten-chili", "n": "Truten-Chili mit Kidneybohnen", "portion": "150 g Trutenhackfleisch + 100 g Kidneybohnen + 200 g gehackte Tomaten + 50 g Mais + 100 g Zwiebel/Peperoni + 5 g Öl", "k": 445, "p": 43, "type": "meal", "veg": false, "hot": true, "min": 35, "tip": "Grosse Pfanne kochen und portionenweise einfrieren; aufgewärmt schmeckt es noch besser.", "src": "https://www.teamblind.com/post/share-your-high-protein-meal-prep-recipes-v4h8auog"},
-{"id": "rindshack-burrito-bowl", "n": "Burrito-Bowl mit magerem Rindshack", "portion": "150 g Rindshackfleisch (5 % Fett) + 70 g Reis (roh) + 80 g Kidneybohnen + 50 g Mais + 50 g Salsa + 50 g Peperoni", "k": 600, "p": 45, "type": "meal", "veg": false, "hot": true, "min": 25, "tip": "Hack mit Taco-Gewürz, Bohnen und Peperoni anbraten; passt für Bowls, Wraps und Tacos.", "src": "https://www.teamblind.com/post/share-your-high-protein-meal-prep-recipes-v4h8auog"},
-{"id": "lachs-kartoffeln-spinat", "n": "Lachs mit Kartoffeln und Spinat", "portion": "150 g Lachsfilet + 300 g Kartoffeln + 200 g Blattspinat", "k": 575, "p": 42, "type": "meal", "veg": false, "hot": true, "min": 30, "tip": "Lachs im Ofen garen, Kartoffeln parallel kochen; liefert Protein und Omega-3.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "linsen-dal-reis", "n": "Rote-Linsen-Dal mit Reis", "portion": "80 g rote Linsen (roh) + 50 g Reis (roh) + 200 g gehackte Tomaten + 50 ml Kokosmilch light + Zwiebel + 5 g Öl", "k": 615, "p": 25, "type": "meal", "veg": true, "hot": true, "min": 30, "tip": "Günstige vegetarische Proteinquelle; mit einem Klecks Skyr servieren für mehr Protein.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "tofu-gemuese-wok", "n": "Tofu-Gemüse-Wok mit Reis", "portion": "200 g Tofu nature + 300 g Wokgemüse + 60 g Reis (roh) + 15 ml Sojasauce + 5 g Sesamöl", "k": 615, "p": 37, "type": "meal", "veg": true, "hot": true, "min": 20, "tip": "Tofu gut abtropfen und knusprig anbraten, bevor das Gemüse dazukommt.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "thon-vollkornpasta", "n": "Vollkornpasta mit Thon und Tomatensauce", "portion": "100 g Vollkornpasta (roh) + 130 g Thon (abgetropft) + 200 g passierte Tomaten + 5 g Olivenöl + Zwiebel", "k": 620, "p": 50, "type": "meal", "veg": false, "hot": true, "min": 15, "tip": "Schnelles Studentenessen; Thon erst am Schluss in die Sauce geben.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "linsenpasta-mozzarella", "n": "Linsenpasta mit Tomatensauce und Mozzarella light", "portion": "100 g Linsenpasta (roh) + 200 g passierte Tomaten + 125 g Mozzarella light", "k": 580, "p": 51, "type": "meal", "veg": true, "hot": true, "min": 15, "tip": "Linsennudeln haben fast doppelt so viel Protein wie normale Pasta.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "spaghetti-bolognese-mager", "n": "Spaghetti Bolognese mit magerem Rindshack", "portion": "100 g Spaghetti (roh) + 125 g Rindshack (5 % Fett) + 200 g passierte Tomaten + 50 g Rüebli/Zwiebel", "k": 605, "p": 42, "type": "meal", "veg": false, "hot": true, "min": 30, "tip": "Mageres Rindshack statt gemischtem Hack spart viel Fett bei gleichem Geschmack.", "src": "https://www.teamblind.com/post/share-your-high-protein-meal-prep-recipes-v4h8auog"},
-{"id": "poulet-wrap", "n": "Poulet-Wrap", "portion": "1 Vollkorn-Tortilla (60 g) + 120 g gegarte Pouletbrust + 30 g Hüttenkäse + 80 g Salat/Tomate", "k": 435, "p": 46, "type": "meal", "veg": false, "hot": false, "min": 10, "tip": "Mit vorgekochtem Poulet vom Meal-Prep schnell fertig, ideal fürs Büro.", "src": "https://www.teamblind.com/post/share-your-high-protein-meal-prep-recipes-v4h8auog"},
-{"id": "couscous-thon-salat", "n": "Couscous-Salat mit Thon", "portion": "70 g Couscous (roh) + 130 g Thon + 100 g Gurke + 100 g Peperoni + 5 g Olivenöl + Zitrone", "k": 485, "p": 44, "type": "meal", "veg": false, "hot": false, "min": 15, "tip": "Couscous nur mit heissem Wasser übergiessen; kalt gut transportierbar.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "salatbowl-poulet-ei-edamame", "n": "Salat-Bowl mit Poulet, Ei und Edamame", "portion": "100 g gegarte Pouletbrust + 1 Ei + 80 g Kidneybohnen + 60 g Edamame + 150 g Salat/Gemüse + 15 ml Dressing light", "k": 450, "p": 53, "type": "meal", "veg": false, "hot": false, "min": 10, "tip": "Wie die Supermarkt-Salatbowl, aber selbst gemacht günstiger und proteinreicher.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "poulet-geschnetzeltes-reis", "n": "Poulet-Geschnetzeltes mit Champignons und Reis", "portion": "150 g Pouletbrust + 150 g Champignons + 50 ml Halbrahm + 70 g Reis (roh)", "k": 570, "p": 46, "type": "meal", "veg": false, "hot": true, "min": 25, "tip": "Leichtes «Zürcher Geschnetzeltes»: Halbrahm sparsam, dafür viele Pilze.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "rindsplaetzli-suesskartoffel", "n": "Rindsplätzli mit Süsskartoffel und Bohnen", "portion": "150 g Rindsplätzli (mager) + 250 g Süsskartoffel + 150 g grüne Bohnen + 5 g Öl", "k": 490, "p": 40, "type": "meal", "veg": false, "hot": true, "min": 30, "tip": "Süsskartoffel im Ofen backen, Fleisch nur kurz scharf anbraten.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "gschwellti-kraeuterquark", "n": "Gschwellti mit Kräuterquark", "portion": "400 g Kartoffeln (Gschwellti) + 250 g Magerquark mit Kräutern", "k": 475, "p": 38, "type": "meal", "veg": true, "hot": true, "min": 30, "tip": "Schweizer Klassiker: Magerquark mit Schnittlauch liefert fast 40 g Protein bei kaum Fett.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "crevetten-reisnudeln", "n": "Crevetten-Gemüse-Pfanne mit Reisnudeln", "portion": "200 g Crevetten (roh, TK) + 70 g Reisnudeln + 250 g Wokgemüse + 5 g Öl + 15 ml Sojasauce", "k": 550, "p": 48, "type": "meal", "veg": false, "hot": true, "min": 20, "tip": "TK-Crevetten sind fast fettfrei und in wenigen Minuten gar.", "src": "https://forums.anandtech.com/threads/low-calorie-high-protein-foods.243734/post-26960297"},
-{"id": "chili-sin-carne-soja", "n": "Chili sin Carne mit Sojagranulat und Reis", "portion": "50 g Sojagranulat (trocken) + 150 g Kidneybohnen + 200 g Tomaten + 50 g Mais + 100 g Zwiebel/Peperoni + 5 g Öl + 50 g Reis (roh)", "k": 630, "p": 43, "type": "meal", "veg": true, "hot": true, "min": 30, "tip": "Sojagranulat in Gemüsebouillon einweichen; wird wie Hackfleisch und ist sehr günstig.", "src": "https://forum.muscle-corps.de/threads/proteinzufuhr-hinkriegen.8969/"},
-{"id": "lachs-poke-bowl", "n": "Lachs-Poke-Bowl", "portion": "120 g gegarter Lachs + 60 g Reis (roh) + 80 g Edamame + 100 g Gurke + 15 ml Sojasauce", "k": 570, "p": 40, "type": "meal", "veg": false, "hot": false, "min": 20, "tip": "Reis und Lachs vorkochen und kalt in der Bowl anrichten, ideal für unterwegs.", "src": "https://forums.anandtech.com/threads/low-calorie-high-protein-foods.243734/post-26960297"},
-{"id": "poulet-ofenblech", "n": "Poulet-Ofengemüse-Blech mit Kartoffeln", "portion": "150 g Pouletbrust + 250 g Kartoffeln + 300 g Ofengemüse + 10 g Olivenöl", "k": 540, "p": 44, "type": "meal", "veg": false, "hot": true, "min": 40, "tip": "Alles auf ein Blech und 30 Minuten in den Ofen; wenig Abwasch, gut vorzubereiten.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "truten-burger", "n": "Truten-Burger im Vollkornbrötchen", "portion": "150 g Trutenhackfleisch + 1 Vollkornbrötchen (70 g) + 20 g Käse light + Salat/Tomate + 20 g Burgersauce light", "k": 450, "p": 44, "type": "meal", "veg": false, "hot": true, "min": 20, "tip": "Selbstgemachte Burger sind die beste Fast-Food-Alternative in der Diät.", "src": "https://forum.muscle-corps.de/threads/snacks.1818/"},
-{"id": "poulet-curry-reis", "n": "Poulet-Curry mit Reis", "portion": "150 g Pouletbrust + 100 ml Kokosmilch light + 150 g Gemüse + 15 g Currypaste + 70 g Reis (roh)", "k": 545, "p": 43, "type": "meal", "veg": false, "hot": true, "min": 25, "tip": "Kokosmilch light statt normaler spart rund 100 kcal pro Portion.", "src": "https://www.team-andro.com/kraftsportgerechte-ernaehrung-studenten-geringverdiener.html"},
-{"id": "thon-huettenkaese-brot", "n": "Thon-Hüttenkäse mit Vollkornbrot", "portion": "130 g Thon + 200 g Hüttenkäse + 150 g Gurke/Tomate + 2 Scheiben Vollkornbrot (100 g)", "k": 585, "p": 65, "type": "meal", "veg": false, "hot": false, "min": 5, "tip": "Thon mit Hüttenkäse vermischen, würzen und aufs Brot; über 60 g Protein ohne Kochen.", "src": "https://www.team-andro.com/phpBB3/alternative-huettenkaese-thunfisch-t171544.html"},
-{"id": "hackfleisch-ei-burrito", "n": "Hackfleisch-Ei-Burrito", "portion": "2 Tortillas (120 g) + 125 g Rindshack (15 % Fett) + 2 Eier + 30 g Reibkäse + 50 g Salsa", "k": 940, "p": 56, "type": "meal", "veg": false, "hot": true, "min": 15, "tip": "Günstige Kalorienbombe: Hack und Eier zusammen anbraten und in Tortillas rollen.", "src": "https://forums.anandtech.com/threads/cheapest-way-to-gain-weight.2208950/post-32632859"}];
-const MEAL_TYPE={snack:"Snack",breakfast:"Frühstück",meal:"Hauptgericht"};
-function mealSuggest(remK,remP,day){
-  const F=state.mealF||{}, hr=new Date().getHours(), now=day===todayIso;
-  let pool=MEALS.filter(m=>(!F.temp||(F.temp==="warm")===m.hot)&&(!F.ease||(F.ease==="easy")===(m.min<=15)));
-  if(!pool.length) return [];
-  // Welche Art passt zur Tageszeit und zur Menge, die noch fehlt?
-  const want=remK<350?"snack":now&&hr<10?"breakfast":now&&(hr>=11&&hr<14||hr>=17&&hr<21)?"meal":remK>=700?"meal":"snack";
-  const ratio=remP>0?Math.min(.2,Math.max(.075,remP/Math.max(remK,150))):0;
-  const sc=m=>{let s=-Math.abs(m.p/m.k-ratio)*120;
-    if(m.type===want) s+=4; else if(want==="meal"&&m.type==="breakfast"&&!now) s+=2;
-    if(m.k>remK+60) s-=(m.k-remK)/40; if(remK<=80) s+=m.p/m.k*60;
-    if(m.p>remP+25&&remP>0) s-=1; return s};
-  return pool.map(m=>({m,s:sc(m)})).sort((a,b)=>b.s-a.s).map(x=>x.m);
-}
-function mealHtml(day,kcal,prot,T){
-  const remK=T.kcal-kcal, remP=T.prot-prot, F=state.mealF||{};
-  const chip=(k,v,l)=>`<button class="chip${(F[k]||"")===v?" on":""}" data-mealf="${k}:${v}">${l}</button>`;
-  let body;
-  if(remK<80&&remP<8) body=`<p class="small muted" style="margin:0">Für ${day===todayIso?"heute":"diesen Tag"} hast du dein Ziel erreicht. 🎉</p>`;
-  else{
-    const all=mealSuggest(remK,remP,day), n=Math.min(all.length,12), off=n?(ui.mealOff||0)%n:0, top=[0,1,2].filter(i=>i<n).map(i=>all[(off+i)%n]);
-    body=top.length?`<div class="stack" style="gap:10px">${top.map(m=>`<div class="meal">
-        <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:10px"><div style="min-width:0"><b>${esc(m.n)}</b><div class="small muted">${esc(m.portion)}</div></div><button class="btn" data-meal="${m.id}" style="flex:none">Eintragen</button></div>
-        <div class="row small" style="gap:6px"><span class="pill">${m.k} kcal</span><span class="pill">${m.p} g Protein</span><span class="pill">${m.hot?"warm":"kalt"}</span><span class="pill">${m.min?`${m.min} min`:"sofort"}</span>${m.veg?`<span class="pill">vegetarisch</span>`:""}</div>
-        <div class="small muted">${esc(m.tip)} <a href="${esc(m.src)}" target="_blank" rel="noopener">Quelle</a></div></div>`).join("")}</div>
-      ${n>3?`<button class="btn ghost" data-mealmore="1">Andere Vorschläge</button>`:""}`
-      :`<p class="small muted" style="margin:0">Mit diesen Filtern gibt es keinen Vorschlag.</p>`;
-  }
-  return `<section class="panel stack" id="meals"><div class="row" style="justify-content:space-between;align-items:baseline"><h3>Was passt noch?</h3><span class="small muted">${remK>0?`noch ${fmt(remK)} kcal`:"Kalorien erreicht"} · ${remP>0?`${fmt(remP)} g Protein`:"Protein erreicht"}</span></div>
-    <div class="row" style="gap:6px">${chip("temp","kalt","Kalt")}${chip("temp","warm","Warm")}${chip("ease","easy","Einfach")}${chip("ease","hard","Aufwändig")}</div>
-    ${body}
-    <p class="small muted" style="margin:0">Filter antippen zum Ein- und Ausschalten. Einfach heisst höchstens 15 Minuten. Die Gerichte stammen aus Fitness-Foren, die Nährwerte sind gerundete Schätzungen pro Portion.</p>
-  </section>`;
-}
 function viewErnaehrung(){
   const p=state.profile, T=targets(p), day=ui.foodDay, list=state.food[day]||[], dd=parseIso(day);
   const kcal=list.reduce((a,x)=>a+x.k,0), prot=list.reduce((a,x)=>a+x.p,0);
@@ -2580,7 +2646,7 @@ function viewErnaehrung(){
       </form>
       <p class="small muted" style="margin:0">Beim Tippen erscheinen passende Lebensmittel; nach der Auswahl rechnen sich kcal und Makronährstoffe aus der Menge. Die Werte pro 100 g sind gerundete Durchschnittswerte, eigene Einträge gehen weiterhin.${NATIVE&&NATIVE.scanBarcode?"":" Der Barcode-Scanner funktioniert in der Android-App."}</p>
     </section>
-    ${mealHtml(day,kcal,prot,T)}
+    ${C().on&&C().ai!==false&&aiAvail()?`<section class="panel"><button class="linkbtn" data-askmeal="1">Was soll ich ${day===todayIso?"heute":"an diesem Tag"} noch essen? Frag deinen Trainer</button></section>`:""}
     ${macroHtml(T,p)}
   </div>`;
 }
@@ -2726,7 +2792,7 @@ function go(tab){if(tab==="wear") askWatch(); if(tab!==ui.tab){(ui.hist||(ui.his
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-mealf],[data-mealmore],[data-meal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
@@ -2761,6 +2827,14 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.editcancel){const d=ui.run.date; ui.run=null; ui.sel=d; go("kalender"); return}
   if(t.dataset.coachdo){const tip=coachList().find(x=>x.id===t.dataset.coachdo); if(!tip||!tip.a) return; ui.coachGo=null; tip.a.f();
     state.coach.hide[tip.id]=todayIso; state.coach.msg=ui.coachGo?"":`Übernommen: ${tip.a.l}`; save(); if(ui.coachGo) go(ui.coachGo); else render(); return}
+  if(t.dataset.askmeal){ui.chat=true; ui.chatDraft=`Ich habe ${ui.foodDay===todayIso?"heute":"am "+ui.foodDay} bisher ${Math.round(foodDay(ui.foodDay).k)} kcal und ${Math.round(foodDay(ui.foodDay).p)} g Protein. Was soll ich noch essen?`; go("kalender"); return}
+  if(t.dataset.chat){ui.chat=!ui.chat; render(); if(ui.chat){const b=document.getElementById("chatlog"); if(b) b.scrollTop=b.scrollHeight}; return}
+  if(t.dataset.chatsend){const i=document.getElementById("chatin"); chatSend(i&&i.value); return}
+  if(t.dataset.chatclear){state.coach.chat=[]; save(); render(); return}
+  if(t.dataset.chatdo){const [mi,j]=t.dataset.chatdo.split(":").map(Number), m=state.coach.chat[mi], x=m&&m.a&&aiAction(m.a[j]); if(!x) return; ui.coachGo=null; x.f(); state.coach.hide[`chat:${m.at}:${j}`]=todayIso; save(); if(ui.coachGo) go(ui.coachGo); else render(); return}
+  if(t.dataset.feel){const c=state.coach; c.feel[todayIso]=Number(t.dataset.feel); save(); readyAsk(); return}
+  if(t.dataset.ready){const c=state.coach; if(t.dataset.ready==="reset"){delete c.ready[todayIso]; c.readyRes=null} else if(t.dataset.ready==="normal") c.ready[todayIso]="normal"; else c.ready[todayIso]=t.dataset.ready; save(); render(); return}
+  if(t.dataset.blockdo){const a=t.dataset.blockdo; if(a==="plan") blockPlan(); else {if(a==="apply") blockApply(); else ui.blockProp=null; save(); render()} return}
   if(t.dataset.coachhide){state.coach.hide[t.dataset.coachhide]=todayIso; state.coach.msg=""; save(); render(); return}
   if(t.dataset.coach){const a=t.dataset.coach; if(a==="airefresh"){aiRefresh(true); return} if(a==="off") state.coach.on=false; if(a==="kcalreset") state.coach.kcalAdj=0; if(a==="deloadreset") state.coach.deload=null; save(); render(); return}
   if(t.dataset.rhold){const [i,k]=t.dataset.rhold.split(":").map(Number), H=ui.hold;
@@ -2813,9 +2887,6 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.finish){finishRun(); render(); return}
   if(t.dataset.closesum){ui.summary=null; render(); return}
   if(t.dataset.fday){const d=parseIso(ui.foodDay); d.setDate(d.getDate()+Number(t.dataset.fday)); ui.foodDay=iso(d); render(); return}
-  if(t.dataset.mealf){const [k,v]=t.dataset.mealf.split(":"), cur=(state.mealF||{})[k]; state.mealF=Object.assign({},state.mealF,{[k]:cur===v?"":v}); ui.mealOff=0; save(); render(); return}
-  if(t.dataset.mealmore){ui.mealOff=(ui.mealOff||0)+3; render(); return}
-  if(t.dataset.meal){const m=MEALS.find(x=>x.id===t.dataset.meal); if(m){(state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:m.n.slice(0,60),k:m.k,p:m.p}); ui.mealOff=0; save(); render()} return}
   if(t.dataset.fdel){(state.food[ui.foodDay]||[]).splice(Number(t.dataset.fdel),1); save(); render(); return}
   if(t.dataset.day){ui.sel=t.dataset.day; render()}
   else if(t.dataset.mon){ui.month=new Date(ui.month.getFullYear(),ui.month.getMonth()+Number(t.dataset.mon),1); render()}
@@ -2859,6 +2930,7 @@ document.addEventListener("click",e=>{
 document.getElementById("view").addEventListener("input",e=>{
   if(e.target.dataset.rv&&ui.run){setTimeout(persistRun,0); const [i,k,f]=e.target.dataset.rv.split(":"), y=ui.run.rows[i].sets[k]; y[f]=e.target.value===""?"":Number(e.target.value); if(f==="w"&&y.w!==""){ui.run.rows[i].sets.forEach((x,j)=>{if(j>Number(k)&&!x.done&&x.t!=="w"&&(x.w===""||x.auto)){x.w=y.w; x.auto=true; const el=document.querySelector(`[data-rv="${i}:${j}:w"]`); if(el) el.value=y.w}})} if(f==="w") delete y.auto; if(f==="l"||f==="rr") y.r=Math.min(Number(y.l)||0,Number(y.rr)||0);
     const pl=document.getElementById("pl-"+i); if(pl&&f==="w"&&ui.run.rows[i].sets.find(x=>!x.done)===y) pl.innerHTML=plateTxt(y.w); return}
+  if(e.target.id==="chatin"){ui.chatDraft=e.target.value; return}
   if(e.target.id==="fn"){ui.f100=null; showFoodSug(); return}
   if(e.target.id==="fg"){foodCalc(); return}
   if(e.target.id==="sg"&&ui.scan){const g=Number(e.target.value)||0, s2=ui.scan, el=document.getElementById("scanprev"); if(el) el.textContent=scanPrev(s2,g); return}
