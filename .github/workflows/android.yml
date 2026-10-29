@@ -46,12 +46,15 @@ jobs:
         with:
           gradle-version: "8.11.1"
       - name: Bildschirmfotos erzeugen
-        run: gradle :wear:testDebugUnitTest --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle :wear:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee gradle.log
       - name: Fehlerbericht sichern
         if: failure()
         run: |
           mkdir -p shots
           find wear/build/test-results -name "*.xml" -exec cp {} shots/ \; || true
+          grep -E "^e: |error:|FAILED|Exception|Caused by" gradle.log | head -80 > shots/fehler.txt || true
       - name: In Branch screens ablegen
         if: always()
         run: |
