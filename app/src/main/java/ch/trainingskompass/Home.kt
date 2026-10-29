@@ -23,7 +23,7 @@ import java.util.Locale
 
 /**
  * Daten für Widget und Erinnerungen. Die Seite schickt sie bei jeder Änderung über TKNative.setHome:
- * {days:[{date,name,n,done}], supps:{datum:[Namen]}, remind:{train:{on,t}, supp:{on,t}}}
+ * {days:[{date,name,n,done}], supps:{datum:[Namen]}, food:{datum:{n,k}}, kcalGoal, remind:{train:{on,t}, supp:{on,t}, food:{on,t}}}
  */
 object HomeStore {
     private const val PREFS = "home"
@@ -69,7 +69,7 @@ object HomeStore {
 object Reminders {
     const val CHANNEL = "erinnerungen"
     const val EXTRA_START = "start"
-    private val TYPES = listOf("train", "supp")
+    private val TYPES = listOf("train", "supp", "food")
 
     fun reschedule(ctx: Context) {
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return
@@ -139,6 +139,16 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             "supp" -> HomeStore.supps(data, today).takeIf { it.isNotEmpty() }?.let { names ->
                 Reminders.notify(ctx, 2, "Supplements für heute", names.joinToString(", "), Reminders.openApp(ctx, null, 2))
+            }
+            // Trainer-Modus: abends erinnern, wenn heute kaum etwas eingetragen ist
+            "food" -> {
+                val goal = data.optInt("kcalGoal")
+                val k = data.optJSONObject("food")?.optJSONObject(today.toString())?.optDouble("k", 0.0) ?: 0.0
+                if (goal > 0 && k < goal * 0.6) Reminders.notify(
+                    ctx, 3, "Ernährung eintragen",
+                    if (k <= 0) "Heute ist noch nichts eingetragen." else "Erst ${k.toInt()} von $goal kcal eingetragen.",
+                    Reminders.openApp(ctx, null, 3),
+                )
             }
         }
         // Nach dem Neustart, einem Update oder einer Erinnerung den nächsten Termin planen.

@@ -363,6 +363,15 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             runOnUiThread { openBackupLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
         }
 
+        /** KI-Trainer: Antwort kommt über window.onAiResult(id, {text}|{error}) zurück */
+        @JavascriptInterface
+        fun aiAsk(id: String, key: String, system: String, user: String) {
+            lifecycleScope.launch {
+                val res = AiCoach.ask(key, system, user)
+                web.evaluateJavascript("window.onAiResult && window.onAiResult(${JSONObject.quote(id)}, ${JSONObject.quote(res.toString())})", null)
+            }
+        }
+
         @JavascriptInterface
         fun scanBarcode() {
             runOnUiThread { startBarcodeScan() }
