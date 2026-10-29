@@ -115,6 +115,8 @@ class Run(val session: Session) {
     var weight by mutableDoubleStateOf(0.0)
     var reps by mutableIntStateOf(10)
     var restUntil by mutableLongStateOf(0L)
+    /** Länge der laufenden Pause in ms, für den Ring am Rand */
+    var restLen by mutableLongStateOf(0L)
     /** Aufwärmen vor der ersten Übung: Timer, gewählte Arten, Dauer */
     var warmPhase by mutableStateOf(session.warm?.types?.isNotEmpty() == true)
     var warmMinutes by mutableIntStateOf(session.warm?.minutes?.takeIf { it > 0 } ?: 5)
@@ -149,6 +151,8 @@ class Run(val session: Session) {
     val items = mutableStateListOf<Item>().apply { addAll(session.items) }
     /** Liste zum Umsortieren ist offen */
     var picking by mutableStateOf(false)
+    /** Zählt jede Änderung an den Sätzen hoch; die Uhr schickt dann den Stand ans Handy */
+    var version by mutableIntStateOf(0)
     /** Stoppuhr einer Halteübung: Startzeit, 0 = läuft nicht */
     var holdStart by mutableLongStateOf(0L)
     val startedAt = System.currentTimeMillis()
@@ -220,6 +224,7 @@ class Run(val session: Session) {
         if (inWarmSet) {
             // Aufwärmsatz: zählt nicht als Arbeitssatz, keine Pause
             logs.getOrPut(it.id) { mutableListOf() }.add(JSONObject().put("w", weight).put("r", reps).put("t", "w"))
+            version++
             warmIdx++
             val n = it.warmSets.getOrNull(warmIdx)
             weight = n?.first ?: it.weight
@@ -235,10 +240,11 @@ class Run(val session: Session) {
         if (it.timed) o.put("sec", 1)
         if (it.unilateral) o.put("l", reps).put("rr", reps)
         logs.getOrPut(it.id) { mutableListOf() }.add(o)
+        version++
         if (setNo >= it.sets) next()
         else {
             setNo++
-            if (it.restSec > 0) restUntil = System.currentTimeMillis() + it.restSec * 1000L
+            if (it.restSec > 0) { restLen = it.restSec * 1000L; restUntil = System.currentTimeMillis() + restLen }
         }
     }
 
@@ -246,6 +252,7 @@ class Run(val session: Session) {
         val it = item ?: return
         val min = ((System.currentTimeMillis() - itemStartedAt) / 60_000).coerceAtLeast(1)
         logs.getOrPut(it.id) { mutableListOf() }.add(JSONObject().put("w", 0).put("r", 0).put("min", min))
+        version++
         next()
     }
 
@@ -265,6 +272,37 @@ class Run(val session: Session) {
     fun end() {
         restUntil = 0
         index = items.size
+    }
+
+    private fun complete(x: Item): Boolean {
+        val l = logs[x.id].orEmpty()
+        return if (x.cardio) l.isNotEmpty() else l.count { !it.has("min") && it.optString("t") != "w" } >= x.sets
+    }
+
+    /**
+     * Sätze, die auf dem Handy eingetragen wurden, übernehmen: pro Übung gilt die längere Liste.
+     * Ist die aktuelle Übung damit fertig, springt die Uhr zur ersten offenen. Gibt true zurück, wenn sich etwas geändert hat.
+     */
+    fun merge(remote: JSONObject): Boolean {
+        var changed = false
+        for (id in remote.keys()) {
+            val a = remote.optJSONArray(id) ?: continue
+            val list = (0 until a.length()).mapNotNull { a.optJSONObject(it) }
+            if (list.size > logs[id].orEmpty().size) { logs[id] = list.toMutableList(); changed = true }
+        }
+        if (!changed) return false
+        if (warmPhase && logs.isNotEmpty()) endWarmup(true)
+        item?.let { cur -> if (complete(cur)) { val j = items.indexOfFirst { !complete(it) }; index = if (j < 0) items.size else j; restUntil = 0 } }
+        prepare()
+        version++
+        return true
+    }
+
+    /** Aktueller Stand fürs Handy */
+    fun liveJson(): JSONObject {
+        val sets = JSONObject()
+        logs.forEach { (id, list) -> sets.put(id, JSONArray(list)) }
+        return JSONObject().put("date", session.date).put("src", "watch").put("t", System.currentTimeMillis()).put("t0", startedAt).put("sets", sets)
     }
 
     fun toJson(hrAvg: Int, hrMax: Int, kcal: Int = 0): JSONObject {

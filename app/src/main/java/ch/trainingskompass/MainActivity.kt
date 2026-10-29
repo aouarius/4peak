@@ -25,6 +25,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
@@ -138,6 +139,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 override fun onPageFinished(view: WebView, url: String) {
                     pageReady = true
                     pullWatchLogs()
+                    pullLive()
                     deliverStart()
                 }
             }
@@ -181,6 +183,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         super.onResume()
         dataClient.addListener(this)
         pullWatchLogs()
+        pullLive()
         // Sport aus Samsung Health still nachladen, wenn Health Connect schon freigegeben ist
         lifecycleScope.launch { if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) deliverHealth() }
     }
@@ -197,6 +200,30 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onDataChanged(events: DataEventBuffer) {
         if (events.any { it.dataItem.uri.path?.startsWith(LOG_PATH) == true }) pullWatchLogs()
+        events.filter { it.type == DataEvent.TYPE_CHANGED && it.dataItem.uri.path == LIVE_WATCH }
+            .mapNotNull { DataMapItem.fromDataItem(it.dataItem).dataMap.getString("json") }
+            .lastOrNull()?.let { json -> runOnUiThread { deliverLive(json) } }
+    }
+
+    private fun deliverLive(json: String) {
+        if (!pageReady) return
+        web.evaluateJavascript("window.onWatchLive && window.onWatchLive(${JSONObject.quote(json)})", null)
+    }
+
+    /** Beim Öffnen: Läuft auf der Uhr ein Training, steigt die App auf dem gleichen Stand ein. */
+    private fun pullLive() {
+        if (!pageReady) return
+        lifecycleScope.launch {
+            val json = runCatching {
+                val buffer = dataClient.dataItems.await()
+                try {
+                    buffer.filter { it.uri.path == LIVE_WATCH }.mapNotNull { DataMapItem.fromDataItem(it).dataMap.getString("json") }.lastOrNull()
+                } finally {
+                    buffer.release()
+                }
+            }.getOrNull() ?: return@launch
+            deliverLive(json)
+        }
     }
 
     /** Holt alle von der Uhr gespeicherten Trainings, übergibt sie der Seite und löscht sie danach. */
@@ -268,6 +295,13 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 dataMap.putString("json", json)
                 dataMap.putLong("t", System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()
+            dataClient.putDataItem(request)
+        }
+
+        /** Laufendes Training an die Uhr: {date, t, t0, sets} oder {date, end:true} */
+        @JavascriptInterface
+        fun sendLive(json: String) {
+            val request = PutDataMapRequest.create(LIVE_PHONE).apply { dataMap.putString("json", json) }.asPutDataRequest().setUrgent()
             dataClient.putDataItem(request)
         }
 
@@ -396,5 +430,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         /** Von der Uhr-App angemeldet (wear/res/values/wear.xml) */
         const val WATCH_CAPABILITY = "fourpeak_watch"
         const val LOG_PATH = "/log/"
+        const val LIVE_WATCH = "/live/watch"
+        const val LIVE_PHONE = "/live/phone"
     }
 }

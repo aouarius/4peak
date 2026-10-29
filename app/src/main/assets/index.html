@@ -723,7 +723,40 @@ try{const t=localStorage.getItem(LS_KEY+".tab"); if(t) ui.tab=t;}catch(e){}
 const RUN_KEY=LS_KEY+".run";
 try{const r=JSON.parse(localStorage.getItem(RUN_KEY)||"null"); if(r&&r.date&&r.t0&&!r.edit&&Date.now()-r.t0<18*3600e3){ui.run=r; ui.tab="training"} else localStorage.removeItem(RUN_KEY)}catch(e){}
 let lastRunJ="";
-function persistRun(){try{if(!ui.run){if(lastRunJ){localStorage.removeItem(RUN_KEY); lastRunJ=""} return}
+/* ---------- Live-Abgleich mit der Uhr: gleiches Training, gleiche Sätze auf beiden Geräten ---------- */
+let liveJ="", liveDate=null;
+function liveSend(){
+  if(!(NATIVE&&NATIVE.sendLive)) return;
+  const r=ui.run;
+  if(!r||r.edit){ // Training auf dem Handy gespeichert: Uhr beendet ihres auch
+    if(liveDate&&state.done[liveDate]){try{NATIVE.sendLive(JSON.stringify({date:liveDate,src:"phone",t:Date.now(),end:true}))}catch(e){}}
+    liveDate=null; liveJ=""; return}
+  if(!r.rows) return;
+  const sets=runLogs(r), j=JSON.stringify([r.date,sets]); if(j===liveJ) return;
+  liveJ=j; liveDate=r.date;
+  try{NATIVE.sendLive(JSON.stringify({date:r.date,src:"phone",t:Date.now(),t0:r.t0,sets}))}catch(e){}
+}
+window.onWatchLive=function(json){
+  let x; try{x=typeof json==="string"?JSON.parse(json):json}catch(e){return}
+  if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date||"")||Date.now()-(Number(x.t)||0)>6*3600e3) return;
+  if(x.end){if(ui.run&&!ui.run.edit&&ui.run.date===x.date){ui.run=null; liveDate=null; liveJ=""; ui.sel=x.date; clearInterval(timerInt); timerInt=null; go(state.done[x.date]?"kalender":ui.tab)} return}
+  if(state.done[x.date]) return;
+  if(ui.run&&(ui.run.edit||ui.run.date!==x.date)) return;
+  if(!ui.run) startRun(x.date);
+  const r=ui.run; r.watch=true; if(x.t0&&x.t0<r.t0) r.t0=x.t0;
+  runInit(r,runSession(r));
+  let changed=false;
+  for(const [id,list] of Object.entries(x.sets||{})){
+    if(!Array.isArray(list)) continue;
+    let e=Object.entries(r.rows).find(([i,row])=>row.id===id&&!(r.del||{})[i]);
+    if(!e) continue;
+    const row=e[1], mine=row.sets.filter(y=>y.done).length; if(list.length<=mine) continue;
+    list.forEach((v,k)=>{const y=row.sets[k]||(row.sets[k]={}); Object.assign(y,v,{done:true})}); changed=true;
+  }
+  if(changed){liveJ=JSON.stringify([r.date,runLogs(r)]); const s=runSession(r); while(r.i<s.items.length&&itemLeft({...r,logs:runLogs(r)},s,r.i)<=0) r.i++}
+  persistRun(); if(ui.tab==="training") render(); else go("training");
+};
+function persistRun(){liveSend(); try{if(!ui.run){if(lastRunJ){localStorage.removeItem(RUN_KEY); lastRunJ=""} return}
   const j=JSON.stringify(ui.run,(k,v)=>k==="_s"?undefined:v); if(j!==lastRunJ){localStorage.setItem(RUN_KEY,j); lastRunJ=j}}catch(e){}}
 addEventListener("visibilitychange",persistRun); addEventListener("pagehide",persistRun);
 
@@ -2211,7 +2244,7 @@ function viewTraining(){
     </div>
     ${r.restUntil?`<div class="restbar" role="status"><span>Pause</span><b class="mono" id="timer">${durTxt((r.restUntil-Date.now())/1000)}</b>
       <button class="chip" data-rest="30">+30 s</button><button class="chip" data-rest="skip">Überspringen</button></div>`:""}
-    <div class="row runsub"><span class="muted small">${esc(s.name)} · ${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.</span>
+    <div class="row runsub"><span class="muted small">${esc(s.name)} · ${parseIso(r.date).getDate()}.${parseIso(r.date).getMonth()+1}.${r.watch?` · <span style="color:var(--accent)">⌚ läuft auch auf der Uhr</span>`:""}</span>
       ${r.edit?"":`<span class="row" style="gap:6px;margin-left:auto">${!hrOn&&HAS_BT()?`<button class="chip" id="btconnect">♥ Gurt verbinden</button>`:""}${musicHtml(s)}</span>`}</div>
     <div class="stack">
       ${r.edit?`<p class="small muted" style="margin:0 2px">Werte ändern, Häkchen setzen oder entfernen und dann speichern. Nur Sätze mit Häkchen werden gespeichert.</p>`:warmCardHtml(r)}
@@ -2293,7 +2326,7 @@ function runSuggest(r,s){
 function runLogs(r){
   const L={}, del=r.del||{}; for(const [i,x] of Object.entries(r.rows||{})) if(!del[i]) for(const y of x.sets) if(y.done){
     const o=y.min!=null?{w:0,r:0,min:Number(y.min)||0}:{w:Number(y.w)||0,r:Number(y.r)||0}; if(y.l!=null&&y.min==null){o.l=Number(y.l)||0; o.rr=Number(y.rr)||0; o.r=Math.min(o.l,o.rr)} if(y.t) o.t=y.t; if(y.sec&&y.min==null) o.sec=1;
-    (L[x.id]||(L[x.id]=[])).push(o)}
+    for(const k of ["ar","tp","sl","hr","ps"]) if(Number(y[k])) o[k]=Number(y[k]); (L[x.id]||(L[x.id]=[])).push(o)}
   return L;
 }
 /* Aufwärmen nach dem RAMP-Prinzip: locker steigern, dann die Muskeln und Gelenke der Einheit mobilisieren, dann Aufwärmsätze. */

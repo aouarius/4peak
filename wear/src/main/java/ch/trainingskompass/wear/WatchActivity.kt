@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,6 +56,8 @@ import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.CircularProgressIndicator
+import androidx.wear.compose.material.Colors
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Picker
@@ -69,6 +72,7 @@ import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import org.json.JSONObject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -174,6 +178,10 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 buffer.firstOrNull { it.uri.path == PLAN_PATH }
                     ?.let { DataMapItem.fromDataItem(it).dataMap.getString("json") }
                     ?.let { setPlan(it) }
+                // Läuft auf dem Handy gerade ein Training? Dann hier mitmachen.
+                buffer.filter { it.uri.path == LIVE_PHONE }
+                    .mapNotNull { DataMapItem.fromDataItem(it).dataMap.getString("json") }
+                    .forEach { applyLive(it) }
             } finally {
                 buffer.release()
             }
@@ -182,9 +190,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onDataChanged(events: DataEventBuffer) {
         for (e in events) {
-            if (e.type == DataEvent.TYPE_CHANGED && e.dataItem.uri.path == PLAN_PATH) {
+            if (e.type != DataEvent.TYPE_CHANGED) continue
+            val path = e.dataItem.uri.path
+            if (path == PLAN_PATH || path == LIVE_PHONE) {
                 val json = DataMapItem.fromDataItem(e.dataItem).dataMap.getString("json") ?: continue
-                runOnUiThread { setPlan(json) }
+                runOnUiThread { if (path == PLAN_PATH) setPlan(json) else applyLive(json) }
             }
         }
     }
@@ -194,6 +204,37 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         plan = p
         Store.savePlan(this, json)
         startPending()
+    }
+
+    // ---------- Live-Abgleich mit dem Handy ----------
+
+    /** Stand vom Handy: Training mitstarten, Sätze übernehmen oder beenden, wenn es dort gespeichert wurde. */
+    private fun applyLive(json: String) {
+        val o = runCatching { JSONObject(json) }.getOrNull() ?: return
+        val date = o.optString("date")
+        if (date.isEmpty() || System.currentTimeMillis() - o.optLong("t") > 6 * 3600_000L) return
+        val r = run
+        if (o.optBoolean("end")) {
+            if (r != null && r.session.date == date) {
+                doneDates = doneDates + date
+                Store.saveDone(this, doneDates)
+                closeRun()
+            }
+            return
+        }
+        if (date in doneDates) return
+        if (r == null) {
+            val s = plan?.sessions?.firstOrNull { it.date == date } ?: return
+            startRun(s)
+        }
+        val cur = run ?: return
+        if (cur.session.date != date) return
+        o.optJSONObject("sets")?.let { cur.merge(it) }
+    }
+
+    private suspend fun publishLive(o: JSONObject) {
+        val request = PutDataMapRequest.create(LIVE_WATCH).apply { dataMap.putString("json", o.toString()) }.asPutDataRequest().setUrgent()
+        runCatching { dataClient.putDataItem(request).await() }
     }
 
     // ---------- Training ----------
@@ -225,6 +266,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             dataMap.putString("json", json)
         }.asPutDataRequest().setUrgent()
         runCatching { dataClient.putDataItem(request).await() }
+        publishLive(JSONObject().put("date", r.session.date).put("src", "watch").put("t", System.currentTimeMillis()).put("end", true))
         doneDates = doneDates + r.session.date
         Store.saveDone(this, doneDates)
     }
@@ -241,11 +283,42 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     // ---------- Oberfläche ----------
 
+    /** 4peak-Farben: Lila wie im Logo, Türkis für Puls und Pausen, dunkle Flächen fürs runde OLED-Display */
+    private val brand = Colors(
+        primary = Color(0xFFB45CFF),
+        primaryVariant = Color(0xFF7B2FE0),
+        secondary = Color(0xFF3DE0D0),
+        secondaryVariant = Color(0xFF1FA89C),
+        background = Color.Black,
+        surface = Color(0xFF221A2E),
+        onPrimary = Color.White,
+        onSecondary = Color.Black,
+        onBackground = Color.White,
+        onSurface = Color.White,
+        onSurfaceVariant = Color(0xFFB9AFC9),
+    )
+
+    /** Ring am Displayrand, oben offen für die Uhrzeit */
+    @Composable
+    private fun EdgeRing(progress: Float, color: Color) {
+        CircularProgressIndicator(
+            progress = progress.coerceIn(0f, 1f),
+            modifier = Modifier.fillMaxSize().padding(3.dp),
+            startAngle = 300f,
+            endAngle = 240f,
+            indicatorColor = color,
+            trackColor = color.copy(alpha = 0.18f),
+            strokeWidth = 6.dp,
+        )
+    }
+
     @Composable
     private fun App() {
-        MaterialTheme {
+        MaterialTheme(colors = brand) {
             Scaffold(timeText = { if (!ambient) TimeText() }) {
                 val r = run
+                // Jeder neue Satz geht sofort ans Handy, damit die App dort auf dem gleichen Stand ist
+                if (r != null) LaunchedEffect(r, r.version) { publishLive(r.liveJson()) }
                 // Pausenende ans Hintergrund-Training melden, damit es auch bei dunklem Bildschirm vibriert
                 if (r != null) LaunchedEffect(r.restUntil, r.warmUntil) { WorkoutService.rest(this@WatchActivity, maxOf(r.restUntil, r.warmUntil)) }
                 // Während des Aufwärmens den Puls beobachten und melden, sobald du warm bist
@@ -286,7 +359,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         val p = plan
         val open = p?.sessions?.filter { it.date !in doneDates }.orEmpty()
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("4peak", style = MaterialTheme.typography.title3) }
+            item { Text("4peak", style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary) }
             if (open.isEmpty()) {
                 item {
                     Text(
@@ -297,12 +370,15 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     )
                 }
             }
-            items(open) { s ->
+            items(open.size) { i ->
+                val s = open[i]
                 Chip(
                     onClick = { startRun(s) },
-                    label = { Text(s.name) },
-                    secondaryLabel = { Text(Store.dayLabel(s.date) + if (s.deload) " · Deload" else "") },
-                    colors = ChipDefaults.primaryChipColors(),
+                    label = { Text((if (i == 0) "▶ " else "") + s.name, fontWeight = FontWeight.Bold) },
+                    secondaryLabel = { Text(Store.dayLabel(s.date) + " · ${s.items.size} Übungen" + if (s.deload) " · Deload" else "") },
+                    // Das nächste Training leuchtet, die späteren bleiben dunkel
+                    colors = if (i == 0) ChipDefaults.gradientBackgroundChipColors(startBackgroundColor = MaterialTheme.colors.primaryVariant, endBackgroundColor = MaterialTheme.colors.primary)
+                    else ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -357,6 +433,9 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val focus = remember { FocusRequester() }
             val scope = rememberCoroutineScope()
             LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+            // Fortschritt des ganzen Trainings als Ring am Rand
+            val total = r.items.filter { x -> !x.cardio }.sumOf { x -> x.sets }.coerceAtLeast(1)
+            Box(Modifier.fillMaxSize()) { EdgeRing(r.setCount.toFloat() / total, MaterialTheme.colors.primary) }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -374,24 +453,25 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     }
                     .focusRequester(focus)
                     .focusable()
-                    .padding(start = 12.dp, end = 12.dp, top = if (small) 20.dp else 24.dp, bottom = if (small) 4.dp else 8.dp),
+                    .padding(start = 14.dp, end = 14.dp, top = if (small) 22.dp else 26.dp, bottom = if (small) 6.dp else 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HeartRateLine()
                 // Antippen öffnet die Reihenfolge (Gerät besetzt → andere Übung vorziehen)
                 Text(
-                    "⇅ " + it.name,
-                    style = MaterialTheme.typography.caption1,
+                    it.name + if (r.index < r.items.size - 1) " ⇅" else "",
+                    style = MaterialTheme.typography.title3,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colors.primary,
+                    color = MaterialTheme.colors.onSurface,
+                    textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
                 Text(
                     if (r.inWarmSet) "Aufwärmsatz ${r.warmIdx + 1} von ${it.warmSets.size}" else "Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}",
-                    style = MaterialTheme.typography.caption3,
-                    color = if (r.inWarmSet) MaterialTheme.colors.secondary else MaterialTheme.colors.onSurface,
+                    style = MaterialTheme.typography.caption2,
+                    color = if (r.inWarmSet) MaterialTheme.colors.secondary else MaterialTheme.colors.primary,
                 )
                 if (it.timed) {
                     // Stoppuhr: läuft bis zum zweiten Tippen, vibriert beim Erreichen des Ziels
@@ -479,9 +559,9 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 state = state,
                 contentDescription = label,
                 onSelected = onSelect,
-                modifier = Modifier.size(width = if (small) 58.dp else 66.dp, height = if (small) 62.dp else 74.dp),
+                modifier = Modifier.size(width = if (small) 62.dp else 72.dp, height = if (small) 66.dp else 80.dp),
             ) { i ->
-                Text(text(i), style = MaterialTheme.typography.title3, fontWeight = FontWeight.Bold)
+                Text(text(i), style = if (small) MaterialTheme.typography.title2 else MaterialTheme.typography.title1, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -574,13 +654,15 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
         }
         val left = ((r.restUntil - now + 999) / 1000).coerceAtLeast(0)
+        // Der Ring am Rand läuft mit der Pause ab
+        if (r.restLen > 0) EdgeRing((r.restUntil - now).toFloat() / r.restLen, MaterialTheme.colors.secondary)
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Pause", style = MaterialTheme.typography.caption1)
-            Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2)
+            Text("PAUSE", style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.secondary, fontWeight = FontWeight.Bold)
+            Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display1, fontWeight = FontWeight.Bold)
             HeartRateLine()
             val sum by Motion.lastSummary.collectAsState()
             sum?.let { Text(it, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 18.dp)) }
@@ -597,7 +679,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             Spacer(Modifier.size(8.dp))
             Row {
                 CompactChip(
-                    onClick = { r.restUntil += 30_000 },
+                    onClick = { r.restUntil += 30_000; r.restLen += 30_000 },
                     label = { Text("+30 s") },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
@@ -617,15 +699,16 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         var sending by remember { mutableStateOf(false) }
         val minutes = ((System.currentTimeMillis() - r.startedAt) / 60_000).coerceAtLeast(1)
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("Training beendet", style = MaterialTheme.typography.title3) }
+            item { Text("Geschafft 💪", style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary) }
             item {
-                Text(
-                    "${r.setCount} Sätze · $minutes min" +
-                        (if (WorkoutService.hrMax > 0) " · max. ♥ ${WorkoutService.hrMax}" else "") +
-                        if (WorkoutService.kcal.value > 0) " · ${WorkoutService.kcal.value} kcal" else "",
-                    style = MaterialTheme.typography.body2,
-                    textAlign = TextAlign.Center,
-                )
+                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                    Stat("${r.setCount}", "Sätze")
+                    Stat("$minutes", "min")
+                    if (WorkoutService.kcal.value > 0) Stat("${WorkoutService.kcal.value}", "kcal")
+                }
+            }
+            if (WorkoutService.hrMax > 0) item {
+                Text("max. ♥ ${WorkoutService.hrMax}", style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.secondary)
             }
             if (r.logs.isNotEmpty()) {
                 item {
@@ -639,9 +722,9 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                                 }
                             }
                         },
-                        label = { Text(if (sending) "Wird gespeichert …" else "Speichern") },
-                        secondaryLabel = { Text("Geht ans Handy, sobald es verbunden ist") },
-                        colors = ChipDefaults.primaryChipColors(),
+                        label = { Text(if (sending) "Wird gespeichert …" else "Speichern", fontWeight = FontWeight.Bold) },
+                        secondaryLabel = { Text("Geht ans Handy") },
+                        colors = ChipDefaults.gradientBackgroundChipColors(startBackgroundColor = MaterialTheme.colors.primaryVariant, endBackgroundColor = MaterialTheme.colors.primary),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -653,6 +736,14 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     colors = ChipDefaults.secondaryChipColors(),
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun Stat(value: String, label: String) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, style = MaterialTheme.typography.title1, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.onSurfaceVariant)
         }
     }
 
@@ -785,6 +876,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     companion object {
         const val PLAN_PATH = "/plan"
+        const val LIVE_WATCH = "/live/watch"
+        const val LIVE_PHONE = "/live/phone"
         const val EXTRA_START = "start"
     }
 }
