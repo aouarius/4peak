@@ -465,6 +465,31 @@ a.chip{text-decoration:none;color:var(--ink)}
 .memchip{display:inline-flex;align-items:center;gap:6px;background:var(--sunk);border-radius:99px;padding:5px 6px 5px 12px;font-size:.8rem;font-weight:600;margin:4px 6px 0 0}
 .memchip button{border:0;background:var(--surface);color:var(--muted);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:.7rem}
 .feel{font-size:1.15rem;padding:6px 12px}
+
+/* Übungen: Suche, Muskel-Chips, kompakte aufklappbare Liste */
+.exbar{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.exbar #exq{width:100%;box-sizing:border-box;padding:11px 14px;font-size:1rem;border-radius:14px;border:1px solid transparent;background:var(--sunk);color:var(--ink)}
+.chiprow{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+.chiprow::-webkit-scrollbar{display:none}
+.chiprow .chip{flex:none;white-space:nowrap}
+.exmeta{gap:6px;align-items:center}
+.exbar .filters{margin:0}
+.exbar .filters select{flex:1}
+.exlist{display:flex;flex-direction:column;gap:8px}
+.exitem{background:var(--surface);border-radius:16px;overflow:hidden}
+.exitem summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+.exitem summary::-webkit-details-marker{display:none}
+.exitem summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:-4px 2px 0 2px;flex:none;transition:transform .15s}
+.exitem[open] summary::after{transform:rotate(225deg);margin-top:4px}
+.exhd{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.exhd b{font-size:.98rem}
+.exhd .small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exmk{display:flex;align-items:center;gap:6px;flex:none}
+.exstar{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:1.05rem}
+.exnope{color:var(--red)}
+.exbody{display:flex;flex-direction:column;gap:10px;padding:0 14px 14px;border-top:1px solid var(--line);padding-top:12px}
+.exbody ol{margin:0;padding-left:20px;font-size:.9rem;line-height:1.45}
+.exitem.blocked summary b{opacity:.6}
 </style>
 
 <div class="wrap">
@@ -1125,40 +1150,47 @@ function viewUebungen(){
     &&(!ui.exMus||(ui.exMus==="mob"?x.mob:ui.exMus==="cardio"?x.cardio:MUS[id]&&MUS[id][0].includes(ui.exMus)))
     &&(!ui.exMark||(ui.exMark==="fav"?fav.includes(id):block.includes(id))))
     .sort((a,b)=>(fav.includes(b[0])-fav.includes(a[0]))||(block.includes(a[0])-block.includes(b[0])));
-  return `<div class="filters">
+  const nF=(ui.exEquip!=="all")+!!ui.exGear, chip=(k,v,on,n)=>`<button type="button" class="chip${on?" on":""}" data-${k}="${v}" aria-pressed="${on}">${n}</button>`;
+  const gearLbl=(id,x)=>x.cardio||x.mob?(x.e==="gym"?"Studio":x.e==="kh"?"Kurzhanteln":"Körpergewicht"):GEAR[gearOf(id)];
+  return `<div class="exbar">
       <input id="exq" type="search" placeholder="Übung oder Muskel suchen" value="${esc(ui.exFilter)}" aria-label="Übung suchen">
-      <select id="exmus" aria-label="Muskelgruppe"><option value="">Alle Muskelgruppen</option>${Object.entries(MUS_N).map(([k,v])=>`<option value="${k}"${ui.exMus===k?" selected":""}>${v}</option>`).join("")}<option value="cardio"${ui.exMus==="cardio"?" selected":""}>Ausdauer</option><option value="mob"${ui.exMus==="mob"?" selected":""}>Mobilität</option></select>
-      <select id="exeq" aria-label="Ausrüstung">
-        <option value="all"${ui.exEquip==="all"?" selected":""}>Alle Ausrüstungen</option>
-        ${Object.entries(EQUIP).map(([k,v])=>`<option value="${k}"${ui.exEquip===k?" selected":""}>${v}</option>`).join("")}
-      </select>
-      <select id="exgear" aria-label="Gerät"><option value="">Alle Geräte</option>${Object.entries(GEAR).map(([k,v])=>`<option value="${k}"${ui.exGear===k?" selected":""}>Nur ${v}</option>`).join("")}<option value="no-lh"${ui.exGear==="no-lh"?" selected":""}>Ohne Langhantel</option></select>
-      <select id="exmark" aria-label="Markierung"><option value="">Alle Übungen</option><option value="fav"${ui.exMark==="fav"?" selected":""}>Nur Favoriten (${fav.length})</option><option value="block"${ui.exMark==="block"?" selected":""}>Nope! (${block.length})</option></select>
+      <div class="chiprow" role="group" aria-label="Muskelgruppe">
+        ${chip("exmusc","",!ui.exMus&&!ui.exMark,"Alle")}${chip("exmarkc","fav",ui.exMark==="fav",`★ Favoriten${fav.length?" "+fav.length:""}`)}
+        ${Object.entries(MUS_N).map(([k,v])=>chip("exmusc",k,ui.exMus===k,v)).join("")}${chip("exmusc","cardio",ui.exMus==="cardio","Ausdauer")}${chip("exmusc","mob",ui.exMus==="mob","Mobilität")}
+        ${block.length?chip("exmarkc","block",ui.exMark==="block",`⊘ Nope! ${block.length}`):""}
+      </div>
+      <div class="row exmeta"><span class="small muted">${list.length} ${list.length===1?"Übung":"Übungen"}</span><span style="flex:1"></span>
+        <button type="button" class="chip${nF?" on":""}" data-exfilt="1" aria-expanded="${!!ui.exFilt}">Ausrüstung${nF?" · "+nF:""} ${ui.exFilt?"▴":"▾"}</button>
+        ${ui.exNew?"":`<button type="button" class="chip" data-exnew="1">+ Eigene</button>`}</div>
+      ${ui.exFilt?`<div class="filters">
+        <select id="exeq" aria-label="Ausrüstung"><option value="all"${ui.exEquip==="all"?" selected":""}>Alle Ausrüstungen</option>${Object.entries(EQUIP).map(([k,v])=>`<option value="${k}"${ui.exEquip===k?" selected":""}>${v}</option>`).join("")}</select>
+        <select id="exgear" aria-label="Gerät"><option value="">Alle Geräte</option>${Object.entries(GEAR).map(([k,v])=>`<option value="${k}"${ui.exGear===k?" selected":""}>Nur ${v}</option>`).join("")}<option value="no-lh"${ui.exGear==="no-lh"?" selected":""}>Ohne Langhantel</option></select>
+      </div>`:""}
     </div>
-    <div class="row" style="justify-content:space-between;align-items:flex-start;margin:0 0 12px;gap:8px"><p class="small muted" style="margin:0;flex:1;min-width:200px">${list.length} Übungen. Favoriten bevorzugt der Plan bei Ergänzungsübungen. Übungen mit „Nope!“ ersetzt er durch eine Alternative für dieselben Muskeln.</p>
-      ${ui.exNew?"":`<button class="chip" data-exnew="1">+ Eigene Übung</button>`}</div>
     ${ui.exNew?exFormHtml():""}
-    <div class="cards">${list.map(([id,x])=>{const isF=fav.includes(id), isB=block.includes(id), alt=isB?altFor(id,null):null;
-      return `<article class="panel ex-card${isB?" blocked":""}" id="ex-${id}">
-      <div class="row" style="justify-content:space-between;align-items:flex-start"><h3>${esc(x.n)}</h3><span class="pill">${x.own?"Eigene · ":""}${x.cardio||x.mob?(x.e==="gym"?"Studio":x.e==="kh"?"Kurzhanteln":"Körpergewicht"):GEAR[gearOf(id)]}</span></div>
-      <div class="small muted">${esc(x.m)}</div>
+    <div class="exlist">${list.map(([id,x])=>{const isF=fav.includes(id), isB=block.includes(id), alt=isB?altFor(id,null):null;
+      return `<details class="exitem${isB?" blocked":""}" id="ex-${id}"${ui.exOpen===id?" open":""} data-exitem="${id}">
+      <summary><span class="exhd"><b>${esc(x.n)}</b><span class="small muted">${esc(x.m)}</span></span>
+        <span class="exmk">${isF?`<span class="exstar" title="Favorit">★</span>`:""}${isB?`<span class="exnope" title="Nope!">⊘</span>`:""}<span class="pill">${x.own?"Eigene · ":""}${gearLbl(id,x)}</span></span></summary>
+      <div class="exbody">
       <div class="row" style="gap:6px">
         <button class="chip${isF?" on":""}" data-fav="${id}" aria-pressed="${isF}">${isF?"★ Favorit":"☆ Favorit"}</button>
-        <button class="chip${isB?" off-on":""}" data-block="${id}" aria-pressed="${isB}">⊘ Nope!</button>
+        <button class="chip${isB?" off-on":""}" data-block="${id}" aria-pressed="${isB}" title="Der Plan ersetzt sie durch eine Alternative für dieselben Muskeln">⊘ Nope!</button>
         ${x.own?`<button class="chip" data-exdel="${id}">${ui.exDel===id?"Wirklich löschen?":"Löschen"}</button>`:""}
+        <a class="chip" href="${yt(x.n)}" target="_blank" rel="noopener">▶ Videos</a>
       </div>
-      ${noteHtml(id)}
-      ${exHistHtml(id)}
       ${isB?`<div class="small">${alt?`Im Plan ersetzt durch <button class="linkbtn" data-ex="${alt}">${esc(EX[alt].n)}</button>`:"Keine passende Alternative mit deiner Ausrüstung."}</div>`:""}
       ${x.own?`<div class="small muted">Eigene Übung. Unter <button class="linkbtn" data-goto="plan">Plan</button> → Bearbeiten fügst du sie einer Einheit hinzu.</div>`:""}
       ${x.s.length?`<ol>${x.s.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>`:""}
       ${x.f.length?`<div class="small"><b>Häufige Fehler:</b> ${x.f.map(esc).join(" · ")}</div>`:""}
-      ${x.tip?`<div class="small"><b>Tipp aus Foren:</b> ${esc(x.tip)}</div>`:""}
-      <a class="small" href="${yt(x.n)}" target="_blank" rel="noopener">Videos zur Ausführung ansehen ↗</a>
-    </article>`}).join("")}</div>
-    ${list.length?"":`<p class="muted">Keine Übung gefunden.</p>`}`;
+      ${x.tip?`<div class="small"><b>Tipp:</b> ${esc(x.tip)}</div>`:""}
+      ${noteHtml(id)}
+      ${exHistHtml(id)}
+      </div>
+    </details>`}).join("")}</div>
+    ${list.length?"":`<p class="muted">Keine Übung gefunden.${ui.exMus||ui.exMark||nF||ui.exFilter?` <button class="linkbtn" data-exreset="1">Filter zurücksetzen</button>`:""}</p>`}`;
 }
-
+function exReset(){ui.exFilter=""; ui.exEquip="all"; ui.exGear=""; ui.exMus=""; ui.exMark=""}
 function exFormHtml(){
   return `<form class="panel stack" id="exform" style="margin-bottom:12px"><h3>Eigene Übung</h3>
     <div class="form">
@@ -2869,23 +2901,30 @@ function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===ui.tab?"true":"false"));
   navSync();
   const v=document.getElementById("view");
+  if(ui.tab==="uebungen"&&ui.openEx) ui.exOpen=ui.openEx;
   v.innerHTML=VIEWS[ui.tab]();
   tidyInfo(v);
   if(ui.tab==="training"&&ui.run){tick(); if(!timerInt) timerInt=setInterval(tick,250);
     if(ui.run.scrollTo!=null){const el=document.getElementById("it-"+ui.run.scrollTo); ui.run.scrollTo=null; if(el) el.scrollIntoView({block:"start",behavior:"smooth"})}}
-  if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el) el.scrollIntoView({block:"start"}); ui.openEx=null;}
+  if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el){el.open=true; ui.exOpen=ui.openEx; el.scrollIntoView({block:"start"})} ui.openEx=null;}
   persistRun();
 }
 function go(tab){if(tab==="wear") askWatch(); if(tab!==ui.tab){(ui.hist||(ui.hist=[])).push(ui.tab); if(ui.hist.length>20) ui.hist.shift()} ui.tab=tab; ui.more=false; try{localStorage.setItem(LS_KEY+".tab",tab)}catch(e){} render(); window.scrollTo(0,0)}
 
 /* ---------- Ereignisse ---------- */
+document.addEventListener("toggle",e=>{const d=e.target; if(!d.dataset||!d.dataset.exitem) return; const id=d.dataset.exitem;
+  if(d.open){if(ui.exOpen&&ui.exOpen!==id){const o=document.getElementById("ex-"+ui.exOpen); if(o) o.open=false} ui.exOpen=id} else if(ui.exOpen===id) ui.exOpen=null},true);
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
-  if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; ui.exFilter=""; ui.exEquip="all"; ui.exMus=""; ui.exMark=""; go("uebungen"); return}
+  if(t.dataset.exmusc!=null){ui.exMus=t.dataset.exmusc; ui.exMark=""; render(); return}
+  if(t.dataset.exmarkc!=null){ui.exMark=ui.exMark===t.dataset.exmarkc?"":t.dataset.exmarkc; ui.exMus=""; render(); return}
+  if(t.dataset.exfilt){ui.exFilt=!ui.exFilt; render(); return}
+  if(t.dataset.exreset){exReset(); render(); return}
+  if(t.dataset.hist){ui.histOpen=t.dataset.hist; ui.openEx=t.dataset.hist; exReset(); go("uebungen"); return}
   if(t.dataset.exnew){ui.exNew=t.dataset.exnew==="1"; render(); if(ui.exNew){const n=document.getElementById("xn"); if(n) n.focus()} return}
   if(t.dataset.exdel){const id=t.dataset.exdel; if(ui.exDel!==id){ui.exDel=id; render(); return}
     ui.exDel=null; if(state.customEx[id]) state.customEx[id].del=true;
@@ -2983,7 +3022,7 @@ document.getElementById("view").addEventListener("click",e=>{
   else if(t.dataset.mon){ui.month=new Date(ui.month.getFullYear(),ui.month.getMonth()+Number(t.dataset.mon),1); render()}
   else if(t.dataset.done){const r=document.getElementById("rpe"); state.done[t.dataset.done]={rpe:r?Number(r.value):null,at:new Date().toISOString()}; save(); render()}
   else if(t.dataset.undone){if(ui.delDone!==t.dataset.undone){ui.delDone=t.dataset.undone; render(); return} ui.delDone=null; delete state.done[t.dataset.undone]; const wasEdit=ui.run&&ui.run.edit&&ui.run.date===t.dataset.undone; if(wasEdit) ui.run=null; save(); if(wasEdit){ui.sel=t.dataset.undone; go("kalender")} else render()}
-  else if(t.dataset.ex){ui.openEx=t.dataset.ex; ui.exFilter=""; ui.exEquip="all"; go("uebungen"); const el=document.getElementById("ex-"+t.dataset.ex); if(el) el.scrollIntoView({block:"start"})}
+  else if(t.dataset.ex){ui.openEx=t.dataset.ex; exReset(); go("uebungen"); const el=document.getElementById("ex-"+t.dataset.ex); if(el) el.scrollIntoView({block:"start"})}
   else if(t.dataset.goto){go(t.dataset.goto)}
   else if(t.id==="btconnect"){connectBt()}
 });
@@ -3034,7 +3073,7 @@ document.getElementById("view").addEventListener("submit",e=>{
   if(e.target.id==="exform"){e.preventDefault(); const g=id=>document.getElementById(id); const n=g("xn").value.trim().slice(0,60); if(!n) return;
     const id="u"+Date.now().toString(36); state.customEx=state.customEx||{};
     state.customEx[id]={n,mus:g("xm").value,e:g("xe").value,r:g("xr").value,uni:g("xu").checked};
-    applyCustomEx(); ui.exNew=false; ui.exFilter=""; ui.exMus=""; ui.exMark=""; ui.exEquip="all"; ui.openEx=id; save(); render(); return}
+    applyCustomEx(); ui.exNew=false; exReset(); ui.openEx=id; save(); render(); return}
   if(e.target.id==="prodform"){e.preventDefault(); const g=id=>document.getElementById(id).value.trim(); const a=Number(g("cpa"));
     if(!g("cpb")||!g("cpn")||!(a>0)) return;
     const pr={id:"c"+Date.now().toString(36),brand:g("cpb").slice(0,40),name:g("cpn").slice(0,60),cat:g("cpc"),serving:g("cps").slice(0,40),amount:a,unit:g("cpu")};
