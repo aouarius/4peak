@@ -96,11 +96,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private var pendingStart: String? = null
 
     // Always-on: Während des Trainings bleibt eine schlichte, stromsparende Ansicht sichtbar.
-    private val ambientObserver = AmbientLifecycleObserver(this, object : AmbientLifecycleObserver.AmbientLifecycleCallback {
+    private val ambientObserver by lazy { AmbientLifecycleObserver(this, object : AmbientLifecycleObserver.AmbientLifecycleCallback {
         override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) { ambient = true; ambientTick = System.currentTimeMillis() }
         override fun onExitAmbient() { ambient = false }
         override fun onUpdateAmbient() { ambientTick = System.currentTimeMillis() }
-    })
+    }) }
 
     private val sensorPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
@@ -114,7 +114,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         super.onCreate(savedInstanceState)
         // Nach einem Absturz zuerst den Fehler zeigen (ohne Compose, damit das sicher klappt)
         FourPeakApp.take(this)?.let { showCrash(it); return }
-        lifecycle.addObserver(ambientObserver)
+        // Ausserhalb einer Uhr (z. B. in den Bildschirmfoto-Tests) fehlt die Wear-Bibliothek dafür
+        runCatching { lifecycle.addObserver(ambientObserver) }
         doneDates = Store.done(this)
         plan = Store.plan(this)
         if (savedInstanceState == null) pendingStart = intent.getStringExtra(EXTRA_START)
