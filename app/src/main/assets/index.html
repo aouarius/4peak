@@ -143,15 +143,12 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mu
 .badge{display:inline-block;font-size:.8rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--sunk);border:1px solid var(--line)}
 .badge.off{color:var(--muted);opacity:.6}
 .fwrap{position:relative;display:flex;flex-direction:column}
-.coach{border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
-.aibadge{font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;background:var(--accent);color:var(--accent-ink);vertical-align:middle}
 #chatin{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical}
 .chatlog{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto}
 .msg{padding:8px 10px;border-radius:12px;font-size:14px;line-height:1.4;max-width:88%;white-space:pre-wrap}
 .msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
 .msg.tr{align-self:flex-start;background:var(--soft)}
 .coachtip{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
-.coachtip:first-of-type{border-top:0;padding-top:0}
 .holdbtn{margin-left:6px;min-width:40px;height:34px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
 .holdbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .macros{display:grid;gap:10px}
@@ -443,6 +440,31 @@ table.sets input{border-radius:10px;font-weight:700}
 .restsel{border:0;background:var(--soft);font-weight:700}
 a.chip{text-decoration:none;color:var(--ink)}
 @media (prefers-reduced-motion: reduce){.rchk[aria-pressed="true"]{animation:none}.btn{transition:none}}
+/* Trainer (Design 3): Verlaufs-Symbol, Karten auf vertiefter Fläche, Chat-Blasen, Werte als Kacheln */
+.coach{border:0}
+.coach-hd{display:flex;align-items:center;gap:10px}
+.coach-hd h3{margin:0;display:flex;align-items:center;gap:6px}
+.coach-hd .sub{font-size:.74rem;color:var(--muted);font-weight:600}
+.coach-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--grad);color:#fff;font-size:1.1rem;flex:none;box-shadow:0 6px 16px rgba(58,91,255,.3)}
+.aibadge{background:var(--grad);color:#fff;border-radius:99px;padding:2px 8px;font-size:.62rem;font-weight:800;letter-spacing:.06em}
+.coachsum{font-size:.92rem;line-height:1.5}
+.coachtip{display:flex;flex-direction:column;gap:8px;background:var(--sunk);border-radius:16px;padding:12px 14px;border:0}
+.coachtip .tile{background:var(--surface);box-shadow:none}
+.coachtip .tiles{grid-template-columns:repeat(auto-fit,minmax(86px,1fr))}
+.coachtip .tv{font-size:1.25rem}
+.chatbtn{display:flex;align-items:center;gap:10px;width:100%;border:0;background:var(--sunk);color:var(--ink);border-radius:16px;padding:12px 14px;font:700 .95rem var(--f-body);cursor:pointer;text-align:left}
+.chatbtn .ar{margin-left:auto;color:var(--muted);transition:transform .2s}
+.chatbtn[aria-expanded="true"]{border-radius:16px 16px 0 0}.chatbtn[aria-expanded="true"] .ar{transform:rotate(90deg)}
+.chatwrap{background:var(--sunk);border-radius:0 0 16px 16px;padding:0 14px 14px}
+.chatlog{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;padding-top:4px}
+.msg{padding:9px 13px;border-radius:18px;font-size:.9rem;line-height:1.45;max-width:86%;white-space:pre-wrap}
+.msg.me{align-self:flex-end;background:var(--grad);color:#fff;border-bottom-right-radius:6px}
+.msg.tr{align-self:flex-start;background:var(--surface);border-bottom-left-radius:6px;box-shadow:var(--shadow)}
+#chatin{font:inherit;padding:10px 12px;border-radius:14px;border:1px solid transparent;background:var(--surface);color:var(--ink);resize:none}
+#chatin:focus{border-color:var(--accent);outline:none}
+.memchip{display:inline-flex;align-items:center;gap:6px;background:var(--sunk);border-radius:99px;padding:5px 6px 5px 12px;font-size:.8rem;font-weight:600;margin:4px 6px 0 0}
+.memchip button{border:0;background:var(--surface);color:var(--muted);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:.7rem}
+.feel{font-size:1.15rem;padding:6px 12px}
 </style>
 
 <div class="wrap">
@@ -1531,16 +1553,15 @@ function coachHtml(onlyFood){
   const useAi=c.ai!==false&&aiAvail();
   const stand=r?new Date(r.at):null;
   return `<section class="panel stack coach">
-    <div class="row" style="justify-content:space-between;align-items:center"><h3>Dein Trainer${useAi||r?` <span class="aibadge">KI</span>`:""}</h3>${onlyFood?"":`<button class="linkbtn small" data-coach="off">Ausschalten</button>`}</div>
-    ${!onlyFood&&r?`<div class="small">${esc(r.summary)}</div>`:""}
+    <div class="coach-hd"><span class="coach-ic" aria-hidden="true">✦</span><div style="flex:1;min-width:0"><h3>Dein Trainer${useAi||r?` <span class="aibadge">KI</span>`:""}</h3><div class="sub">${aiBusy?"schaut sich deine neusten Werte an …":stand?`Stand ${stand.toLocaleDateString("de-CH",{day:"numeric",month:"numeric"})}, ${stand.toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"})}`:"prüft Training, Erholung und Ernährung"}</div></div>${onlyFood?"":`<button class="linkbtn small" data-coach="off">Aus</button>`}</div>
+    ${!onlyFood&&r?`<div class="coachsum">${esc(r.summary)}</div>`:""}
     ${onlyFood?"":readyHtml()+blockHtml()}
-    ${!onlyFood&&aiBusy?`<div class="small muted">Ich schaue mir deine neusten Werte an …</div>`:""}
     ${list.length?list.map(t=>`<div class="coachtip"><b>${esc(t.t)}</b><div class="small">${esc(t.x)}</div>
       <div class="row" style="gap:6px">${t.a?`<button class="btn small" data-coachdo="${esc(t.id)}">${esc(t.a.l)}</button>`:""}<button class="btn ghost small" data-coachhide="${esc(t.id)}">Ausblenden</button></div></div>`).join("")
       :(r||aiBusy?"":`<div class="small">Alles im grünen Bereich: Deine Werte entwickeln sich wie geplant. Ich melde mich, sobald etwas auffällt.</div>`)}
     ${c.msg?`<div class="small" style="color:var(--green)">✓ ${esc(c.msg)}</div>`:""}
-    ${onlyFood?"":`<div class="coachtip"><button class="linkbtn" data-chat="toggle" style="align-self:flex-start"><b>${ui.chat?"▾":"▸"} Trainer fragen</b></button>${ui.chat?chatHtml():""}</div>`}
-    ${onlyFood?"":`<div class="small muted">${useAi?`${stand?`KI-Einschätzung von ${stand.toLocaleDateString("de-CH",{day:"numeric",month:"numeric"})}, ${stand.toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"})} · `:""}<button class="linkbtn" data-coach="airefresh" ${aiBusy?"disabled":""}>Neu einschätzen</button>`:(c.ai!==false?`Feste Trainer-Regeln aktiv. ${NATIVE&&NATIVE.aiAsk?`Für die KI-Einschätzung im Profil einen API-Schlüssel eintragen.`:""}`:"Feste Trainer-Regeln aktiv.")}${aiErr?` <span style="color:var(--red)">${esc(aiErr)}</span>`:""}</div>`}
+    ${onlyFood?"":`<div><button class="chatbtn" data-chat="toggle" aria-expanded="${!!ui.chat}"><span aria-hidden="true">💬</span>Trainer fragen<span class="ar" aria-hidden="true">›</span></button>${ui.chat?`<div class="chatwrap">${chatHtml()}</div>`:""}</div>`}
+    ${onlyFood?"":`<div class="small muted">${useAi?`<button class="linkbtn" data-coach="airefresh" ${aiBusy?"disabled":""}>Neu einschätzen</button>`:(c.ai!==false?`Feste Trainer-Regeln aktiv. ${NATIVE&&NATIVE.aiAsk?`Für die KI-Einschätzung im Profil einen API-Schlüssel eintragen.`:""}`:"Feste Trainer-Regeln aktiv.")}${aiErr?` <span style="color:var(--red)">${esc(aiErr)}</span>`:""}</div>`}
   </section>`;
 }
 function coachSettingsHtml(){
@@ -1552,7 +1573,7 @@ function coachSettingsHtml(){
     <div class="small muted">Die KI bekommt bei jeder neuen Eintragung alle deine Daten ohne Namen: Trainings mit den Messwerten der Uhr (gezählte Wiederholungen, Tempo, Puls, Pausen), Schlaf, HRV, Ruhepuls, andere Sportarten, Gewicht, Ernährung und was du ihr im Chat erzählt hast, und schreibt eine Einschätzung mit Vorschlägen. Die festen Regeln laufen immer mit, auch ohne Internet.</div>
     ${NATIVE&&NATIVE.aiAsk?`<label class="small">Anthropic API-Schlüssel (nur auf diesem Handy gespeichert)<input type="password" id="aikey" autocomplete="off" placeholder="sk-ant-…" value="${esc(aiKey())}"></label>
     <div class="small muted">In der Handy-App läuft die KI über deinen eigenen Schlüssel von console.anthropic.com. Eine Einschätzung kostet ungefähr 2–5 Rappen.</div>`:""}
-    ${(c.mem||[]).length?`<div class="small"><b>Das merkt sich der Trainer:</b>${c.mem.map((m,i)=>`<div class="row" style="justify-content:space-between;gap:6px"><span>${esc(m.t)} <span class="muted">(${parseIso(m.d).getDate()}.${parseIso(m.d).getMonth()+1}.)</span></span><button class="linkbtn" data-memdel="${i}" aria-label="Vergessen">✕</button></div>`).join("")}</div>`:""}
+    ${(c.mem||[]).length?`<div class="small"><b>Das merkt sich der Trainer</b><div>${c.mem.map((m,i)=>`<span class="memchip" title="seit ${parseIso(m.d).getDate()}.${parseIso(m.d).getMonth()+1}.">${esc(m.t)}<button data-memdel="${i}" aria-label="${esc(m.t)} vergessen">✕</button></span>`).join("")}</div></div>`:""}
     <div class="small">Trainingsblock ${blockOf().n} seit ${parseIso(blockOf().start).getDate()}.${parseIso(blockOf().start).getMonth()+1}. (${blockWeeks()} Wochen)${blockOf().title?`: ${esc(blockOf().title)}, Hauptübungen ${esc(blockOf().main)}, Ergänzungen ${esc(blockOf().acc)} Wdh`:""} · <button class="linkbtn" data-blockdo="plan">Neuen Block planen</button></div>
     ${blockHtml()}
     ${c.kcalAdj?`<div class="small">Kalorien vom Trainer angepasst: ${c.kcalAdj>0?"+":"−"}${Math.abs(c.kcalAdj)} kcal pro Tag · <button class="linkbtn" data-coach="kcalreset">Zurücksetzen</button></div>`:""}
@@ -1721,7 +1742,7 @@ function chatHtml(){
       :`<div class="small muted">Frag mich zum Beispiel: „Mein Knie zwickt bei Kniebeugen, was nun?“, „Ich habe heute nur 40 Minuten“ oder „Warum geht es beim Bankdrücken nicht weiter?“</div>`}
     ${ui.chatBusy?`<div class="msg tr muted">…</div>`:""}</div>
     ${ui.chatErr?`<div class="small" style="color:var(--red)">${esc(ui.chatErr)}</div>`:""}
-    <div class="row" style="gap:6px;align-items:flex-end"><textarea id="chatin" rows="2" placeholder="Nachricht an deinen Trainer" style="flex:1">${esc(ui.chatDraft||"")}</textarea><button class="btn" data-chatsend="1" ${ui.chatBusy?"disabled":""}>Senden</button></div>
+    <div class="row" style="gap:6px;align-items:flex-end"><textarea id="chatin" rows="2" placeholder="Schreib deinem Trainer …" style="flex:1">${esc(ui.chatDraft||"")}</textarea><button class="btn" data-chatsend="1" ${ui.chatBusy?"disabled":""}>Senden</button></div>
     ${(c.chat||[]).length?`<button class="linkbtn small" data-chatclear="1" style="align-self:flex-start">Verlauf löschen</button>`:""}
   </div>`;
 }
@@ -1765,14 +1786,17 @@ function readyHtml(){
   const c=C(), u=upcoming(); if(!u||u.date!==todayIso) return "";
   const cur=(c.ready||{})[todayIso], res=c.readyRes&&c.readyRes.d===todayIso?c.readyRes:null, feel=(c.feel||{})[todayIso];
   const hd=state.health&&!state.health.error&&(state.health.sleep.length||state.health.hrv.length);
+  const o=readyData(), hm=m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,"0")} h`;
+  const vals=[o.schlaf_min!=null?tile("Schlaf",hm(o.schlaf_min),o.schlaf_schnitt_min?"Ø "+hm(o.schlaf_schnitt_min):""):"",o.hrv_ms?tile("HRV",o.hrv_ms+" ms",o.hrv_schnitt_ms?"Ø "+o.hrv_schnitt_ms:""):"",o.ruhepuls?tile("Ruhepuls",o.ruhepuls,o.ruhepuls_schnitt?"Ø "+o.ruhepuls_schnitt:""):""].join("");
   return `<div class="coachtip"><b>Check vor dem Training</b>
+    ${vals?`<div class="tiles">${vals}</div>`:""}
     ${cur?`<div class="small">Heute: <b>${READY_N[cur]}</b>${cur==="light"?" (1 Satz weniger bei Übungen mit 3+ Sätzen)":cur==="hard"?" (1 Satz mehr bei den Hauptübungen)":""} · <button class="linkbtn" data-ready="reset">Ändern</button></div>`:`
     <div class="small">Wie fühlst du dich heute?</div>
-    <div class="row" style="gap:6px">${[1,2,3,4,5].map(n=>`<button class="btn small ${feel===n?"":"ghost"}" data-feel="${n}" aria-label="${["","sehr müde","müde","normal","gut","top"][n]}">${["","😫","🥱","😐","🙂","💪"][n]}</button>`).join("")}</div>
+    <div class="row" style="gap:6px">${[1,2,3,4,5].map(n=>`<button class="chip feel${feel===n?" on":""}" data-feel="${n}" aria-label="${["","sehr müde","müde","normal","gut","top"][n]}">${["","😫","🥱","😐","🙂","💪"][n]}</button>`).join("")}</div>
     ${!hd&&NATIVE&&NATIVE.requestHealth?`<div class="small muted">Mit Schlaf und Ruhepuls aus Samsung Health wird der Check genauer: <button class="linkbtn" data-health="1">Health Connect verbinden</button></div>`:""}
     ${ui.readyBusy?`<div class="small muted">Ich schaue mir deine Erholung an …</div>`:""}
     ${res?`<div class="small">${esc(res.text)}</div>
-      <div class="row" style="gap:6px;flex-wrap:wrap">${["light","normal","hard"].map(m=>`<button class="btn small ${m===res.mode?"":"ghost"}" data-ready="${m}">${READY_N[m]}${m===res.mode?" ✓":""}</button>`).join("")}</div>`:""}`}
+      <div class="row" style="gap:6px;flex-wrap:wrap">${["light","normal","hard"].map(m=>`<button class="chip${m===res.mode?" on":""}" data-ready="${m}">${READY_N[m]}${m===res.mode?" · empfohlen":""}</button>`).join("")}</div>`:""}`}
   </div>`;
 }
 /* Anpassung eines einzelnen Trainingstags (Check vor dem Training, Chat) */
@@ -1824,7 +1848,8 @@ function blockHtml(){
   const pr=ui.blockProp; if(!pr&&!ui.blockBusy) return "";
   return `<div class="coachtip"><b>${ui.blockBusy?"Ich plane deinen nächsten Block …":`Vorschlag: ${esc(pr.title)}`}</b>
     ${pr&&!ui.blockBusy?`<div class="small">${esc(pr.why)}</div>
-    <div class="small">Hauptübungen <b>${esc(pr.main)}</b> Wdh · Ergänzungen <b>${esc(pr.acc)}</b> Wdh${pr.swaps.length?`<br>Tausch: ${pr.swaps.map(s=>`${esc(EX[s.from].n)} → ${esc(EX[s.to].n)}`).join(", ")}`:""}</div>
+    <div class="tiles">${tile("Hauptübungen",esc(pr.main),"Wdh.")}${tile("Ergänzungen",esc(pr.acc),"Wdh.")}</div>
+    ${pr.swaps.length?`<div class="small"><b>Tausch:</b> ${pr.swaps.map(s=>`${esc(EX[s.from].n)} → ${esc(EX[s.to].n)}`).join(", ")}</div>`:""}
     <div class="row" style="gap:6px"><button class="btn small" data-blockdo="apply">Block starten</button><button class="btn ghost small" data-blockdo="cancel">Verwerfen</button></div>`:""}</div>`;
 }
 function exOptions(cur,cardio){

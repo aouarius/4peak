@@ -101,7 +101,7 @@ class PlanListenerService : WearableListenerService() {
 class TodayTile : TileService() {
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         val s = Store.next(this)
-        val purple = argb(0xFFB450FF.toInt())
+        val purple = argb(0xFF8A55FF.toInt())
         val col = LayoutElementBuilders.Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .addContent(text(if (s == null) "4Peak" else Store.dayLabel(s.date), 14f, purple, bold = true))
@@ -117,7 +117,7 @@ class TodayTile : TileService() {
                         ModifiersBuilders.Modifiers.Builder()
                             .setBackground(
                                 ModifiersBuilders.Background.Builder()
-                                    .setColor(argb(0xFFA83AFD.toInt()))
+                                    .setColor(argb(0xFF6A5BFF.toInt()))
                                     .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(20f)).build())
                                     .build(),
                             )

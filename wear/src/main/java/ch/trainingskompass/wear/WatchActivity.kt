@@ -286,17 +286,17 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     /** 4peak-Farben: Lila wie im Logo, Türkis für Puls und Pausen, dunkle Flächen fürs runde OLED-Display */
     private val brand = Colors(
-        primary = Color(0xFFB45CFF),
-        primaryVariant = Color(0xFF7B2FE0),
-        secondary = Color(0xFF3DE0D0),
-        secondaryVariant = Color(0xFF1FA89C),
+        primary = Color(0xFF8A55FF),
+        primaryVariant = Color(0xFF4A63FF),
+        secondary = Color(0xFF8EA2FF),
+        secondaryVariant = Color(0xFF6577E0),
         background = Color.Black,
-        surface = Color(0xFF221A2E),
+        surface = Color(0xFF1C1F2E),
         onPrimary = Color.White,
         onSecondary = Color.Black,
         onBackground = Color.White,
         onSurface = Color.White,
-        onSurfaceVariant = Color(0xFFB9AFC9),
+        onSurfaceVariant = Color(0xFFAEB4C8),
     )
 
     private fun zoneColor(z: Int): Color = when (z) {
@@ -305,7 +305,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         3 -> Color(0xFF3DDC84)
         4 -> Color(0xFFFF9F2E)
         5 -> Color(0xFFFF4D5E)
-        else -> Color(0xFFB9AFC9)
+        else -> Color(0xFFAEB4C8)
     }
 
     /** Ring am Displayrand, oben offen für die Uhrzeit */
