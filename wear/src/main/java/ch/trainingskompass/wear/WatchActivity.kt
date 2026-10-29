@@ -759,7 +759,12 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
             item {
                 CompactChip(
-                    onClick = { closeRun() },
+                    onClick = {
+                        // Verwerfen beendet das Training auch auf dem Handy (ohne zu speichern)
+                        val d = r.session.date
+                        lifecycleScope.launch { publishLive(JSONObject().put("date", d).put("src", "watch").put("t", System.currentTimeMillis()).put("end", true).put("discard", true)) }
+                        closeRun()
+                    },
                     label = { Text(if (r.logs.isEmpty()) "Zurück" else "Verwerfen") },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
