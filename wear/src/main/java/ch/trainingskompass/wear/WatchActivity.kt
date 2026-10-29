@@ -220,6 +220,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 doneDates = doneDates + date
                 Store.saveDone(this, doneDates)
                 closeRun()
+                // Eigenen letzten Stand überschreiben, damit das Handy ihn nicht erneut als laufendes Training liest
+                lifecycleScope.launch { publishLive(JSONObject().put("date", date).put("src", "watch").put("t", System.currentTimeMillis()).put("end", true)) }
             }
             return
         }

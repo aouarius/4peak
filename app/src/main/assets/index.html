@@ -475,7 +475,7 @@ a.chip{text-decoration:none;color:var(--ink)}
 .exmeta{gap:6px;align-items:center}
 .exbar .filters{margin:0}
 .exbar .filters select{flex:1}
-.exlist{display:flex;flex-direction:column;gap:8px}
+.exgrid{display:flex;flex-direction:column;gap:8px}
 .exitem{background:var(--surface);border-radius:16px;overflow:hidden}
 .exitem summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
 .exitem summary::-webkit-details-marker{display:none}
@@ -759,7 +759,12 @@ const COACH_DEF=()=>({on:false,ai:true,aiRes:null,kcalAdj:0,hide:{},wNext:{},del
 function defaults(){return{remind:REMIND_DEF(),coach:COACH_DEF(),
   profile:{goal:"hyper",level:"anf",weekdays:[0,2,4],len:60,equip:"gym",split:"auto",bar:20,weight:75,height:178,sex:"m",age:30,restHr:60,start:iso(mondayOf(TODAY)),example:true},
   done:{},supps:{},mySupps:["kreatin","protein"],acts:[],bw:[],food:{},custom:{},myProducts:[],customProducts:[],fav:[],block:[],notes:{},customEx:{}}}
-function normalize(x){const d=defaults(); const o=Object.assign(d,x); o.profile=Object.assign(defaults().profile,x.profile||{}); o.remind=Object.assign(REMIND_DEF(),x.remind||{}); o.coach=Object.assign(COACH_DEF(),x.coach||{}); return o}
+function normalize(x){const d=defaults(); const o=Object.assign(d,x); o.profile=Object.assign(defaults().profile,x.profile||{}); o.remind=Object.assign(REMIND_DEF(),x.remind||{}); o.coach=Object.assign(COACH_DEF(),x.coach||{});
+  // Trainingsdaten säubern (z. B. unvollständige Einträge von der Uhr), damit keine Ansicht daran hängen bleibt
+  if(!o.done||typeof o.done!=="object") o.done={};
+  for(const [k,v] of Object.entries(o.done)){if(!v||typeof v!=="object"){delete o.done[k]; continue}
+    if(v.sets&&typeof v.sets==="object") for(const [id,a] of Object.entries(v.sets)){const l=(Array.isArray(a)?a:Object.values(a||{})).filter(y=>y&&typeof y==="object"); if(l.length) v.sets[id]=l; else delete v.sets[id]} else v.sets={}}
+  return o}
 function REMIND_DEF(){return {train:{on:false,t:"08:00"},supp:{on:false,t:"20:00"},food:{on:true,t:"19:30"}}}
 let state=defaults();
 const LS_KEY="trainingskompass.v1";
@@ -772,24 +777,31 @@ try{const r=JSON.parse(localStorage.getItem(RUN_KEY)||"null"); if(r&&r.date&&r.t
 let lastRunJ="";
 /* ---------- Live-Abgleich mit der Uhr: gleiches Training, gleiche Sätze auf beiden Geräten ---------- */
 let liveJ="", liveDate=null;
+/* Beendete Trainings je Datum (Zeitpunkt). Ältere Uhr-Stände dieses Tages starten sie nicht neu. */
+const LIVE_END_KEY="tk_liveend";
+function liveEnded(){try{return JSON.parse(localStorage.getItem(LIVE_END_KEY)||"{}")||{}}catch(e){return {}}}
+function markLiveEnd(d){if(!d) return; const m=liveEnded(); m[d]=Date.now(); for(const k of Object.keys(m)) if(Date.now()-m[k]>2*86400e3) delete m[k]; try{localStorage.setItem(LIVE_END_KEY,JSON.stringify(m))}catch(e){}}
 function liveSend(){
   if(!(NATIVE&&NATIVE.sendLive)) return;
   const r=ui.run;
-  if(!r||r.edit){ // Training auf dem Handy gespeichert: Uhr beendet ihres auch
-    if(liveDate&&state.done[liveDate]){try{NATIVE.sendLive(JSON.stringify({date:liveDate,src:"phone",t:Date.now(),end:true}))}catch(e){}}
+  if(!r||r.edit){ // Training auf dem Handy beendet: Uhr beendet ihres auch
+    if(liveDate){markLiveEnd(liveDate); try{NATIVE.sendLive(JSON.stringify({date:liveDate,src:"phone",t:Date.now(),end:true}))}catch(e){}}
     liveDate=null; liveJ=""; return}
+  liveDate=r.date;
   if(!r.rows) return;
   const sets=runLogs(r), j=JSON.stringify([r.date,sets]); if(j===liveJ) return;
-  liveJ=j; liveDate=r.date;
+  liveJ=j;
   try{NATIVE.sendLive(JSON.stringify({date:r.date,src:"phone",t:Date.now(),t0:r.t0,sets}))}catch(e){}
 }
 window.onWatchLive=function(json){
   let x; try{x=typeof json==="string"?JSON.parse(json):json}catch(e){return}
   if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.date||"")||Date.now()-(Number(x.t)||0)>6*3600e3) return;
-  if(x.end){if(ui.run&&!ui.run.edit&&ui.run.date===x.date){ui.run=null; liveDate=null; liveJ=""; ui.sel=x.date; clearInterval(timerInt); timerInt=null; go(state.done[x.date]?"kalender":ui.tab)} return}
+  if(x.end){markLiveEnd(x.date); if(ui.run&&!ui.run.edit&&ui.run.date===x.date){ui.run=null; liveDate=null; liveJ=""; ui.sel=x.date; clearInterval(timerInt); timerInt=null; go(state.done[x.date]?"kalender":ui.tab)} return}
   if(state.done[x.date]) return;
+  const ended=liveEnded()[x.date]; if(ended&&!(Number(x.t0)>ended)) return; // alter Stand eines schon beendeten Trainings
   if(ui.run&&(ui.run.edit||ui.run.date!==x.date)) return;
-  if(!ui.run) startRun(x.date);
+  const fresh=!ui.run; if(fresh) startRun(x.date);
+  liveDate=x.date;
   const r=ui.run; r.watch=true; if(x.t0&&x.t0<r.t0) r.t0=x.t0;
   runInit(r,runSession(r));
   let changed=false;
@@ -801,7 +813,7 @@ window.onWatchLive=function(json){
     list.forEach((v,k)=>{const y=row.sets[k]||(row.sets[k]={}); Object.assign(y,v,{done:true})}); changed=true;
   }
   if(changed){liveJ=JSON.stringify([r.date,runLogs(r)]); const s=runSession(r); while(r.i<s.items.length&&itemLeft({...r,logs:runLogs(r)},s,r.i)<=0) r.i++}
-  persistRun(); if(ui.tab==="training") render(); else go("training");
+  persistRun(); if(fresh) go("training"); else if(ui.tab==="training") render();
 };
 function persistRun(){liveSend(); try{if(!ui.run){if(lastRunJ){localStorage.removeItem(RUN_KEY); lastRunJ=""} return}
   const j=JSON.stringify(ui.run,(k,v)=>k==="_s"?undefined:v); if(j!==lastRunJ){localStorage.setItem(RUN_KEY,j); lastRunJ=j}}catch(e){}}
@@ -1168,7 +1180,7 @@ function viewUebungen(){
       </div>`:""}
     </div>
     ${ui.exNew?exFormHtml():""}
-    <div class="exlist">${list.map(([id,x])=>{const isF=fav.includes(id), isB=block.includes(id), alt=isB?altFor(id,null):null;
+    <div class="exgrid">${list.map(([id,x])=>{const isF=fav.includes(id), isB=block.includes(id), alt=isB?altFor(id,null):null;
       return `<details class="exitem${isB?" blocked":""}" id="ex-${id}"${ui.exOpen===id?" open":""} data-exitem="${id}">
       <summary><span class="exhd"><b>${esc(x.n)}</b><span class="small muted">${esc(x.m)}</span></span>
         <span class="exmk">${isF?`<span class="exstar" title="Favorit">★</span>`:""}${isB?`<span class="exnope" title="Nope!">⊘</span>`:""}<span class="pill">${x.own?"Eigene · ":""}${gearLbl(id,x)}</span></span></summary>
@@ -1211,7 +1223,7 @@ function noteHtml(id){
 function exHist(id){
   const out=[];
   for(const [d,x] of history()){
-    const a=work(x.sets&&x.sets[id]).filter(s=>s.min==null); if(!a.length) continue;
+    const a=work(x&&x.sets&&x.sets[id]).filter(s=>s&&s.min==null); if(!a.length) continue;
     const top=a.reduce((b,s)=>(s.w>b.w||(s.w===b.w&&(s.r||0)>(b.r||0)))?s:b,a[0]);
     out.push({d,e:Math.max(0,...a.map(setE1)),w:top.w||0,tr:top.r||0,r:Math.max(...a.map(s=>s.r||0)),sets:a});
   }
@@ -1416,7 +1428,7 @@ const UNI=new Set(["rotarytorso","splitsquat","dbrow","slrdl","lunge","cablelate
 const repsOf=s=>s.l!=null?(s.l||0)+(s.rr||0):(s.r||0);
 // Satztypen: w = Aufwärmsatz (zählt nicht für Volumen, Sätze und Bestleistungen), d = Dropsatz, f = bis zum Versagen
 const STYPE={w:"Aufw.",d:"Drop",f:"Versagen"};
-const work=arr=>(arr||[]).filter(s=>s.t!=="w");
+const work=arr=>(Array.isArray(arr)?arr:[]).filter(s=>s&&s.t!=="w");
 // Halteübungen (Plank usw.): r steht für Sekunden, Gewicht ist Zusatzgewicht; zählt nicht ins Volumen
 const isTimed=(id,reps)=>/\d\s*s\b/.test(String(reps!=null?reps:(EX[id]&&EX[id].r)||""));
 const setVol=s=>s.t==="w"||s.sec?0:(s.w||0)*repsOf(s);
@@ -1505,7 +1517,7 @@ const C=()=>state.coach;
 function exBest(id,sets){const w=work(sets);
   if(!w.length) return 0;
   const e=Math.max(...w.map(setE1)); return e>0?e:Math.max(...w.map(s=>(s.w||0)*100+repsOf(s)))}
-function exHist(id){return history().filter(([d,x])=>x.sets&&work(x.sets[id]).length)}
+function exDays(id){return history().filter(([d,x])=>x.sets&&work(x.sets[id]).length)}
 function planIds(){const p=state.profile, ids=new Map();
   for(const k of new Set(splitFor(p).seq)) for(const it of buildSession(k,p,false).items) if(it.role!=="cardio"&&!ids.has(it.id)) ids.set(it.id,it);
   return ids}
@@ -1517,7 +1529,7 @@ function coachTips(){
   let stalls=0;
   // 1. Übungen: zu schwer, deutlich zu leicht, Stillstand
   for(const [id,it] of ids){
-    const h=exHist(id); if(!h.length) continue;
+    const h=exDays(id); if(!h.length) continue;
     const [ld,lx]=h[h.length-1]; if(daysAgo(ld)>21) continue;
     const sets=work(lx.sets[id]), timed=sets.some(s=>s.sec), lo=lower(it.reps), top=upper(it.reps), w=Math.max(...sets.map(s=>s.w||0)), n=EX[id].n;
     const miss=sets.filter(s=>repsOf(s)/(s.l!=null?2:1)<lo).length;
@@ -1698,7 +1710,7 @@ async function aiAsk(user,sys=AI_SYS){
 function aiAction(a){
   if(!a||typeof a!=="object") return null;
   const c=C(), ids=planIds();
-  if(a.type==="weight"&&ids.has(a.ex)&&a.kg>0){const h=exHist(a.ex), last=h.length?Math.max(...work(h[h.length-1][1].sets[a.ex]).map(s=>s.w||0)):0;
+  if(a.type==="weight"&&ids.has(a.ex)&&a.kg>0){const h=exDays(a.ex), last=h.length?Math.max(...work(h[h.length-1][1].sets[a.ex]).map(s=>s.w||0)):0;
     if(last>0&&Math.abs(a.kg-last)/last>0.25) return null;
     const kg=Math.round(a.kg*2)/2, ld=h.length?h[h.length-1][0]:todayIso; return {l:`Nächstes Mal ${fmt(kg,1)} kg`,f:()=>{c.wNext[a.ex]={w:kg,after:ld}}}}
   if(a.type==="swap"&&ids.has(a.from)&&EX[a.to]&&!EX[a.to].del&&!ids.has(a.to)&&gearOk(a.to)) return {l:`Gegen ${EX[a.to].n} tauschen`,f:()=>coachSwap(a.from,a.to)};
@@ -1851,7 +1863,7 @@ function blockWeeks(){return Math.floor(daysAgo(blockOf().start)/7)}
 function blockRule(){
   const p=state.profile, b=blockOf(), L=BLOCK_REPS[p.goal]||BLOCK_REPS.hyper, [m,a]=L[b.n%L.length], ids=planIds(), used=new Set(ids.keys()), swaps=[];
   // Übungen ohne Fortschritt über den Block gegen ähnliche tauschen
-  for(const [id] of ids){if(swaps.length>=3) break; const h=exHist(id).filter(([d])=>d>=b.start); if(h.length<3) continue;
+  for(const [id] of ids){if(swaps.length>=3) break; const h=exDays(id).filter(([d])=>d>=b.start); if(h.length<3) continue;
     const e=h.map(([d,x])=>exBest(id,x.sets[id])); if(e[e.length-1]<=e[0]*1.01){const to=altFor(id,used); if(to){used.add(to); swaps.push({from:id,to})}}}
   return {title:m==="4–6"||m==="2–4"||m==="3–5"?"Kraftblock":m==="8–12"||m==="10–15"?"Volumenblock":"Aufbaublock",why:`Neue Wiederholungsbereiche geben einen frischen Reiz: Hauptübungen ${m}, Ergänzungen ${a}.${swaps.length?" Übungen ohne Fortschritt im letzten Block werden getauscht.":""}`,main:m,acc:a,swaps};
 }
@@ -2902,8 +2914,8 @@ function render(){
   navSync();
   const v=document.getElementById("view");
   if(ui.tab==="uebungen"&&ui.openEx) ui.exOpen=ui.openEx;
-  v.innerHTML=VIEWS[ui.tab]();
-  tidyInfo(v);
+  try{v.innerHTML=VIEWS[ui.tab](); tidyInfo(v)}
+  catch(err){console.error(err); v.innerHTML=`<section class="panel"><h3>Diese Ansicht konnte nicht geladen werden</h3><p class="small muted">Schick Claude bitte einen Screenshot davon.</p><pre class="small mono" style="white-space:pre-wrap">${esc(String(err&&err.stack||err)).slice(0,600)}</pre><button class="btn" data-goto="kalender">Zum Kalender</button></section>`}
   if(ui.tab==="training"&&ui.run){tick(); if(!timerInt) timerInt=setInterval(tick,250);
     if(ui.run.scrollTo!=null){const el=document.getElementById("it-"+ui.run.scrollTo); ui.run.scrollTo=null; if(el) el.scrollIntoView({block:"start",behavior:"smooth"})}}
   if(ui.tab==="uebungen"&&ui.openEx){const el=document.getElementById("ex-"+ui.openEx); if(el){el.open=true; ui.exOpen=ui.openEx; el.scrollIntoView({block:"start"})} ui.openEx=null;}
@@ -3021,7 +3033,7 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.day){ui.sel=t.dataset.day; render()}
   else if(t.dataset.mon){ui.month=new Date(ui.month.getFullYear(),ui.month.getMonth()+Number(t.dataset.mon),1); render()}
   else if(t.dataset.done){const r=document.getElementById("rpe"); state.done[t.dataset.done]={rpe:r?Number(r.value):null,at:new Date().toISOString()}; save(); render()}
-  else if(t.dataset.undone){if(ui.delDone!==t.dataset.undone){ui.delDone=t.dataset.undone; render(); return} ui.delDone=null; delete state.done[t.dataset.undone]; const wasEdit=ui.run&&ui.run.edit&&ui.run.date===t.dataset.undone; if(wasEdit) ui.run=null; save(); if(wasEdit){ui.sel=t.dataset.undone; go("kalender")} else render()}
+  else if(t.dataset.undone){if(ui.delDone!==t.dataset.undone){ui.delDone=t.dataset.undone; render(); return} ui.delDone=null; delete state.done[t.dataset.undone]; markLiveEnd(t.dataset.undone); const wasEdit=ui.run&&ui.run.edit&&ui.run.date===t.dataset.undone; if(wasEdit) ui.run=null; save(); if(wasEdit){ui.sel=t.dataset.undone; go("kalender")} else render()}
   else if(t.dataset.ex){ui.openEx=t.dataset.ex; exReset(); go("uebungen"); const el=document.getElementById("ex-"+t.dataset.ex); if(el) el.scrollIntoView({block:"start"})}
   else if(t.dataset.goto){go(t.dataset.goto)}
   else if(t.id==="btconnect"){connectBt()}
