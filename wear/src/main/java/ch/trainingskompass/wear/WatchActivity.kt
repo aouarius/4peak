@@ -475,7 +475,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     }
                     .focusRequester(focus)
                     .focusable()
-                    .padding(start = 16.dp, end = 16.dp, top = if (small) 24.dp else 28.dp, bottom = if (small) 8.dp else 12.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = if (small) 24.dp else 28.dp, bottom = if (small) 12.dp else 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HeartRateLine()
@@ -580,7 +580,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 state = state,
                 contentDescription = label,
                 onSelected = onSelect,
-                gradientRatio = 0.25f,
+                gradientRatio = 0.3f,
+                gradientColor = if (selected) Brand.TileHi else Brand.Tile,
                 modifier = Modifier.size(width = if (small) 64.dp else 74.dp, height = if (small) 58.dp else 70.dp),
             ) { i ->
                 Text(text(i), fontSize = if (small) 24.sp else 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -681,26 +682,26 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         // Der Ring am Rand läuft mit der Pause ab
         if (r.restLen > 0) EdgeProgress((r.restUntil - now).toFloat() / r.restLen)
         Column(
-            modifier = Modifier.fillMaxSize().padding(top = 26.dp, bottom = 10.dp, start = 22.dp, end = 22.dp),
+            modifier = Modifier.fillMaxSize().padding(top = 22.dp, bottom = 8.dp, start = 24.dp, end = 24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Pause", fontSize = 12.sp, color = Brand.Muted)
-            Text("%d:%02d".format(left / 60, left % 60), fontSize = 46.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("%d:%02d".format(left / 60, left % 60), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 46.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tile("Puls", if (hr > 0) "$hr" else "–", Modifier.weight(1f), valueColor = if (hr > 0) zoneColor(hrZone(hr, plan)) else Color.White, big = false)
                 Tile("Kalorien", "$kcal", Modifier.weight(1f), big = false)
             }
             val sum by Motion.lastSummary.collectAsState()
+            sum?.let { Text(it, fontSize = 11.sp, color = Brand.Soft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp)) }
             r.item?.let {
                 Text(
-                    (sum?.let { s -> "$s\n" } ?: "") + (if (r.setNo > 1) "Als Nächstes: Satz ${r.setNo} von ${it.sets}" else "Als Nächstes: ${it.name}") + if (r.index < r.items.size - 1) " ⇅" else "",
-                    fontSize = 12.sp,
+                    (if (r.setNo > 1) "Nächster: Satz ${r.setNo} von ${it.sets}" else "Nächste: ${it.name}") + if (r.index < r.items.size - 1) " ⇅" else "",
+                    fontSize = 11.sp,
                     color = Brand.Muted,
                     textAlign = TextAlign.Center,
-                    maxLines = 3,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
+                    modifier = Modifier.padding(top = if (sum == null) 4.dp else 0.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
             }
             Spacer(Modifier.size(6.dp))
@@ -712,7 +713,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 "Training beenden",
                 fontSize = 12.sp,
                 color = Brand.Muted,
-                modifier = Modifier.padding(top = 6.dp).clickable { r.end() },
+                modifier = Modifier.padding(top = 4.dp).clickable { r.end() },
             )
         }
     }

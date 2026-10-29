@@ -102,7 +102,7 @@ fun RoundButton(size: Dp, label: String, enabled: Boolean = true, onClick: () ->
 @Composable
 fun Pill(label: String, primary: Boolean = false, onClick: () -> Unit) {
     val m = Modifier.clip(RoundedCornerShape(50)).let { if (primary) it.background(Brand.grad) else it.background(Brand.TileHi) }
-    Box(m.clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+    Box(m.clickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
         Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }
