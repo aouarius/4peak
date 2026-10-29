@@ -1,17 +1,16 @@
 package ch.trainingskompass.wear
 
-import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.json.JSONObject
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onRoot
 import org.junit.After
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.time.Duration
 import java.time.LocalDate
 
 /**
@@ -62,14 +61,15 @@ class ScreensTest {
         WorkoutService.hr.value = 0; WorkoutService.kcal.value = 0; Motion.count.value = 0; Motion.lastSummary.value = null
     }
 
+    @get:Rule
+    val rule = createAndroidComposeRule<WatchActivity>()
+
     private fun shot(name: String, setup: (WatchActivity) -> Unit) {
-        val c = Robolectric.buildActivity(WatchActivity::class.java).setup()
-        val a = c.get()
-        a.plan = plan
-        setup(a)
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
-        a.window.decorView.captureRoboImage("build/screens/$name.png")
-        c.pause().stop().destroy()
+        // Uhr anhalten: sonst laufen die Zeitschleifen (Pause, Zähler) endlos weiter
+        rule.mainClock.autoAdvance = false
+        rule.runOnUiThread { val a = rule.activity; a.plan = plan; setup(a) }
+        repeat(10) { rule.mainClock.advanceTimeBy(100) }
+        rule.onRoot().captureRoboImage("build/screens/$name.png")
     }
 
     private fun runOf(i: Int = 0, warm: Boolean = false) = Run(if (warm) plan.sessions[i] else plan.sessions[i].copy(warm = null))
