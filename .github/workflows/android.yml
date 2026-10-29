@@ -29,3 +29,39 @@ jobs:
         with:
           name: 4Peak-apps
           path: out/*.apk
+
+  # Bildschirmfotos der Uhr-Ansichten (Beispieldaten) in den Branch «screens», zum Prüfen des Designs ohne Uhr
+  screens:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Bildschirmfotos erzeugen
+        run: gradle :wear:testDebugUnitTest --no-daemon --stacktrace
+      - name: Fehlerbericht sichern
+        if: failure()
+        run: |
+          mkdir -p shots
+          find wear/build/test-results -name "*.xml" -exec cp {} shots/ \; || true
+      - name: In Branch screens ablegen
+        if: always()
+        run: |
+          mkdir -p shots
+          cp wear/build/screens/*.png shots/ 2>/dev/null || true
+          cd shots
+          git init -q -b screens
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          echo "${GITHUB_SHA}" > SHA.txt
+          git add -A
+          git commit -q -m "Bildschirmfotos ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" screens

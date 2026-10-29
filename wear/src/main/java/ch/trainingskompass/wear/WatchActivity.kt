@@ -87,10 +87,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private val dataClient by lazy { Wearable.getDataClient(this) }
     private val prefs by lazy { getSharedPreferences("tk", MODE_PRIVATE) }
 
-    private var plan by mutableStateOf<Plan?>(null)
-    private var run by mutableStateOf<Run?>(null)
-    private var doneDates by mutableStateOf<Set<String>>(emptySet())
-    private var ambient by mutableStateOf(false)
+    // internal statt private: die Bildschirmfoto-Tests (src/test) setzen damit Beispieldaten
+    internal var plan by mutableStateOf<Plan?>(null)
+    internal var run by mutableStateOf<Run?>(null)
+    internal var doneDates by mutableStateOf<Set<String>>(emptySet())
+    internal var ambient by mutableStateOf(false)
     private var ambientTick by mutableLongStateOf(0L)
     private var pendingStart: String? = null
 
@@ -158,11 +159,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onResume() {
         super.onResume()
-        dataClient.addListener(this)
+        runCatching { dataClient.addListener(this) }
     }
 
     override fun onPause() {
-        dataClient.removeListener(this)
+        runCatching { dataClient.removeListener(this) }
         super.onPause()
     }
 
