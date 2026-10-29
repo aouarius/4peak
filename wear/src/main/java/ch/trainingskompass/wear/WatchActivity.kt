@@ -10,6 +10,11 @@ import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
+import androidx.wear.compose.material.Icon
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -296,7 +301,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         secondary = Color(0xFF8EA2FF),
         secondaryVariant = Color(0xFF6577E0),
         background = Color.Black,
-        surface = Color(0xFF1C1F2E),
+        surface = Color(0xFF1E2140),
         onPrimary = Color.White,
         onSecondary = Color.Black,
         onBackground = Color.White,
@@ -304,28 +309,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         onSurfaceVariant = Color(0xFFAEB4C8),
     )
 
-    private fun zoneColor(z: Int): Color = when (z) {
-        1 -> Color(0xFF9AA4B2)
-        2 -> Color(0xFF3D9BFF)
-        3 -> Color(0xFF3DDC84)
-        4 -> Color(0xFFFF9F2E)
-        5 -> Color(0xFFFF4D5E)
-        else -> Color(0xFFAEB4C8)
-    }
 
-    /** Ring am Displayrand, oben offen für die Uhrzeit */
-    @Composable
-    private fun EdgeRing(progress: Float, color: Color) {
-        CircularProgressIndicator(
-            progress = progress.coerceIn(0f, 1f),
-            modifier = Modifier.fillMaxSize().padding(3.dp),
-            startAngle = 300f,
-            endAngle = 240f,
-            indicatorColor = color,
-            trackColor = color.copy(alpha = 0.18f),
-            strokeWidth = 6.dp,
-        )
-    }
 
     @Composable
     private fun App() {
@@ -355,6 +339,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                         delay(500)
                     }
                 }
+                Box(Modifier.fillMaxSize().background(if (ambient) SolidColor(Color.Black) else Brand.bg))
                 when {
                     ambient && r != null && !r.finished -> AmbientScreen(r)
                     r == null -> PlanList()
@@ -374,7 +359,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         val p = plan
         val open = p?.sessions?.filter { it.date !in doneDates }.orEmpty()
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("4Peak", style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary) }
+            item { Logo(30.dp) }
             if (open.isEmpty()) {
                 item {
                     Text(
@@ -382,24 +367,41 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                         else "Keine offenen Trainings. Gute Erholung!",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.body2,
+                        color = Brand.Muted,
+                        modifier = Modifier.padding(horizontal = 8.dp),
                     )
                 }
             }
-            items(open.size) { i ->
-                val s = open[i]
+            // Das nächste Training gross wie der Startbildschirm bei Samsung Health
+            open.firstOrNull()?.let { s ->
+                item {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(
+                            (Store.dayLabel(s.date) + " · ${s.items.size} Übungen" + if (s.deload) " · Deload" else "").uppercase(),
+                            fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, color = Brand.Soft,
+                        )
+                        Text(s.name, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.size(10.dp))
+                        GradButton(60.dp, onClick = { startRun(s) }) {
+                            Icon(painterResource(R.drawable.ic_play), contentDescription = "Training starten", tint = Color.White, modifier = Modifier.size(30.dp))
+                        }
+                    }
+                }
+            }
+            if (open.size > 1) item {
+                Text("DANACH", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, color = Brand.Muted, modifier = Modifier.padding(top = 8.dp))
+            }
+            items(open.drop(1)) { s ->
                 Chip(
                     onClick = { startRun(s) },
-                    label = { Text((if (i == 0) "▶ " else "") + s.name, fontWeight = FontWeight.Bold) },
-                    secondaryLabel = { Text(Store.dayLabel(s.date) + " · ${s.items.size} Übungen" + if (s.deload) " · Deload" else "") },
+                    label = { Text(s.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    secondaryLabel = { Text(Store.dayLabel(s.date, long = false) + " · ${s.items.size} Übungen" + if (s.deload) " · Deload" else "", maxLines = 1, overflow = TextOverflow.Ellipsis, color = Brand.Muted) },
                     icon = {
-                        Box(
-                            Modifier.size(ChipDefaults.LargeIconSize).background(if (i == 0) Color.White.copy(alpha = 0.22f) else MaterialTheme.colors.primary.copy(alpha = 0.25f), CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) { Text("🏋", style = MaterialTheme.typography.caption1) }
+                        Box(Modifier.size(ChipDefaults.LargeIconSize).background(Brand.Blue.copy(alpha = 0.22f), CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(painterResource(R.drawable.ic_dumbbell), contentDescription = null, tint = Brand.Soft, modifier = Modifier.size(20.dp))
+                        }
                     },
-                    // Das nächste Training leuchtet, die späteren bleiben dunkel
-                    colors = if (i == 0) ChipDefaults.gradientBackgroundChipColors(startBackgroundColor = MaterialTheme.colors.primaryVariant, endBackgroundColor = MaterialTheme.colors.primary)
-                    else ChipDefaults.secondaryChipColors(),
+                    colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -410,17 +412,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private fun HeartRateLine() {
         val hr by WorkoutService.hr.collectAsState()
         val kcal by WorkoutService.kcal.collectAsState()
-        if (hr <= 0) {
-            // Platz halten, damit der Titel nicht nach oben in den schmalen Rand rutscht
-            Text("♥ –", style = MaterialTheme.typography.caption1, color = MaterialTheme.colors.onSurfaceVariant)
-            return
-        }
-        val z = hrZone(hr, plan)
-        // Wie bei Samsung Health: Pulszone als Farbe (1 grau, 2 blau, 3 grün, 4 orange, 5 rot)
+        val z = if (hr > 0) hrZone(hr, plan) else 0
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("♥ $hr", style = MaterialTheme.typography.caption1, fontWeight = FontWeight.Bold, color = zoneColor(z))
-            if (z > 0) Text(" Z$z", style = MaterialTheme.typography.caption3, color = zoneColor(z))
-            if (kcal > 0) Text(" · $kcal kcal", style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.onSurfaceVariant)
+            HeartIcon(if (hr > 0) zoneColor(z) else Brand.Muted, 13.dp)
+            Text(if (hr > 0) " $hr" else " –", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            if (kcal > 0) Text("  $kcal kcal", fontSize = 12.sp, color = Brand.Muted)
         }
     }
 
@@ -459,9 +455,9 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val focus = remember { FocusRequester() }
             val scope = rememberCoroutineScope()
             LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-            // Fortschritt des ganzen Trainings als Ring am Rand
-            val total = r.items.filter { x -> !x.cardio }.sumOf { x -> x.sets }.coerceAtLeast(1)
-            Box(Modifier.fillMaxSize()) { EdgeRing(r.setCount.toFloat() / total, MaterialTheme.colors.primary) }
+            // Pulszone als Bogen unten am Rand (wie Samsung Health)
+            val hr by WorkoutService.hr.collectAsState()
+            if (hr > 0) ZoneArc(hrZone(hr, plan))
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -479,7 +475,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     }
                     .focusRequester(focus)
                     .focusable()
-                    .padding(start = 14.dp, end = 14.dp, top = if (small) 22.dp else 26.dp, bottom = if (small) 6.dp else 10.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = if (small) 24.dp else 28.dp, bottom = if (small) 8.dp else 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HeartRateLine()
@@ -487,19 +483,24 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 val title = it.name + if (r.index < r.items.size - 1) " ⇅" else ""
                 Text(
                     title,
-                    style = MaterialTheme.typography.title3.copy(fontSize = if (title.length > 22) 13.sp else if (title.length > 16) 15.sp else MaterialTheme.typography.title3.fontSize),
+                    fontSize = if (title.length > 22) 13.sp else if (title.length > 16) 15.sp else 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colors.onSurface,
+                    color = Color.White,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 6.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
-                Text(
-                    if (r.inWarmSet) "Aufwärmsatz ${r.warmIdx + 1} von ${it.warmSets.size}" else "Satz ${r.setNo} von ${it.sets} · Ziel ${it.reps}",
-                    style = MaterialTheme.typography.caption2,
-                    color = if (r.inWarmSet) MaterialTheme.colors.secondary else MaterialTheme.colors.primary,
-                )
+                Spacer(Modifier.size(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (r.inWarmSet) {
+                        SetDots(r.warmIdx, it.warmSets.size, warm = true)
+                        Text("  Aufwärmen", fontSize = 12.sp, color = Brand.Soft, fontWeight = FontWeight.Bold)
+                    } else {
+                        SetDots(r.setNo - 1, it.sets)
+                        Text("  Ziel ${it.reps}", fontSize = 12.sp, color = Brand.Muted)
+                    }
+                }
                 if (it.timed) {
                     // Stoppuhr: läuft bis zum zweiten Tippen, vibriert beim Erreichen des Ziels
                     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -513,61 +514,45 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                         }
                     }
                     val sec = if (r.holdStart > 0) ((now - r.holdStart) / 1000).toInt().coerceAtLeast(0) else 0
-                    CompactChip(
-                        onClick = {
-                            if (r.holdStart == 0L) { r.holdStart = System.currentTimeMillis(); now = r.holdStart; tick() }
-                            else {
-                                val done = ((System.currentTimeMillis() - r.holdStart) / 1000).toInt().coerceIn(1, maxR)
-                                r.holdStart = 0
-                                scope.launch { rState.scrollToOption(done) }
-                                tick()
-                            }
-                        },
-                        label = { Text(if (r.holdStart > 0) "■ $sec s / $goal s" else "▶ Stoppuhr") },
-                        colors = if (r.holdStart > 0) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
-                    )
+                    Spacer(Modifier.size(3.dp))
+                    Pill(if (r.holdStart > 0) "■ $sec s / $goal s" else "▶ Stoppuhr", primary = r.holdStart > 0) {
+                        if (r.holdStart == 0L) { r.holdStart = System.currentTimeMillis(); now = r.holdStart; tick() }
+                        else {
+                            val done = ((System.currentTimeMillis() - r.holdStart) / 1000).toInt().coerceIn(1, maxR)
+                            r.holdStart = 0
+                            scope.launch { rState.scrollToOption(done) }
+                            tick()
+                        }
+                    }
                 }
-                if (counts) Text(
-                    if (counted >= 2) "⟲ $counted gezählt" + (if (manual) " · geändert" else "") else "⟲ zählt mit",
-                    style = MaterialTheme.typography.caption3,
-                    color = MaterialTheme.colors.secondary,
-                )
-                Spacer(Modifier.size(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PickerBox(if (it.bodyweight || it.timed) "+ kg" else "kg", wState, active == 0, small, { active = 0; runCatching { focus.requestFocus() } }) { i -> formatKg(i * step) }
                     PickerBox(if (it.timed) (if (it.unilateral) "Sek./Seite" else "Sek.") else if (it.unilateral) "Wdh./Seite" else "Wdh.", rState, active == 1, small, { active = 1; runCatching { focus.requestFocus() } }) { i -> i.toString() }
                 }
+                if (counts) Text(
+                    if (counted >= 2) "⟲ $counted gezählt" + (if (manual) " · geändert" else "") else "⟲ zählt mit",
+                    fontSize = 11.sp,
+                    color = Brand.Soft,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Button(
-                        onClick = { r.prev() },
-                        enabled = r.index > 0,
-                        colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.size(if (small) ButtonDefaults.ExtraSmallButtonSize else ButtonDefaults.SmallButtonSize),
-                    ) { Text("‹") }
-                    Button(
-                        onClick = {
-                            r.holdStart = 0
-                            r.weight = wState.selectedOption * step
-                            r.reps = rState.selectedOption
-                            val ar = if (r.inWarmSet) 0 else Motion.finishSet(this@WatchActivity, it.id, r.reps, r.weight)
-                            r.logSet(ar, if (ar > 0) Motion.lastTempo else 0.0, if (ar > 0) Motion.lastSlow else 0, WorkoutService.hr.value)
-                            tick()
-                        },
-                        modifier = Modifier.size(if (small) ButtonDefaults.SmallButtonSize else ButtonDefaults.DefaultButtonSize),
-                    ) { Text("✓", fontWeight = FontWeight.Bold) }
-                    Button(
-                        onClick = { r.next() },
-                        colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.size(if (small) ButtonDefaults.ExtraSmallButtonSize else ButtonDefaults.SmallButtonSize),
-                    ) { Text("›") }
+                    RoundButton(if (small) 34.dp else 38.dp, "‹", enabled = r.index > 0) { r.prev() }
+                    GradButton(if (small) 50.dp else 56.dp, onClick = {
+                        r.holdStart = 0
+                        r.weight = wState.selectedOption * step
+                        r.reps = rState.selectedOption
+                        val ar = if (r.inWarmSet) 0 else Motion.finishSet(this@WatchActivity, it.id, r.reps, r.weight)
+                        r.logSet(ar, if (ar > 0) Motion.lastTempo else 0.0, if (ar > 0) Motion.lastSlow else 0, WorkoutService.hr.value)
+                        tick()
+                    }) { Text("✓", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White) }
+                    RoundButton(if (small) 34.dp else 38.dp, "›") { r.next() }
                 }
             }
         }
@@ -575,11 +560,19 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     @Composable
     private fun PickerBox(label: String, state: PickerState, selected: Boolean, small: Boolean, onSelect: () -> Unit, text: (Int) -> String) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Kachel wie bei Samsung Health: Beschriftung oben, grosse Zahl; die aktive Kachel hat einen Verlaufsrahmen
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .background(if (selected) Brand.TileHi else Brand.Tile)
+                .gradBorder(selected)
+                .padding(top = 4.dp),
+        ) {
             Text(
                 label,
-                style = MaterialTheme.typography.caption3,
-                color = if (selected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurfaceVariant,
+                fontSize = 11.sp,
+                color = if (selected) Brand.Soft else Brand.Muted,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier.clickable { onSelect() },
             )
@@ -587,9 +580,10 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 state = state,
                 contentDescription = label,
                 onSelected = onSelect,
-                modifier = Modifier.size(width = if (small) 62.dp else 72.dp, height = if (small) 66.dp else 80.dp),
+                gradientRatio = 0.25f,
+                modifier = Modifier.size(width = if (small) 64.dp else 74.dp, height = if (small) 58.dp else 70.dp),
             ) { i ->
-                Text(text(i), style = if (small) MaterialTheme.typography.title2 else MaterialTheme.typography.title1, fontWeight = FontWeight.Bold)
+                Text(text(i), fontSize = if (small) 24.sp else 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
@@ -598,13 +592,13 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     private fun CardioScreen(r: Run, it: Item) {
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
             item { HeartRateLine() }
-            item { Text(it.name, style = MaterialTheme.typography.title3, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
-            item { Text(it.text.ifEmpty { "Ausdauer" }, textAlign = TextAlign.Center, style = MaterialTheme.typography.body2) }
+            item { Text(it.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
+            item { Text(it.text.ifEmpty { "Ausdauer" }, textAlign = TextAlign.Center, fontSize = 14.sp, color = Brand.Muted) }
             item {
                 Chip(
                     onClick = { r.logCardio() },
                     label = { Text("Erledigt") },
-                    colors = ChipDefaults.primaryChipColors(),
+                    colors = gradChip(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -636,7 +630,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     @Composable
     private fun OrderScreen(r: Run) {
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("Was machst du jetzt?", style = MaterialTheme.typography.caption1, textAlign = TextAlign.Center) }
+            item { Text("Was machst du jetzt?", fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) }
             for (j in r.index + 1 until r.items.size) {
                 val x = r.items[j]
                 val done = r.logs[x.id].orEmpty().count { !it.has("min") && it.optString("t") != "w" }
@@ -682,44 +676,44 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
         }
         val left = ((r.restUntil - now + 999) / 1000).coerceAtLeast(0)
+        val hr by WorkoutService.hr.collectAsState()
+        val kcal by WorkoutService.kcal.collectAsState()
         // Der Ring am Rand läuft mit der Pause ab
-        if (r.restLen > 0) EdgeRing((r.restUntil - now).toFloat() / r.restLen, MaterialTheme.colors.secondary)
+        if (r.restLen > 0) EdgeProgress((r.restUntil - now).toFloat() / r.restLen)
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(top = 26.dp, bottom = 10.dp, start = 22.dp, end = 22.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Kein eigener «Pause»-Titel: Ring und Zeit sagen es, und oben bleibt Platz für die Uhrzeit
-            Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.secondary)
-            HeartRateLine()
+            Text("Pause", fontSize = 12.sp, color = Brand.Muted)
+            Text("%d:%02d".format(left / 60, left % 60), fontSize = 46.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Tile("Puls", if (hr > 0) "$hr" else "–", Modifier.weight(1f), valueColor = if (hr > 0) zoneColor(hrZone(hr, plan)) else Color.White, big = false)
+                Tile("Kalorien", "$kcal", Modifier.weight(1f), big = false)
+            }
             val sum by Motion.lastSummary.collectAsState()
-            sum?.let { Text(it, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 18.dp)) }
             r.item?.let {
                 Text(
-                    (if (r.setNo > 1) "Als Nächstes: Satz ${r.setNo} von ${it.sets}" else "Als Nächstes: ${it.name}") + if (r.index < r.items.size - 1) " ⇅" else "",
-                    style = MaterialTheme.typography.caption2,
+                    (sum?.let { s -> "$s\n" } ?: "") + (if (r.setNo > 1) "Als Nächstes: Satz ${r.setNo} von ${it.sets}" else "Als Nächstes: ${it.name}") + if (r.index < r.items.size - 1) " ⇅" else "",
+                    fontSize = 12.sp,
+                    color = Brand.Muted,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 16.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
+                    modifier = Modifier.padding(top = 4.dp).clickable(enabled = r.index < r.items.size - 1) { r.picking = true },
                 )
             }
             Spacer(Modifier.size(6.dp))
-            Row {
-                CompactChip(
-                    onClick = { r.restUntil += 30_000; r.restLen += 30_000 },
-                    label = { Text("+30 s") },
-                    colors = ChipDefaults.secondaryChipColors(),
-                )
-                Spacer(Modifier.width(8.dp))
-                CompactChip(onClick = { r.restUntil = 0 }, label = { Text("Weiter") })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill("+30 s") { r.restUntil += 30_000; r.restLen += 30_000 }
+                Pill("Weiter", primary = true) { r.restUntil = 0 }
             }
-            CompactChip(
-                onClick = { r.end() },
-                label = { Text("Beenden", color = MaterialTheme.colors.onSurfaceVariant) },
-                colors = ChipDefaults.childChipColors(),
+            Text(
+                "Training beenden",
+                fontSize = 12.sp,
+                color = Brand.Muted,
+                modifier = Modifier.padding(top = 6.dp).clickable { r.end() },
             )
-            Spacer(Modifier.size(14.dp))
         }
     }
 
@@ -728,16 +722,20 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         var sending by remember { mutableStateOf(false) }
         val minutes = ((System.currentTimeMillis() - r.startedAt) / 60_000).coerceAtLeast(1)
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("Geschafft 💪", style = MaterialTheme.typography.title2, fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary) }
+            item { Logo(22.dp) }
+            item { Text("Geschafft!", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White) }
             item {
-                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
-                    Stat("${r.setCount}", "Sätze")
-                    Stat("$minutes", "min")
-                    if (WorkoutService.kcal.value > 0) Stat("${WorkoutService.kcal.value}", "kcal")
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Tile("Sätze", "${r.setCount}", Modifier.weight(1f))
+                    Tile("Minuten", "$minutes", Modifier.weight(1f))
+                    if (WorkoutService.kcal.value > 0) Tile("kcal", "${WorkoutService.kcal.value}", Modifier.weight(1f))
                 }
             }
             if (WorkoutService.hrMax > 0) item {
-                Text("max. ♥ ${WorkoutService.hrMax}", style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.secondary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HeartIcon(zoneColor(hrZone(WorkoutService.hrMax, plan)), 12.dp)
+                    Text(" max. ${WorkoutService.hrMax}  ·  Ø ${WorkoutService.hrAvg}", fontSize = 12.sp, color = Brand.Muted)
+                }
             }
             if (r.logs.isNotEmpty()) {
                 item {
@@ -753,7 +751,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                         },
                         label = { Text(if (sending) "Wird gespeichert …" else "Speichern", fontWeight = FontWeight.Bold) },
                         secondaryLabel = { Text("Geht ans Handy") },
-                        colors = ChipDefaults.gradientBackgroundChipColors(startBackgroundColor = MaterialTheme.colors.primaryVariant, endBackgroundColor = MaterialTheme.colors.primary),
+                        colors = gradChip(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -768,19 +766,12 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
     }
 
-    @Composable
-    private fun Stat(value: String, label: String) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, style = MaterialTheme.typography.title1, fontWeight = FontWeight.Bold)
-            Text(label, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.onSurfaceVariant)
-        }
-    }
 
     /** Hinweis: Puls zeigt, dass du warm bist. Weiter oder noch aufwärmen. */
     @Composable
     private fun WarmReadyScreen(r: Run) {
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("Aufgewärmt ✓", style = MaterialTheme.typography.title2, color = MaterialTheme.colors.secondary) }
+            item { Text("Aufgewärmt ✓", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Brand.Soft) }
             item {
                 Text(
                     "Dein Puls liegt seit 2 Minuten im Aufwärmbereich. Mit dem Training beginnen?",
@@ -793,7 +784,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 Chip(
                     onClick = { r.endWarmup(skip = false); tick() },
                     label = { Text("Weiter zum Training") },
-                    colors = ChipDefaults.primaryChipColors(),
+                    colors = gradChip(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -818,7 +809,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
         }
         ScalingLazyColumn(modifier = Modifier.fillMaxSize(), state = rememberScalingLazyListState()) {
-            item { Text("Aufwärmen", style = MaterialTheme.typography.title3) }
+            item { Text("Aufwärmen", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
             item {
                 val bpm by WorkoutService.hr.collectAsState()
                 val p = plan
@@ -833,7 +824,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             item {
                 if (r.warmUntil > 0) {
                     val left = ((r.warmUntil - now + 999) / 1000).coerceAtLeast(0)
-                    Text("%d:%02d".format(left / 60, left % 60), style = MaterialTheme.typography.display2)
+                    Text("%d:%02d".format(left / 60, left % 60), fontSize = 40.sp, fontWeight = FontWeight.Bold)
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CompactChip(onClick = { if (r.warmMinutes > 1) r.warmMinutes-- }, label = { Text("−") }, colors = ChipDefaults.secondaryChipColors())
@@ -844,7 +835,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
             item {
                 if (r.warmUntil > 0) CompactChip(onClick = { r.warmUntil += 60_000 }, label = { Text("+1 min") }, colors = ChipDefaults.secondaryChipColors())
-                else Chip(onClick = { r.startWarmTimer() }, label = { Text(if (r.warmStart == 0L) "Timer starten" else "Timer neu starten") }, colors = ChipDefaults.primaryChipColors(), modifier = Modifier.fillMaxWidth())
+                else Chip(onClick = { r.startWarmTimer() }, label = { Text(if (r.warmStart == 0L) "Timer starten" else "Timer neu starten") }, colors = gradChip(), modifier = Modifier.fillMaxWidth())
             }
             for (t in w.types) {
                 val on = t.key in r.warmOn
@@ -863,7 +854,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     }
                 }
             }
-            item { Chip(onClick = { r.endWarmup(skip = false); tick() }, label = { Text("Fertig, los geht's") }, colors = ChipDefaults.primaryChipColors(), modifier = Modifier.fillMaxWidth()) }
+            item { Chip(onClick = { r.endWarmup(skip = false); tick() }, label = { Text("Fertig, los geht's") }, colors = gradChip(), modifier = Modifier.fillMaxWidth()) }
             item { CompactChip(onClick = { r.endWarmup(skip = true) }, label = { Text("Überspringen") }, colors = ChipDefaults.secondaryChipColors()) }
         }
     }
