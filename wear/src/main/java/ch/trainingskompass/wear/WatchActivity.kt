@@ -128,6 +128,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         if (savedInstanceState == null) pendingStart = intent.getStringExtra(EXTRA_START)
         startPending()
         lifecycleScope.launch { loadPlanFromDataLayer() }
+        lifecycleScope.launch { sendMotion() }
         // Ende vom Handy, auch wenn die App gerade im Hintergrund war (kommt über PlanListenerService)
         lifecycleScope.launch { phoneLive.collect { j -> if (j != null) { phoneLive.value = null; applyLive(j) } } }
         setContent { App() }
@@ -311,6 +312,26 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         publishLive(JSONObject().put("date", r.session.date).put("src", "watch").put("t", System.currentTimeMillis()).put("end", true))
         doneDates = doneDates + r.session.date
         Store.saveDone(this, doneDates)
+        sendMotion()
+    }
+
+    /**
+     * Bewegungsdaten der Sätze (CSV, siehe Motion.writeCsv) gepackt ans Handy schicken, damit sie sich dort
+     * exportieren lassen. Erst nach erfolgreicher Übergabe an den Data Layer wird die Datei auf der Uhr gelöscht.
+     */
+    private suspend fun sendMotion() {
+        val dir = java.io.File(filesDir, "motion")
+        val files = dir.listFiles { f -> f.name.endsWith(".csv") }?.sortedBy { it.name }.orEmpty()
+        for (f in files) {
+            val ok = runCatching {
+                val bytes = java.io.ByteArrayOutputStream().also { bo -> java.util.zip.GZIPOutputStream(bo).use { it.write(f.readBytes()) } }.toByteArray()
+                val req = PutDataMapRequest.create(MOTION_PATH + f.name).apply {
+                    dataMap.putAsset("csv", com.google.android.gms.wearable.Asset.createFromBytes(bytes))
+                }.asPutDataRequest()
+                dataClient.putDataItem(req).await()
+            }.isSuccess
+            if (ok) f.delete() else break
+        }
     }
 
     private fun vibrate() {
@@ -1002,6 +1023,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         const val PLAN_PATH = "/plan"
         const val LIVE_WATCH = "/live/watch"
         const val LIVE_PHONE = "/live/phone"
+        const val MOTION_PATH = "/motion/"
         const val EXTRA_START = "start"
         /** Live-Stand vom Handy, den der Hintergrund-Dienst empfangen hat */
         val phoneLive = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)

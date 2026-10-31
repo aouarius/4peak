@@ -898,8 +898,19 @@ function watchHtml(){
     <div class="small muted">Plan zuletzt an die Uhr gesendet: ${sent?when(sent):"noch nie"}${fromW?` · Letztes Training von der Uhr: ${when(fromW[1].at||fromW[0])}`:""}</div>
     ${cnt.length?`<div class="small muted">Wiederholungszähler: ${exact} von ${cnt.length} gezählten Sätzen genau, ${near} auf ±1 Wiederholung.</div>`:""}
     <div class="row" style="gap:8px"><button class="btn" data-watchsend="1">Plan jetzt an die Uhr senden</button><button class="btn ghost" data-watchask="1">Status aktualisieren</button></div>
+    ${motionHtml()}
   </section>`;
 }
+/* Bewegungsdaten der Uhr (Sensor-Rohdaten je Satz) als ZIP exportieren, z. B. um den Wiederholungszähler zu verbessern */
+function motionHtml(){
+  if(!(NATIVE&&NATIVE.exportMotion)) return "";
+  if(ui.motionN==null&&!ui.motionAsked){ui.motionAsked=true; setTimeout(()=>{try{NATIVE.motionCount()}catch(e){}},0)}
+  const n=ui.motionN;
+  return `<div class="coachtip"><b>Bewegungsdaten</b><div class="small muted">${n==null?"Wird gezählt …":n?`${n} Sätze mit Sensordaten von der Uhr auf dem Handy.`:"Noch keine. Sie kommen, sobald du ein Training auf der Uhr speicherst."}${ui.motionMsg?` · ${esc(ui.motionMsg)}`:""}</div>
+    ${n?`<div class="row"><button class="btn" data-motionexp="1">Bewegungsdaten exportieren (ZIP)</button></div>`:""}</div>`;
+}
+window.onMotionCount=function(n){ui.motionN=Number(n)||0; if(ui.tab==="wear") keepScroll(render)};
+window.onMotionExported=function(r){ui.motionMsg=r==null?"":r===false?"Export fehlgeschlagen":`${r} Sätze exportiert ✓`; if(ui.tab==="wear") keepScroll(render)};
 window.onWatchSessions=function(arr){
   let n=0;
   for(const x of arr||[]){
@@ -2929,9 +2940,10 @@ document.addEventListener("toggle",e=>{const d=e.target; if(!d.dataset||!d.datas
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
+  if(t.dataset.motionexp){try{NATIVE.exportMotion("4peak-bewegungsdaten-"+todayIso+".zip")}catch(e){} return}
   if(t.dataset.exmusc!=null){ui.exMus=t.dataset.exmusc; ui.exMark=""; render(); return}
   if(t.dataset.exmarkc!=null){ui.exMark=ui.exMark===t.dataset.exmarkc?"":t.dataset.exmarkc; ui.exMus=""; render(); return}
   if(t.dataset.exfilt){ui.exFilt=!ui.exFilt; render(); return}

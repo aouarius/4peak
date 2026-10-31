@@ -183,6 +183,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         super.onResume()
         dataClient.addListener(this)
         pullWatchLogs()
+        pullMotion()
         pullLive()
         // Sport aus Samsung Health still nachladen, wenn Health Connect schon freigegeben ist
         lifecycleScope.launch { if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) deliverHealth() }
@@ -200,6 +201,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onDataChanged(events: DataEventBuffer) {
         if (events.any { it.dataItem.uri.path?.startsWith(LOG_PATH) == true }) pullWatchLogs()
+        if (events.any { it.dataItem.uri.path?.startsWith(MOTION_PATH) == true }) pullMotion()
         events.filter { it.type == DataEvent.TYPE_CHANGED && it.dataItem.uri.path == LIVE_WATCH }
             .mapNotNull { DataMapItem.fromDataItem(it.dataItem).dataMap.getString("json") }
             .lastOrNull()?.let { json -> runOnUiThread { deliverLive(json) } }
@@ -225,6 +227,57 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             deliverLive(json)
         }
     }
+
+    /** Bewegungsdaten der Uhr (gepackte CSV je Satz) abholen, in filesDir/motion ablegen und den Eintrag löschen. */
+    private fun pullMotion() {
+        lifecycleScope.launch {
+            val items = runCatching {
+                val buffer = dataClient.dataItems.await()
+                try {
+                    buffer.filter { it.uri.path?.startsWith(MOTION_PATH) == true }.mapNotNull { item ->
+                        val asset = DataMapItem.fromDataItem(item).dataMap.getAsset("csv") ?: return@mapNotNull null
+                        Triple(item.uri, item.uri.lastPathSegment ?: return@mapNotNull null, asset)
+                    }
+                } finally {
+                    buffer.release()
+                }
+            }.getOrDefault(emptyList())
+            if (items.isEmpty()) return@launch
+            val dir = java.io.File(filesDir, "motion").apply { mkdirs() }
+            var n = 0
+            for ((uri, name, asset) in items) {
+                val ok = runCatching {
+                    val fd = dataClient.getFdForAsset(asset).await()
+                    fd.inputStream.use { inp -> java.io.File(dir, "$name.gz").outputStream().use { inp.copyTo(it) } }
+                }.isSuccess
+                if (ok) { n++; runCatching { dataClient.deleteDataItems(uri).await() } }
+            }
+            if (n > 0 && pageReady) web.evaluateJavascript("window.onMotionCount && window.onMotionCount(${motionFiles().size})", null)
+        }
+    }
+
+    private fun motionFiles() = java.io.File(filesDir, "motion").listFiles { f -> f.name.endsWith(".csv.gz") }?.sortedBy { it.name }.orEmpty()
+
+    // Export der Bewegungsdaten als ZIP (eine CSV je Satz), Speicherort wählt Android
+    private val createMotionZip =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+            if (uri == null) { web.evaluateJavascript("window.onMotionExported && window.onMotionExported(null)", null); return@registerForActivityResult }
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val files = motionFiles()
+                val ok = runCatching {
+                    contentResolver.openOutputStream(uri, "wt")!!.use { os ->
+                        java.util.zip.ZipOutputStream(os).use { zip ->
+                            for (f in files) {
+                                zip.putNextEntry(java.util.zip.ZipEntry(f.name.removeSuffix(".gz")))
+                                java.util.zip.GZIPInputStream(f.inputStream()).use { it.copyTo(zip) }
+                                zip.closeEntry()
+                            }
+                        }
+                    }
+                }.isSuccess
+                runOnUiThread { web.evaluateJavascript("window.onMotionExported && window.onMotionExported(${if (ok) files.size else "false"})", null) }
+            }
+        }
 
     /** Holt alle von der Uhr gespeicherten Trainings, übergibt sie der Seite und löscht sie danach. */
     private fun pullWatchLogs() {
@@ -384,6 +437,17 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
         }
 
+        /** Anzahl gespeicherter Bewegungsdaten-Sätze; Antwort über window.onMotionCount(n) */
+        @JavascriptInterface
+        fun motionCount() {
+            runOnUiThread { pullMotion(); web.evaluateJavascript("window.onMotionCount && window.onMotionCount(${motionFiles().size})", null) }
+        }
+
+        @JavascriptInterface
+        fun exportMotion(name: String) {
+            runOnUiThread { createMotionZip.launch(name) }
+        }
+
         @JavascriptInterface
         fun saveBackup(name: String, json: String) {
             runOnUiThread {
@@ -430,6 +494,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         /** Von der Uhr-App angemeldet (wear/res/values/wear.xml) */
         const val WATCH_CAPABILITY = "fourpeak_watch"
         const val LOG_PATH = "/log/"
+        const val MOTION_PATH = "/motion/"
         const val LIVE_WATCH = "/live/watch"
         const val LIVE_PHONE = "/live/phone"
     }
