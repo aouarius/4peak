@@ -1688,7 +1688,7 @@ function coachData(){
     ernaehrung_14_tage:days,
     koerpergewicht:[...state.bw].sort((a,b)=>a.d<b.d?-1:1).filter(x=>daysAgo(x.d)<=84).map(x=>`${x.d}: ${x.v} kg${x.f?`, ${x.f} % Körperfett`:""}`),
     gesundheit_14_tage:hl?{schlaf_min:hl.sleep.slice(-14).map(x=>`${x.d}: ${x.min}`),hrv_ms:hl.hrv.slice(-14).map(x=>`${x.d}: ${Math.round(x.v)}`),ruhepuls:hl.rest.slice(-14).map(x=>`${x.d}: ${Math.round(x.v)}`)}:"nicht verbunden",
-    andere_aktivitaeten_4_wochen:(state.acts||[]).filter(a=>daysAgo(a.date)<=28).map(a=>`${a.date}: ${a.name||a.kind||"Cardio"} ${a.dur} min${a.avg?`, Puls Ø ${a.avg}`:""}`),
+    andere_aktivitaeten_4_wochen:(state.acts||[]).filter(a=>daysAgo(a.date)<=28).map(a=>`${a.date}: ${a.name||a.kind||"Cardio"} ${a.dur} min${a.avg?`, Puls Ø ${a.avg}`:""}${a.max?`, max ${a.max}`:""}${a.kcal?`, ${a.kcal} kcal`:""}${a.src?` (${a.src})`:""}`),
     muskel_saetze_diese_woche:Object.fromEntries(Object.keys(MUS_N).map(k=>[MUS_N[k],{erledigt:Math.round((mw.done[k]||0)*10)/10,geplant:Math.round((mw.plan[k]||0)*10)/10}])),
     trainings_8_wochen:trainings, plan_letzte_4_wochen:geplant,
     naechstes_training:u?{d:u.date,einheit:u.s.name,tagesform:u.s.ready||null,uebungen:u.s.items.filter(i=>i.role!=="cardio").map(i=>`${i.id} ${i.sets}×${i.reps}`)}:null,
