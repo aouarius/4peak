@@ -51,8 +51,9 @@ object AiCoach {
             out.put("error", if (e.statusCode() == 402) "Kein Guthaben auf dem Anthropic-Konto." else "Die KI hat nicht geantwortet (${e.statusCode()}).")
         } catch (e: AnthropicIoException) {
             out.put("error", "Keine Verbindung zur KI.")
-        } catch (e: Exception) {
-            out.put("error", "Die KI hat nicht geantwortet.")
+        } catch (e: Throwable) {
+            // Auch Fehler der Bibliothek auf Android melden, mit Ursache, damit sich das eingrenzen lässt
+            out.put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}: ${e.message?.take(120) ?: "-"}).")
         }
         out
     }

@@ -1795,7 +1795,7 @@ function chatHtml(){
     <div id="chatlog" class="chatlog">${msgs.length?msgs.map((m,i)=>{const idx=(c.chat.length-msgs.length)+i;
       return `<div class="msg ${m.r==="u"?"me":"tr"}">${esc(m.t)}${m.r==="a"&&m.a&&m.a.length?`<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">${m.a.map((a,j)=>{const k=`chat:${m.at}:${j}`; if(c.hide[k]) return `<span class="small muted">✓ Übernommen</span>`; const x=aiAction(a); if(!x) return ""; return `<button class="btn small" data-chatdo="${idx}:${j}">${esc(x.l)}</button>`}).join("")}</div>`:""}</div>`}).join("")
       :`<div class="small muted">Frag mich zum Beispiel: „Mein Knie zwickt bei Kniebeugen, was nun?“, „Ich habe heute nur 40 Minuten“ oder „Warum geht es beim Bankdrücken nicht weiter?“</div>`}
-    ${ui.chatBusy?`<div class="msg tr muted">…</div>`:""}</div>
+    ${ui.chatBusy?`<div class="msg tr muted">Dein Trainer schaut sich deine Daten an … das kann bis zu einer Minute dauern.</div>`:""}</div>
     ${ui.chatErr?`<div class="small" style="color:var(--red)">${esc(ui.chatErr)}</div>`:""}
     <div class="row" style="gap:6px;align-items:flex-end"><textarea id="chatin" rows="2" placeholder="Schreib deinem Trainer …" style="flex:1">${esc(ui.chatDraft||"")}</textarea><button class="btn" data-chatsend="1" ${ui.chatBusy?"disabled":""}>Senden</button></div>
     ${(c.chat||[]).length?`<button class="linkbtn small" data-chatclear="1" style="align-self:flex-start">Verlauf löschen</button>`:""}

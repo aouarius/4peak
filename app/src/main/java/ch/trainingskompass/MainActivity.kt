@@ -465,7 +465,8 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         @JavascriptInterface
         fun aiAsk(id: String, key: String, system: String, user: String) {
             lifecycleScope.launch {
-                val res = AiCoach.ask(key, system, user)
+                val res = runCatching { AiCoach.ask(key, system, user) }
+                    .getOrElse { e -> JSONObject().put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}).") }
                 web.evaluateJavascript("window.onAiResult && window.onAiResult(${JSONObject.quote(id)}, ${JSONObject.quote(res.toString())})", null)
             }
         }
