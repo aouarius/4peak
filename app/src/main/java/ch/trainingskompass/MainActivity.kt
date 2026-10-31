@@ -464,8 +464,10 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         /** KI-Trainer: Antwort kommt über window.onAiResult(id, {text}|{error}) zurück */
         @JavascriptInterface
         fun aiAsk(id: String, key: String, system: String, user: String) {
+            // Chat soll schnell antworten: geringerer Aufwand als bei der ausführlichen Einschätzung
+            val effort = if (system.contains("chattest")) "low" else "medium"
             lifecycleScope.launch {
-                val res = runCatching { AiCoach.ask(key, system, user) }
+                val res = runCatching { AiCoach.ask(key, system, user, effort) }
                     .getOrElse { e -> JSONObject().put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}).") }
                 web.evaluateJavascript("window.onAiResult && window.onAiResult(${JSONObject.quote(id)}, ${JSONObject.quote(res.toString())})", null)
             }

@@ -1,14 +1,5 @@
 package ch.trainingskompass
 
-import com.anthropic.client.okhttp.AnthropicOkHttpClient
-import com.anthropic.core.JsonValue
-import com.anthropic.errors.AnthropicIoException
-import com.anthropic.errors.AnthropicServiceException
-import com.anthropic.errors.PermissionDeniedException
-import com.anthropic.errors.RateLimitException
-import com.anthropic.errors.UnauthorizedException
-import com.anthropic.models.messages.MessageCreateParams
-import com.anthropic.models.messages.OutputConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -21,46 +12,17 @@ import org.json.JSONObject
 object AiCoach {
     private const val MODEL = "claude-opus-5-5"
 
-    suspend fun ask(apiKey: String, system: String, user: String): JSONObject = withContext(Dispatchers.IO) {
-        val out = JSONObject()
-        try {
-            val client = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
-            val params = MessageCreateParams.builder()
-                .model(MODEL)
-                .maxTokens(16000L)
-                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.MEDIUM).build())
-                .system(system)
-                .addUserMessage(user)
-                // Lehnt das Modell ab, beantwortet ein passendes anderes Modell die Anfrage
-                .putAdditionalHeader("anthropic-beta", "server-side-fallback-2026-07-01")
-                .putAdditionalBodyProperty("fallbacks", JsonValue.from("default"))
-                .build()
-            val msg = client.messages().create(params)
-            if (msg.stopReason().map { it.toString() }.orElse("") == "refusal") {
-                out.put("error", "Die KI hat diese Anfrage abgelehnt.")
-            } else {
-                out.put("text", msg.content().mapNotNull { it.text().orElse(null)?.text() }.joinToString(""))
-            }
-        } catch (e: UnauthorizedException) {
-            out.put("error", "API-Schlüssel ungültig.")
-        } catch (e: PermissionDeniedException) {
-            out.put("error", "Dieser API-Schlüssel darf das Modell nicht nutzen.")
-        } catch (e: RateLimitException) {
-            out.put("error", "Gerade zu viele Anfragen, später nochmals.")
-        } catch (e: AnthropicServiceException) {
-            out.put("error", if (e.statusCode() == 402) "Kein Guthaben auf dem Anthropic-Konto." else "Die KI hat nicht geantwortet (${e.statusCode()}).")
-        } catch (e: AnthropicIoException) {
-            // Auf manchen Handys scheitert die Verbindung der Bibliothek; dann direkt per HTTPS versuchen
-            return@withContext direct(apiKey, system, user, e)
-        } catch (e: Throwable) {
-            // Auch Fehler der Bibliothek auf Android melden, mit Ursache, damit sich das eingrenzen lässt
-            out.put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}: ${e.message?.take(120) ?: "-"}).")
-        }
-        out
+    /**
+     * Direkt per HTTPS (HttpURLConnection). Die Java-Bibliothek kam auf dem Handy nicht durch
+     * (Verbindungsfehler, dann Zeitüberschreitung), der einfache Weg funktioniert wie die Lebensmittel-Suche.
+     */
+    suspend fun ask(apiKey: String, system: String, user: String, effort: String = "medium"): JSONObject = withContext(Dispatchers.IO) {
+        direct(apiKey, system, user, effort)
     }
 
     /** Gleiche Anfrage ohne Bibliothek, über HttpURLConnection (wie die Lebensmittel-Suche) */
-    private fun direct(apiKey: String, system: String, user: String, first: Throwable): JSONObject {
+    private fun direct(apiKey: String, system: String, user: String, effort: String): JSONObject {
+        val t0 = System.currentTimeMillis()
         val out = JSONObject()
         try {
             val body = JSONObject()
@@ -68,12 +30,12 @@ object AiCoach {
                 .put("max_tokens", 16000)
                 .put("system", system)
                 .put("messages", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", user)))
-                .put("output_config", JSONObject().put("effort", "medium"))
+                .put("output_config", JSONObject().put("effort", effort))
                 .put("fallbacks", "default")
             val con = (java.net.URL("https://api.anthropic.com/v1/messages").openConnection() as java.net.HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 20_000
-                readTimeout = 150_000
+                readTimeout = 110_000
                 doOutput = true
                 setRequestProperty("content-type", "application/json")
                 setRequestProperty("x-api-key", apiKey)
@@ -102,9 +64,8 @@ object AiCoach {
                 }
             }
         } catch (e: Throwable) {
-            val why = (e.message ?: e.javaClass.simpleName).take(100)
-            val why1 = (first.cause?.message ?: first.message ?: first.javaClass.simpleName).take(80)
-            out.put("error", "Keine Verbindung zur KI ($why · $why1).")
+            val why = (e.message ?: e.javaClass.simpleName).take(120)
+            out.put("error", "Keine Verbindung zur KI (${e.javaClass.simpleName}: $why, nach ${(System.currentTimeMillis() - t0) / 1000} s).")
         }
         return out
     }

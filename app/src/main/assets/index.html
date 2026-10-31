@@ -1711,7 +1711,7 @@ async function aiAsk(user,sys=AI_SYS){
   }
   if(NATIVE&&NATIVE.aiAsk&&aiKey()){
     const id=String(Date.now())+Math.random().toString(36).slice(2,6);
-    const o=await new Promise(res=>{aiWait[id]=res; NATIVE.aiAsk(id,aiKey(),sys,user); setTimeout(()=>{if(aiWait[id]){delete aiWait[id]; res({error:"Keine Antwort in 2 Minuten."})}},120000)});
+    const o=await new Promise(res=>{aiWait[id]=res; NATIVE.aiAsk(id,aiKey(),sys,user); setTimeout(()=>{if(aiWait[id]){delete aiWait[id]; res({error:"Keine Antwort in 2 Minuten."})}},130000)});
     if(o.error) throw new Error(o.error);
     const m=String(o.text||"").match(/\{[\s\S]*\}/); if(!m) throw new Error("Antwort unlesbar.");
     return JSON.parse(m[0]);
