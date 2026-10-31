@@ -1744,6 +1744,11 @@ function aiAction(a){
   if(a.type==="kcal"){const d=Math.round(Math.max(-300,Math.min(300,+a.delta||0))/50)*50; if(!d||Math.abs((c.kcalAdj||0)+d)>600) return null; return {l:`${d>0?"+":"−"}${Math.abs(d)} kcal pro Tag`,f:()=>{c.kcalAdj=(c.kcalAdj||0)+d}}}
   const u=upcoming();
   if(a.type==="skip"&&u&&u.s.items.some(i=>i.id===a.ex)) return {l:`${EX[a.ex].n} nächstes Mal weglassen`,f:()=>{(c.skip[u.date]=c.skip[u.date]||[]).push(a.ex)}};
+  if(a.type==="add"&&u&&EX[a.ex]&&!EX[a.ex].del&&gearOk(a.ex)&&!u.s.items.some(i=>i.id===a.ex)){
+    const sets=Math.max(1,Math.min(6,Math.round(+a.sets||3))), reps=okReps(a.reps)||/s$/.test(String(a.reps||""))?String(a.reps):(EX[a.ex].r||"10–15"), cardio=!!EX[a.ex].cardio;
+    const it=cardio?{id:a.ex,role:"cardio",dur:String(a.dur||"20–30 min").slice(0,20)}:{id:a.ex,role:"acc",sets,reps};
+    if(a.dauerhaft&&u.s.key) return {l:`${EX[a.ex].n} fest in ${u.s.name}`,f:()=>{const L=materialize(u.s.key); if(!L.some(x=>x.id===a.ex)) L.push(it)}};
+    return {l:`${EX[a.ex].n} ins nächste Training`,f:()=>{const E=c.extra=c.extra||{}; (E[u.date]=E[u.date]||[]).push({id:a.ex,sets,reps,dur:it.dur})}}}
   if(a.type==="ready"&&u&&READY_N[a.mode]) return {l:`Nächstes Training: ${READY_N[a.mode]}`,f:()=>{if(a.mode==="normal") delete c.ready[u.date]; else c.ready[u.date]=a.mode}};
   if(a.type==="block") return {l:"Neuen Block planen",f:()=>{setTimeout(blockPlan,0)}};
   const tabs={ernaehrung:"Zur Ernährung",profil:"Zum Profil",fortschritt:"Zum Fortschritt",plan:"Zum Plan"};
@@ -1783,22 +1788,34 @@ AKTION ist genau eine von:
 {"type":"swap","from":"<übungs-id im Plan>","to":"<id aus moegliche_tauschuebungen>"} dauerhaft tauschen
 {"type":"sets","ex":"<übungs-id im Plan>","sets":<1–6>} Satzzahl dauerhaft ändern
 {"type":"skip","ex":"<übungs-id aus naechstes_training>"} nur im nächsten Training weglassen
+{"type":"add","ex":"<id aus uebungs_katalog>","sets":<1–6>,"reps":"z. B. 8–12","dauerhaft":false} Übung ins nächste Training einbauen; mit "dauerhaft":true fest in diese Einheit des Plans
+{"type":"activity","name":"z. B. Padel","min":<Minuten>,"d":"YYYY-MM-DD","kcal":<geschätzt>,"kind":"cardio"|"kraft"|"mob"} andere Sportart eintragen (ohne Knopf, die App trägt es sofort ein). Erzählt die Person, dass sie Sport gemacht hat (z. B. "heute 90 min Padel"), trage es so ein und berücksichtige die Belastung fürs nächste Training (z. B. bei müden Beinen "ready":"light").
 {"type":"note","text":"…"} / {"type":"unnote","text":"…"} merken / vergessen (ohne Knopf)
 {"type":"ready","mode":"light"|"normal"|"hard"} nächstes Training leichter (1 Satz weniger bei Übungen mit 3+ Sätzen, mehr Reserve), normal oder härter (1 Satz mehr bei Hauptübungen)
 {"type":"deload"} nächste Woche leichter
 {"type":"kcal","delta":<-300 bis 300>} Kalorienziel anpassen
 {"type":"block"} neuen Trainingsblock planen
 Verwende nur Übungs-IDs aus den Daten.`;
+const actKey=a=>`${a.date}|${(a.name||"").toLowerCase()}|${a.dur}`;
 async function chatSend(q){
   const c=C(); q=String(q||"").trim().slice(0,800); if(!q||ui.chatBusy) return;
   c.chat=(c.chat||[]).concat({r:"u",t:q,at:new Date().toISOString()}).slice(-30); ui.chatDraft=""; ui.chatBusy=true; ui.chatErr=""; save(); render();
-  try{const r=await aiAsk(JSON.stringify({daten:coachData(),chat:c.chat.slice(-11,-1).map(m=>({von:m.r==="u"?"person":"trainer",text:m.t})),neue_nachricht:q}),CHAT_SYS);
+  try{const kat=Object.entries(EX).filter(([id,x])=>!x.del&&gearOk(id)).map(([id,x])=>`${id}: ${x.n}`);
+    const r=await aiAsk(JSON.stringify({daten:{...coachData(),uebungs_katalog:kat},chat:c.chat.slice(-11,-1).map(m=>({von:m.r==="u"?"person":"trainer",text:m.t})),neue_nachricht:q}),CHAT_SYS);
     if(!r||typeof r.text!=="string") throw new Error("Antwort unlesbar.");
     const acts=Array.isArray(r.actions)?r.actions:[];
     for(const a of acts){if(!a||!a.text) continue; const tx=String(a.text).slice(0,120);
       if(a.type==="note") c.mem=(c.mem||[]).filter(m=>m.t!==tx).concat({d:todayIso,t:tx}).slice(-20);
       if(a.type==="unnote") c.mem=(c.mem||[]).filter(m=>m.t!==tx&&!m.t.includes(tx))}
-    c.chat.push({r:"a",t:r.text.slice(0,1500),at:new Date().toISOString(),a:acts.filter(a=>a&&a.type!=="note"&&a.type!=="unnote").slice(0,3)}); c.chat=c.chat.slice(-30); save()}
+    const logged=[];
+    for(const a of acts){if(!a||a.type!=="activity") continue;
+      const min=Math.round(+a.min||0), d=/^\d{4}-\d\d-\d\d$/.test(a.d||"")&&a.d<=todayIso?a.d:todayIso, name=String(a.name||"Sport").slice(0,40);
+      if(!(min>=5&&min<=600)) continue;
+      const en={date:d,dur:min,avg:0,max:0,kcal:Math.max(0,Math.min(3000,Math.round(+a.kcal||0))),name,kind:["cardio","kraft","mob"].includes(a.kind)?a.kind:"cardio",src:"Trainer"};
+      if(state.acts.some(x=>actKey(x)===actKey(en))) continue;
+      state.acts.push(en); logged.push(`${name}, ${min} min${d!==todayIso?` am ${parseIso(d).getDate()}.${parseIso(d).getMonth()+1}.`:""}`)}
+    if(logged.length) state.acts.sort((a,b)=>a.date<b.date?-1:1);
+    c.chat.push({r:"a",t:r.text.slice(0,1500),at:new Date().toISOString(),log:logged.length?logged:undefined,a:acts.filter(a=>a&&a.type!=="note"&&a.type!=="unnote"&&a.type!=="activity").slice(0,3)}); c.chat=c.chat.slice(-30); save()}
   catch(e){ui.chatErr=e&&e.message==="nokey"?"Für den Chat braucht es die KI-Anbindung (im Profil).":(e&&e.message)||"Die KI hat nicht geantwortet."}
   ui.chatBusy=false; render();
   const box=document.getElementById("chatlog"); if(box) box.scrollTop=box.scrollHeight;
@@ -1807,7 +1824,7 @@ function chatHtml(){
   const c=C(), msgs=(c.chat||[]).slice(-12);
   return `<div class="chat stack" style="gap:8px">
     <div id="chatlog" class="chatlog">${msgs.length?msgs.map((m,i)=>{const idx=(c.chat.length-msgs.length)+i;
-      return `<div class="msg ${m.r==="u"?"me":"tr"}">${esc(m.t)}${m.r==="a"&&m.a&&m.a.length?`<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">${m.a.map((a,j)=>{const k=`chat:${m.at}:${j}`; if(c.hide[k]) return `<span class="small muted">✓ Übernommen</span>`; const x=aiAction(a); if(!x) return ""; return `<button class="btn small" data-chatdo="${idx}:${j}">${esc(x.l)}</button>`}).join("")}</div>`:""}</div>`}).join("")
+      return `<div class="msg ${m.r==="u"?"me":"tr"}">${esc(m.t)}${m.log?`<div class="small" style="margin-top:6px;opacity:.8">✓ Eingetragen: ${m.log.map(esc).join(", ")}</div>`:""}${m.r==="a"&&m.a&&m.a.length?`<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">${m.a.map((a,j)=>{const k=`chat:${m.at}:${j}`; if(c.hide[k]) return `<span class="small muted">✓ Übernommen</span>`; const x=aiAction(a); if(!x) return ""; return `<button class="btn small" data-chatdo="${idx}:${j}">${esc(x.l)}</button>`}).join("")}</div>`:""}</div>`}).join("")
       :`<div class="small muted">Frag mich zum Beispiel: „Mein Knie zwickt bei Kniebeugen, was nun?“, „Ich habe heute nur 40 Minuten“ oder „Warum geht es beim Bankdrücken nicht weiter?“</div>`}
     ${ui.chatBusy?`<div class="msg tr muted">Dein Trainer schaut sich deine Daten an … das kann bis zu einer Minute dauern.</div>`:""}</div>
     ${ui.chatErr?`<div class="small" style="color:var(--red)">${esc(ui.chatErr)}</div>`:""}
@@ -1873,6 +1890,7 @@ function adjustDay(s,dateIso){
   const c=state.coach; if(!s||!c) return s;
   const mode=(c.ready||{})[dateIso], skip=(c.skip||{})[dateIso]||[];
   if(skip.length) s.items=s.items.filter(it=>!skip.includes(it.id));
+  for(const x of (c.extra||{})[dateIso]||[]) if(EX[x.id]&&!s.items.some(it=>it.id===x.id)) s.items.push(EX[x.id].cardio?{id:x.id,role:"cardio",txt:x.dur||"20–30 min"}:{id:x.id,role:"acc",sets:x.sets||3,reps:x.reps||EX[x.id].r||"10–15",rir:"2"});
   if(mode==="light") s.items=s.items.map(it=>it.role==="cardio"?it:{...it,sets:it.sets>=3?it.sets-1:it.sets,rir:it.role==="core"?it.rir:"3"});
   if(mode==="hard") s.items=s.items.map(it=>it.role==="main"?{...it,sets:Math.min(6,it.sets+1)}:it);
   if(mode) s.ready=mode;
