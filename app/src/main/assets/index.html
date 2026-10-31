@@ -2790,6 +2790,7 @@ function viewErnaehrung(){
         <p class="sources" style="margin:0"><a href="https://doi.org/10.1093/ajcn/51.2.241" target="_blank" rel="noopener">Mifflin et al., 1990</a></p>
       </section>
     </div>
+    ${mealHtml()}
     <section class="panel stack">
       <div class="row" style="justify-content:space-between;align-items:center"><h3>Schnell eintragen</h3>${NATIVE&&NATIVE.scanBarcode?`<button class="btn" data-scan="1">Barcode scannen</button>`:""}</div>
       ${scanHtml()}
@@ -2853,6 +2854,34 @@ function novaHtml(s){
   return `<div class="row" style="gap:10px;align-items:center"><span class="nova nova${s.nova}" aria-label="NOVA-Gruppe ${s.nova}">NOVA ${s.nova}</span><span class="small">${NOVA[s.nova]}</span></div>
     <p class="small muted" style="margin:0">NOVA teilt Lebensmittel nach dem Grad der Verarbeitung in vier Gruppen ein, nicht nach Nährwerten. Ein Proteinpulver ist z. B. fast immer Gruppe 4 und trotzdem nützlich. Für die Grundernährung lohnt es sich, möglichst viel aus Gruppe 1 zu wählen.</p>
     <p class="sources" style="margin:0"><a href="https://world.openfoodfacts.org/nova" target="_blank" rel="noopener">NOVA bei Open Food Facts</a></p>`;
+}
+/* ---------- Auswärts gegessen: KI schätzt die Nährwerte aus einer Beschreibung ---------- */
+const MEAL_SYS=`Du bist Ernährungsberater in der Fitness-App 4Peak und schätzt Nährwerte einer Mahlzeit, die jemand auswärts gegessen hat (Restaurant, Kantine, Imbiss, bei Freunden). Die Person beschreibt auf Deutsch, was sie gegessen und getrunken hat, oft ungenau. Zerlege die Beschreibung in Posten und schätze für jeden realistische Restaurantportionen in der Schweiz (eher grosszügig, mit Öl, Butter und Saucen, die beim Auswärtsessen üblich sind). Wenn eine Kette oder ein bekanntes Gericht genannt ist (z. B. McDonald's Big Mac, Döner), nutze die bekannten Werte. Getränke mit Kalorien als eigenen Posten. Antworte NUR mit JSON: {"items":[{"n":"kurzer Name mit Portion, z. B. Pizza Margherita (ganze, ca. 350 g)","k":kcal,"p":Protein g,"c":Kohlenhydrate g,"f":Fett g}],"note":"ein kurzer Satz, was die Schätzung am stärksten beeinflusst oder ein Tipp für die nächste Bestellung"}. Ganze Zahlen. Höchstens 8 Posten.`;
+function mealHtml(){
+  const m=ui.meal||{}, it=m.items||[], sum=k=>it.reduce((a,x)=>a+(x[k]||0),0);
+  if(!aiAvail()) return `<section class="panel stack"><h3>Auswärts gegessen?</h3><p class="small muted" style="margin:0">Beschreib dein Essen und die KI schätzt die Nährwerte. Dafür braucht es deinen KI-Zugang (API-Schlüssel beim Trainer).</p></section>`;
+  return `<section class="panel stack">
+    <h3>Auswärts gegessen?</h3>
+    <form class="stack" id="mealform" style="gap:8px">
+      <label class="f" for="mealq">Was hast du gegessen und getrunken?<textarea id="mealq" rows="2" maxlength="400" placeholder="z. B. Cordon bleu mit Pommes und Salat, 1 Rivella" style="font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);resize:vertical">${esc(m.q||"")}</textarea></label>
+      <div class="row"><button class="btn" type="submit"${m.loading?" disabled":""}>${m.loading?"Schätze …":"Nährwerte schätzen"}</button>${it.length||m.err?`<button class="btn ghost" type="button" data-mealclr="1">Verwerfen</button>`:""}</div>
+    </form>
+    ${m.err?`<p class="small" style="margin:0;color:var(--red)">${esc(m.err)}</p>`:""}
+    ${it.length?`<ul class="exlist">${it.map(x=>`<li><span>${esc(x.n)}</span><span class="presc">${x.k} kcal · ${x.p} g P</span></li>`).join("")}
+      <li><b>Total</b><span class="presc"><b>${sum("k")} kcal · ${sum("p")} g P · ${sum("c")} g KH · ${sum("f")} g F</b></span></li></ul>
+      ${m.note?`<p class="small muted" style="margin:0">${esc(m.note)}</p>`:""}
+      <div class="row"><button class="btn" type="button" data-mealadd="1">Eintragen</button><span class="small muted" style="align-self:center">Schätzung, kann 20–30 % daneben liegen.</span></div>`:""}
+  </section>`;
+}
+async function mealEstimate(q){
+  ui.meal={q,loading:true}; render();
+  try{
+    const o=await aiAsk(q,MEAL_SYS);
+    const n=v=>Math.max(0,Math.min(5000,Math.round(Number(v)||0)));
+    const items=(Array.isArray(o&&o.items)?o.items:[]).slice(0,8).map(x=>({n:String(x&&x.n||"Posten").slice(0,60),k:n(x.k),p:n(x.p),c:n(x.c),f:n(x.f)})).filter(x=>x.k>0);
+    ui.meal=items.length?{q,items,note:String(o.note||"").slice(0,200)}:{q,err:"Die KI konnte daraus nichts schätzen. Beschreib das Essen etwas genauer."};
+  }catch(e){ui.meal={q,err:e.message==="nokey"?"Kein KI-Zugang eingerichtet.":e.message}}
+  if(ui.tab==="ernaehrung") render();
 }
 function scanHtml(){
   const s=ui.scan; if(!s) return "";
@@ -2953,7 +2982,7 @@ document.addEventListener("toggle",e=>{const d=e.target; if(!d.dataset||!d.datas
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.motionexp){try{NATIVE.exportMotion("4peak-bewegungsdaten-"+todayIso+".zip")}catch(e){} return}
@@ -2970,6 +2999,8 @@ document.getElementById("view").addEventListener("click",e=>{
     applyCustomEx(); save(); render(); return}
   if(t.dataset.backup){backupAction(t.dataset.backup); return}
   if(t.dataset.scanforget){if(state.scans) delete state.scans[t.dataset.scanforget]; ui.scan=null; save(); render(); return}
+  if(t.dataset.mealclr){ui.meal=null; render(); return}
+  if(t.dataset.mealadd){const it=ui.meal&&ui.meal.items||[]; if(!it.length) return; const L=state.food[ui.foodDay]||(state.food[ui.foodDay]=[]); for(const x of it) L.push({n:("🍽 "+x.n).slice(0,60),k:x.k,p:x.p,c:x.c,f:x.f}); ui.meal=null; save(); render(); return}
   if(t.dataset.scan){ui.scan={loading:true}; render(); NATIVE.scanBarcode(); return}
   if(t.dataset.health){if(NATIVE) NATIVE.requestHealth(); t.textContent="Wird geladen …"; return}
   if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
@@ -3123,6 +3154,7 @@ document.getElementById("view").addEventListener("submit",e=>{
     (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${p.name}, ${g} g`.slice(0,60),k:Math.round(p.kcal*g/100),p:Math.round(p.prot*g/100)});
     ui.scan=null; save(); render(); return}
   if(e.target.id==="scanform"){e.preventDefault(); const s=ui.scan, g=Math.max(1,Number(document.getElementById("sg").value)||100); (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push(Object.assign({n:`${s.name||"Gescannt"}${s.brand?" ("+s.brand+")":""}, ${g} g`.slice(0,60),k:Math.round((s.kcal||0)*g/100),p:Math.round((s.prot||0)*g/100)},s.carb!=null?{c:Math.round(s.carb*g/100)}:{},s.fat!=null?{f:Math.round(s.fat*g/100)}:{})); ui.scan=null; save(); render(); return}
+  if(e.target.id==="mealform"){e.preventDefault(); const q=document.getElementById("mealq").value.trim(); if(q.length>2&&!(ui.meal&&ui.meal.loading)) mealEstimate(q); return}
   if(e.target.id==="foodform"){e.preventDefault(); const g=Math.round(Number(document.getElementById("fg").value)||0), n0=document.getElementById("fn").value.trim()||"Eintrag", n=ui.f100&&g?`${n0}, ${g} g`:n0, num=id=>{const v=document.getElementById(id).value; return v===""?null:Math.max(0,Math.round(Number(v)||0))}, k=num("fk")||0, p=num("fp")||0, c=num("fc"), f=num("ff");
     if(!k&&!p) return; ui.f100=null; const en={n:n.slice(0,60),k,p}; if(c!=null) en.c=c; if(f!=null) en.f=f; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push(en); save(); render(); return}
   if(e.target.id!=="pform") return; e.preventDefault();

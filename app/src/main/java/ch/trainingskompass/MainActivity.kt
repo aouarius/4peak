@@ -465,7 +465,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         @JavascriptInterface
         fun aiAsk(id: String, key: String, system: String, user: String) {
             // Chat soll schnell antworten: geringerer Aufwand als bei der ausführlichen Einschätzung
-            val effort = if (system.contains("chattest")) "low" else "medium"
+            val effort = if (system.contains("chattest") || system.contains("schätzt Nährwerte")) "low" else "medium"
             lifecycleScope.launch {
                 val res = runCatching { AiCoach.ask(key, system, user, effort) }
                     .getOrElse { e -> JSONObject().put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}).") }
