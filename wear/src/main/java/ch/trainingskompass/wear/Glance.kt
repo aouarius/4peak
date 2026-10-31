@@ -90,8 +90,18 @@ object Store {
 class PlanListenerService : WearableListenerService() {
     override fun onDataChanged(events: DataEventBuffer) {
         for (e in events) {
-            if (e.type == DataEvent.TYPE_CHANGED && e.dataItem.uri.path == WatchActivity.PLAN_PATH) {
-                DataMapItem.fromDataItem(e.dataItem).dataMap.getString("json")?.let { Store.savePlan(this, it) }
+            if (e.type != DataEvent.TYPE_CHANGED) continue
+            val path = e.dataItem.uri.path
+            val json = DataMapItem.fromDataItem(e.dataItem).dataMap.getString("json") ?: continue
+            if (path == WatchActivity.PLAN_PATH) Store.savePlan(this, json)
+            // Training auf dem Handy beendet: auf der Uhr sofort Puls-Messung und Zähler stoppen, die App schliesst es dann
+            if (path == WatchActivity.LIVE_PHONE) {
+                val o = runCatching { org.json.JSONObject(json) }.getOrNull() ?: continue
+                if (o.optBoolean("end") && o.optString("date") == WatchActivity.runDate) {
+                    WorkoutService.stop(this)
+                    Motion.stop()
+                }
+                WatchActivity.phoneLive.value = json
             }
         }
     }

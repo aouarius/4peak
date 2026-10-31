@@ -15,6 +15,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.wear.compose.material.Icon
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -126,6 +128,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         if (savedInstanceState == null) pendingStart = intent.getStringExtra(EXTRA_START)
         startPending()
         lifecycleScope.launch { loadPlanFromDataLayer() }
+        // Ende vom Handy, auch wenn die App gerade im Hintergrund war (kommt über PlanListenerService)
+        lifecycleScope.launch { phoneLive.collect { j -> if (j != null) { phoneLive.value = null; applyLive(j) } } }
         setContent { App() }
     }
 
@@ -166,6 +170,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     override fun onResume() {
         super.onResume()
         runCatching { dataClient.addListener(this) }
+        // Was das Handy geschickt hat, während die App nicht vorne war (z. B. Training dort beendet)
+        lifecycleScope.launch { pullLivePhone() }
     }
 
     override fun onPause() {
@@ -208,6 +214,19 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
     }
 
+    private suspend fun pullLivePhone() {
+        runCatching {
+            val buffer = dataClient.dataItems.await()
+            try {
+                buffer.filter { it.uri.path == LIVE_PHONE }
+                    .mapNotNull { DataMapItem.fromDataItem(it).dataMap.getString("json") }
+                    .forEach { applyLive(it) }
+            } finally {
+                buffer.release()
+            }
+        }
+    }
+
     private fun setPlan(json: String) {
         val p = parsePlan(json) ?: return
         plan = p
@@ -225,8 +244,11 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         val r = run
         if (o.optBoolean("end")) {
             if (r != null && r.session.date == date) {
-                doneDates = doneDates + date
-                Store.saveDone(this, doneDates)
+                // Auf dem Handy gespeichert: gilt als erledigt. Verworfen: Training bleibt offen.
+                if (o.optBoolean("saved", true)) {
+                    doneDates = doneDates + date
+                    Store.saveDone(this, doneDates)
+                }
                 closeRun()
                 // Eigenen letzten Stand überschreiben, damit das Handy ihn nicht erneut als laufendes Training liest
                 lifecycleScope.launch { publishLive(JSONObject().put("date", date).put("src", "watch").put("t", System.currentTimeMillis()).put("end", true)) }
@@ -255,6 +277,7 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     private fun startRun(s: Session) {
         run = Run(s)
+        runDate = s.date
         Motion.start(this)
         val wanted = buildList {
             add(Manifest.permission.BODY_SENSORS)
@@ -264,8 +287,16 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         if (wanted.isEmpty()) WorkoutService.start(this, s.name) else sensorPermission.launch(wanted.toTypedArray())
     }
 
+    private fun swipeBack() {
+        val r = run
+        if (r == null) { finish(); return }
+        if (ambient) return
+        if (r.back()) tick()
+    }
+
     private fun closeRun() {
         run = null
+        runDate = null
         Motion.stop()
         WorkoutService.stop(this)
     }
@@ -334,12 +365,24 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     while (true) {
                         val it = r.item
                         val resting = r.restUntil > System.currentTimeMillis()
-                        val on = !r.warmPhase && !r.finished && !r.picking && !resting && it != null && !it.cardio && Motion.supports(it.id)
+                        val on = !r.warmPhase && !r.finished && !r.picking && !r.waiting && !resting && it != null && !it.cardio && Motion.supports(it.id)
                         Motion.setPhase(if (resting) "rest" else "${r.index}-${r.setNo}-${r.warmIdx}-${it?.id}", on)
                         delay(500)
                     }
                 }
                 Box(Modifier.fillMaxSize().background(if (ambient) SolidColor(Color.Black) else Brand.bg))
+                // Vom linken Rand nach rechts wischen = zurück (Liste zu, Pause weg, vorherige Übung; in der Übersicht: App schliessen)
+                Box(
+                    Modifier.fillMaxSize().pointerInput(Unit) {
+                        var startX = 0f
+                        var dx = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { o -> startX = o.x; dx = 0f },
+                            onHorizontalDrag = { _, d -> dx += d },
+                            onDragEnd = { if (startX < size.width * 0.35f && dx > 70.dp.toPx()) swipeBack() },
+                        )
+                    },
+                ) {
                 when {
                     ambient && r != null && !r.finished -> AmbientScreen(r)
                     r == null -> PlanList()
@@ -347,8 +390,10 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                     r.warmPhase -> WarmupScreen(r)
                     r.finished -> FinishScreen(r)
                     r.picking -> OrderScreen(r)
+                    r.waiting -> NextScreen(r)
                     r.restUntil > 0 -> RestScreen(r)
                     else -> ExerciseScreen(r)
+                }
                 }
             }
         }
@@ -663,6 +708,59 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
     }
 
+    /** Übung fertig: Pause läuft, die nächste Übung startet erst auf «Los» (wie der Startbildschirm bei Samsung Health) */
+    @Composable
+    private fun NextScreen(r: Run) {
+        val it = r.item ?: return
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(r.restUntil) {
+            while (r.restUntil > 0 && System.currentTimeMillis() < r.restUntil) {
+                delay(250)
+                now = System.currentTimeMillis()
+            }
+            if (r.restUntil > 0) {
+                if (!WorkoutService.active.value) vibrate() // sonst vibriert der Hintergrund-Dienst
+                r.restUntil = 0
+            }
+        }
+        val left = ((r.restUntil - now + 999) / 1000).coerceAtLeast(0)
+        if (r.restUntil > 0 && r.restLen > 0) EdgeProgress((r.restUntil - now).toFloat() / r.restLen)
+        Column(
+            modifier = Modifier.fillMaxSize().padding(top = 24.dp, bottom = 18.dp, start = 22.dp, end = 22.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                if (r.restUntil > 0) "PAUSE %d:%02d".format(left / 60, left % 60) else "BEREIT",
+                fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, color = Brand.Soft,
+            )
+            Text("Als Nächstes", fontSize = 12.sp, color = Brand.Muted)
+            Text(
+                it.name,
+                fontSize = if (it.name.length > 22) 16.sp else 20.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(if (it.cardio) "Ausdauer" else "${it.sets} × ${it.reps}" + if (it.weight > 0) " · ${formatKg(it.weight)} kg" else "", fontSize = 12.sp, color = Brand.Muted)
+            Spacer(Modifier.size(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (r.openCount > 1) RoundButton(40.dp, "⇅") { r.picking = true }
+                GradButton(56.dp, onClick = { r.go(); tick() }) {
+                    Icon(painterResource(R.drawable.ic_play), contentDescription = "Los", tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+                if (r.restUntil > 0) RoundButton(40.dp, "+30") { r.restUntil += 30_000; r.restLen += 30_000 }
+            }
+            Text(
+                "Training beenden",
+                fontSize = 12.sp,
+                color = Brand.Muted,
+                modifier = Modifier.padding(top = 6.dp).clickable { r.end() },
+            )
+        }
+    }
+
     @Composable
     private fun RestScreen(r: Run) {
         var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -905,5 +1003,9 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         const val LIVE_WATCH = "/live/watch"
         const val LIVE_PHONE = "/live/phone"
         const val EXTRA_START = "start"
+        /** Live-Stand vom Handy, den der Hintergrund-Dienst empfangen hat */
+        val phoneLive = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+        /** Datum des laufenden Trainings (für den Hintergrund-Dienst) */
+        @Volatile var runDate: String? = null
     }
 }

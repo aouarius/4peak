@@ -151,6 +151,24 @@ class Run(val session: Session) {
     val items = mutableStateListOf<Item>().apply { addAll(session.items) }
     /** Liste zum Umsortieren ist offen */
     var picking by mutableStateOf(false)
+    /** Bisherige Positionen fürs Zurückwischen */
+    private val trail = ArrayDeque<Int>()
+    private fun mark() { trail.addLast(index); if (trail.size > 40) trail.removeFirst() }
+
+    /** Zurückwischen: Liste schliessen, Pause abbrechen oder zur vorherigen Ansicht. false = nichts zurückzunehmen */
+    fun back(): Boolean {
+        if (picking) { picking = false; return true }
+        if (restUntil > 0 && !waiting) { restUntil = 0; return true }
+        val j = trail.removeLastOrNull() ?: return false
+        waiting = false
+        restUntil = 0
+        index = j.coerceIn(0, items.size - 1)
+        prepare()
+        return true
+    }
+
+    /** Übung fertig, die nächste wartet auf «Los» (Gerät evtl. noch besetzt) */
+    var waiting by mutableStateOf(false)
     /** Zählt jede Änderung an den Sätzen hoch; die Uhr schickt dann den Stand ans Handy */
     var version by mutableIntStateOf(0)
     /** Stoppuhr einer Halteübung: Startzeit, 0 = läuft nicht */
@@ -200,6 +218,7 @@ class Run(val session: Session) {
         if (j <= index || j >= items.size) return
         items.add(index, items.removeAt(j))
         picking = false
+        waiting = false
         prepare()
     }
 
@@ -241,8 +260,18 @@ class Run(val session: Session) {
         if (it.unilateral) o.put("l", reps).put("rr", reps)
         logs.getOrPut(it.id) { mutableListOf() }.add(o)
         version++
-        if (setNo >= it.sets) next()
-        else {
+        if (setNo >= it.sets) {
+            // Nicht gleich weiterspringen: Pause läuft, die nächste Übung startet erst auf «Los»
+            val j = nextOpen()
+            mark()
+            if (j >= 0) {
+                index = j
+                prepare()
+                waiting = true
+                restLen = if (it.restSec > 0) it.restSec * 1000L else 0
+                restUntil = if (restLen > 0) System.currentTimeMillis() + restLen else 0
+            } else next()
+        } else {
             setNo++
             if (it.restSec > 0) { restLen = it.restSec * 1000L; restUntil = System.currentTimeMillis() + restLen }
         }
@@ -256,23 +285,46 @@ class Run(val session: Session) {
         next()
     }
 
-    fun next() {
+    /** Nächste Übung beginnen (nach «Los») */
+    fun go() {
+        waiting = false
         restUntil = 0
-        index++
+        itemStartedAt = System.currentTimeMillis()
+    }
+
+    /** Weiter zur nächsten offenen Übung (übersprungene kommen am Schluss wieder); keine mehr offen = fertig */
+    fun next() {
+        waiting = false
+        restUntil = 0
+        val j = nextOpen()
+        mark()
+        index = if (j >= 0) j else items.size
         prepare()
+    }
+
+    /** Erste offene Übung nach der aktuellen, sonst die erste offene davor; -1 wenn alles erledigt */
+    private fun nextOpen(): Int {
+        val after = (index + 1 until items.size).firstOrNull { !complete(items[it]) }
+        return after ?: (0 until minOf(index, items.size)).firstOrNull { !complete(items[it]) } ?: -1
     }
 
     fun prev() {
         if (index <= 0) return
+        waiting = false
         restUntil = 0
         index--
         prepare()
     }
 
     fun end() {
+        mark()
+        waiting = false
         restUntil = 0
         index = items.size
     }
+
+    /** Noch offene Übungen (inkl. der aktuellen) */
+    val openCount: Int get() = items.count { !complete(it) }
 
     private fun complete(x: Item): Boolean {
         val l = logs[x.id].orEmpty()
@@ -292,7 +344,7 @@ class Run(val session: Session) {
         }
         if (!changed) return false
         if (warmPhase && logs.isNotEmpty()) endWarmup(true)
-        item?.let { cur -> if (complete(cur)) { val j = items.indexOfFirst { !complete(it) }; index = if (j < 0) items.size else j; restUntil = 0 } }
+        item?.let { cur -> if (complete(cur)) { val j = items.indexOfFirst { !complete(it) }; index = if (j < 0) items.size else j; restUntil = 0; waiting = false } }
         prepare()
         version++
         return true

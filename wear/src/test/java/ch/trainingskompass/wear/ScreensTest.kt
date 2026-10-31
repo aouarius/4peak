@@ -95,6 +95,11 @@ class ScreensTest {
         it.run = runOf().apply { setNo = 2; restLen = 120_000; restUntil = System.currentTimeMillis() + 92_000 }
     }
 
+    @Test fun next() = shot("05b-naechste") {
+        WorkoutService.hr.value = 104
+        it.run = runOf().apply { repeat(3) { logSet() } }
+    }
+
     @Test fun order() = shot("06-reihenfolge") { it.run = runOf().apply { picking = true } }
 
     @Test fun warmup() = shot("07-aufwaermen") { WorkoutService.hr.value = 104; it.run = runOf(warm = true) }

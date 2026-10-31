@@ -785,7 +785,7 @@ function liveSend(){
   if(!(NATIVE&&NATIVE.sendLive)) return;
   const r=ui.run;
   if(!r||r.edit){ // Training auf dem Handy beendet: Uhr beendet ihres auch
-    if(liveDate){markLiveEnd(liveDate); try{NATIVE.sendLive(JSON.stringify({date:liveDate,src:"phone",t:Date.now(),end:true}))}catch(e){}}
+    if(liveDate){markLiveEnd(liveDate); try{NATIVE.sendLive(JSON.stringify({date:liveDate,src:"phone",t:Date.now(),end:true,saved:!!state.done[liveDate]}))}catch(e){}}
     liveDate=null; liveJ=""; return}
   liveDate=r.date;
   if(!r.rows) return;
