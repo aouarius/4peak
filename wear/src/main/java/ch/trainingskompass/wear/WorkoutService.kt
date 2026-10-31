@@ -49,6 +49,12 @@ class WorkoutService : Service(), SensorEventListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val handler = Handler(Looper.getMainLooper())
     private var wakeLock: PowerManager.WakeLock? = null
+    /**
+     * Hält den Prozessor während des ganzen Trainings wach. Ohne ihn schläft die Uhr bei dunklem
+     * Bildschirm ein: Der Bewegungssensor verliert dann Daten (Lücken bis 100 s in den Exporten)
+     * und der Satz beginnt für den Zähler erst, wenn man wieder auf die Uhr schaut.
+     */
+    private var workoutLock: PowerManager.WakeLock? = null
     private var exerciseRunning = false
     private var sensorFallback = false
 
@@ -103,6 +109,9 @@ class WorkoutService : Service(), SensorEventListener {
             return
         }
         active.value = true
+        if (workoutLock?.isHeld != true) workoutLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "4peak:training")
+            .apply { setReferenceCounted(false); acquire(3 * 60 * 60 * 1000L) }
         scope.launch { startExercise() }
     }
 
@@ -176,6 +185,11 @@ class WorkoutService : Service(), SensorEventListener {
         wakeLock = null
     }
 
+    private fun releaseWorkout() {
+        workoutLock?.let { if (it.isHeld) it.release() }
+        workoutLock = null
+    }
+
     private fun buzz(pattern: LongArray) {
         getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(pattern, -1))
     }
@@ -183,6 +197,7 @@ class WorkoutService : Service(), SensorEventListener {
     private fun finish() {
         handler.removeCallbacks(restEnd)
         releaseWake()
+        releaseWorkout()
         if (sensorFallback) getSystemService(SensorManager::class.java)?.unregisterListener(this)
         sensorFallback = false
         val wasRunning = exerciseRunning
@@ -202,6 +217,7 @@ class WorkoutService : Service(), SensorEventListener {
     override fun onDestroy() {
         handler.removeCallbacks(restEnd)
         releaseWake()
+        releaseWorkout()
         active.value = false
         scope.cancel()
         super.onDestroy()
