@@ -932,7 +932,17 @@ window.onNativeHealth=function(h){
     if(dn&&dn.at&&x.k==="kraft"&&Math.abs(Date.parse(dn.at)-endT)<45*60000) continue;
     state.acts.push({date:x.d,dur:Number(x.min)||0,avg:Math.round(Number(x.avg))||0,max:Math.round(Number(x.max))||0,kcal:Number(x.kcal)||0,name:String(x.n||"Sport").slice(0,40),kind:x.k||"cardio",hc:String(x.id),src:/shealth|samsung/.test(x.src||"")?"Samsung Health":"Health Connect"}); added++;
   }
-  if(added){state.acts.sort((a,b)=>a.date<b.date?-1:1); render()}
+  // Gewicht und Körperfett von der Waage (über Health Connect); Waage gewinnt am selben Tag
+  let bwc=0;
+  for(const x of Array.isArray(h.bw)?h.bw:[]){
+    const v=Number(x&&x.v), f=Number(x&&x.f)||0;
+    if(!x||!/^\d{4}-\d\d-\d\d$/.test(x.d)||!(v>=30&&v<=300)) continue;
+    const old=state.bw.find(b=>b.d===x.d);
+    if(old&&old.v===v&&(old.f||0)===f) continue;
+    state.bw=state.bw.filter(b=>b.d!==x.d); const o={d:x.d,v,src:"hc"}; if(f>2&&f<70) o.f=f; state.bw.push(o); bwc++;
+  }
+  if(bwc){const last=state.bw.slice().sort((a,b)=>a.d<b.d?-1:1).pop(); state.profile.weight=last.v; save()}
+  if(added||bwc){state.acts.sort((a,b)=>a.date<b.date?-1:1); render()}
   const r=state.health.rest.slice(-7).map(x=>Number(x.v)).filter(v=>v>30&&v<110); if(r.length) state.profile.restHr=Math.round(r.reduce((x,y)=>x+y,0)/r.length)
   save(); if(ui.tab==="wear") render();
 };
@@ -1672,7 +1682,7 @@ function coachData(){
     ziele_ernaehrung:{kcal:T.kcal,protein_g:T.prot,kh_g:T.carbs,fett_g:T.fat,trainer_kcal_anpassung:c.kcalAdj||0},
     ernaehrung_heute:(f=>({eintraege:f.n,kcal:Math.round(f.k),prot:Math.round(f.p)}))(foodDay(todayIso)),
     ernaehrung_14_tage:days,
-    koerpergewicht:[...state.bw].sort((a,b)=>a.d<b.d?-1:1).filter(x=>daysAgo(x.d)<=84).map(x=>`${x.d}: ${x.v} kg`),
+    koerpergewicht:[...state.bw].sort((a,b)=>a.d<b.d?-1:1).filter(x=>daysAgo(x.d)<=84).map(x=>`${x.d}: ${x.v} kg${x.f?`, ${x.f} % Körperfett`:""}`),
     gesundheit_14_tage:hl?{schlaf_min:hl.sleep.slice(-14).map(x=>`${x.d}: ${x.min}`),hrv_ms:hl.hrv.slice(-14).map(x=>`${x.d}: ${Math.round(x.v)}`),ruhepuls:hl.rest.slice(-14).map(x=>`${x.d}: ${Math.round(x.v)}`)}:"nicht verbunden",
     andere_aktivitaeten_4_wochen:(state.acts||[]).filter(a=>daysAgo(a.date)<=28).map(a=>`${a.date}: ${a.name||a.kind||"Cardio"} ${a.dur} min${a.avg?`, Puls Ø ${a.avg}`:""}`),
     muskel_saetze_diese_woche:Object.fromEntries(Object.keys(MUS_N).map(k=>[MUS_N[k],{erledigt:Math.round((mw.done[k]||0)*10)/10,geplant:Math.round((mw.plan[k]||0)*10)/10}])),
@@ -2657,6 +2667,9 @@ function viewFortschritt(){
         ${bwDelta!==null?`<span class="small muted" style="align-self:flex-end">${bwDelta>0?"+":""}${fmt(bwDelta,1)} kg seit ${bw[0].d}</span>`:""}
       </form>
       ${lineChart(bw.map(x=>({d:x.d,v:x.v})),"kg")}
+      ${(()=>{const bf=bw.filter(x=>x.f); if(!bf.length) return `<p class="small muted" style="margin:0">Mit einer Waage, die an Health Connect überträgt (z. B. Withings), kommen Gewicht und Körperfett automatisch hierher.</p>`;
+        const d=bf.length>1?bf[bf.length-1].f-bf[0].f:null;
+        return `<h3>Körperfett (%)</h3><p class="small muted" style="margin:0">Zuletzt ${fmt(bf[bf.length-1].f,1)} % am ${bf[bf.length-1].d}${d!==null?` · ${d>0?"+":""}${fmt(d,1)} % seit ${bf[0].d}`:""}</p>${lineChart(bf.map(x=>({d:x.d,v:x.f})),"%")}`})()}
     </section>
   </div>`;
 }

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
@@ -21,7 +23,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
-/** Liest Ruhepuls, HRV, Schlaf und Sport-Einheiten der letzten 14 Tage aus Health Connect (dorthin schreibt Samsung Health). */
+/** Liest Ruhepuls, HRV, Schlaf, Sport-Einheiten, Gewicht und Körperfett der letzten 14 Tage aus Health Connect (dorthin schreibt Samsung Health). */
 class HealthBridge(private val context: Context) {
 
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
@@ -89,8 +91,28 @@ class HealthBridge(private val context: Context) {
                 }
         }
 
+        // Gewicht und Körperfett der letzten 120 Tage, z. B. von einer Withings-Waage; pro Tag die letzte Messung
+        val longRange = TimeRangeFilter.between(end.minus(120, ChronoUnit.DAYS), end)
+        val weight = runCatching {
+            client.readRecords(ReadRecordsRequest(WeightRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+                .groupBy { day(it.time) }
+                .mapValues { (_, r) -> r.maxBy { it.time }.weight.inKilograms }
+        }.getOrDefault(emptyMap())
+        val fat = runCatching {
+            client.readRecords(ReadRecordsRequest(BodyFatRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+                .groupBy { day(it.time) }
+                .mapValues { (_, r) -> r.maxBy { it.time }.percentage.value }
+        }.getOrDefault(emptyMap())
+        val bw = JSONArray()
+        weight.toSortedMap().forEach { (d, v) ->
+            val o = JSONObject().put("d", d.toString()).put("v", Math.round(v * 10) / 10.0)
+            fat[d]?.let { o.put("f", Math.round(it * 10) / 10.0) }
+            bw.put(o)
+        }
+
         return JSONObject()
             .put("ex", ex)
+            .put("bw", bw)
             .put("rest", series(rest, "v"))
             .put("hrv", series(hrv, "v"))
             .put("sleep", series(sleep, "min"))
@@ -136,6 +158,8 @@ class HealthBridge(private val context: Context) {
             HealthPermission.getReadPermission(ExerciseSessionRecord::class),
             HealthPermission.getReadPermission(HeartRateRecord::class),
             HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+            HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.getReadPermission(BodyFatRecord::class),
         )
     }
 }

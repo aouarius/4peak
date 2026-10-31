@@ -311,7 +311,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         val obj = if (!health.available()) {
             JSONObject().put("error", "Health Connect ist auf diesem Handy nicht installiert oder nicht eingerichtet.")
         } else if (!health.hasAny()) {
-            JSONObject().put("error", "Ohne Freigabe in Health Connect kann die App Puls, HRV und Schlaf nicht lesen.")
+            JSONObject().put("error", "Ohne Freigabe in Health Connect kann die App Puls, HRV, Schlaf und Gewicht nicht lesen.")
         } else {
             runCatching { health.read() }.getOrElse {
                 JSONObject().put("error", "Die Daten aus Health Connect konnten nicht gelesen werden.")
