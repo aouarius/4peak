@@ -1713,15 +1713,15 @@ function aiSig(){const h=history(), last=h[h.length-1], bw=state.bw.length?[...s
 function aiAvail(){return !!(window.claude&&window.claude.use)||!!(NATIVE&&NATIVE.aiAsk&&aiKey())}
 const aiWait={};
 window.onAiResult=(id,json)=>{const w=aiWait[id]; if(!w) return; delete aiWait[id]; let o; try{o=typeof json==="string"?JSON.parse(json):json}catch(e){o={error:"Antwort unlesbar."}} w(o)};
-async function aiAsk(user,sys=AI_SYS){
-  if(window.claude&&window.claude.use){
+async function aiAsk(user,sys=AI_SYS,img=false){
+  if(!img&&window.claude&&window.claude.use){
     const sample=await window.claude.use("sample");
     if(sample){try{return await sample.json([{role:"user",content:sys+"\n\nDaten:\n"+user}],{modelTier:"default",cache:false})}
       catch(e){throw new Error(e&&e.code==="not_granted"?"Du hast der App den Zugriff auf Claude nicht erlaubt.":e&&e.code==="rate_limited"?"Gerade zu viele Anfragen, später nochmals.":"Die KI hat nicht geantwortet.")}}
   }
   if(NATIVE&&NATIVE.aiAsk&&aiKey()){
     const id=String(Date.now())+Math.random().toString(36).slice(2,6);
-    const o=await new Promise(res=>{aiWait[id]=res; NATIVE.aiAsk(id,aiKey(),sys,user); setTimeout(()=>{if(aiWait[id]){delete aiWait[id]; res({error:"Keine Antwort in 2 Minuten."})}},130000)});
+    const o=await new Promise(res=>{aiWait[id]=res; (img?NATIVE.aiAskImage:NATIVE.aiAsk).call(NATIVE,id,aiKey(),sys,user); setTimeout(()=>{if(aiWait[id]){delete aiWait[id]; res({error:"Keine Antwort in 2 Minuten."})}},130000)});
     if(o.error) throw new Error(o.error);
     const m=String(o.text||"").match(/\{[\s\S]*\}/); if(!m) throw new Error("Antwort unlesbar.");
     return JSON.parse(m[0]);
@@ -2856,15 +2856,16 @@ function novaHtml(s){
     <p class="sources" style="margin:0"><a href="https://world.openfoodfacts.org/nova" target="_blank" rel="noopener">NOVA bei Open Food Facts</a></p>`;
 }
 /* ---------- Auswärts gegessen: KI schätzt die Nährwerte aus einer Beschreibung ---------- */
-const MEAL_SYS=`Du bist Ernährungsberater in der Fitness-App 4Peak und schätzt Nährwerte einer Mahlzeit, die jemand auswärts gegessen hat (Restaurant, Kantine, Imbiss, bei Freunden). Die Person beschreibt auf Deutsch, was sie gegessen und getrunken hat, oft ungenau. Zerlege die Beschreibung in Posten und schätze für jeden realistische Restaurantportionen in der Schweiz (eher grosszügig, mit Öl, Butter und Saucen, die beim Auswärtsessen üblich sind). Wenn eine Kette oder ein bekanntes Gericht genannt ist (z. B. McDonald's Big Mac, Döner), nutze die bekannten Werte. Getränke mit Kalorien als eigenen Posten. Antworte NUR mit JSON: {"items":[{"n":"kurzer Name mit Portion, z. B. Pizza Margherita (ganze, ca. 350 g)","k":kcal,"p":Protein g,"c":Kohlenhydrate g,"f":Fett g}],"note":"ein kurzer Satz, was die Schätzung am stärksten beeinflusst oder ein Tipp für die nächste Bestellung"}. Ganze Zahlen. Höchstens 8 Posten.`;
+const MEAL_SYS=`Du bist Ernährungsberater in der Fitness-App 4Peak und schätzt Nährwerte einer Mahlzeit, die jemand auswärts gegessen hat (Restaurant, Kantine, Imbiss, bei Freunden). Die Person beschreibt auf Deutsch, was sie gegessen und getrunken hat, oft ungenau, oder schickt ein Foto ihres Tellers (dann Portionen anhand von Teller, Besteck und Händen abschätzen; die Beschreibung ergänzt das Foto, z. B. versteckte Zutaten oder Getränke). Zerlege die Beschreibung in Posten und schätze für jeden realistische Restaurantportionen in der Schweiz (eher grosszügig, mit Öl, Butter und Saucen, die beim Auswärtsessen üblich sind). Wenn eine Kette oder ein bekanntes Gericht genannt ist (z. B. McDonald's Big Mac, Döner), nutze die bekannten Werte. Getränke mit Kalorien als eigenen Posten. Ist auf dem Foto kein Essen, gib {"items":[],"note":"Auf dem Foto ist kein Essen zu sehen."} zurück. Antworte NUR mit JSON: {"items":[{"n":"kurzer Name mit Portion, z. B. Pizza Margherita (ganze, ca. 350 g)","k":kcal,"p":Protein g,"c":Kohlenhydrate g,"f":Fett g}],"note":"ein kurzer Satz, was die Schätzung am stärksten beeinflusst oder ein Tipp für die nächste Bestellung"}. Ganze Zahlen. Höchstens 8 Posten.`;
 function mealHtml(){
   const m=ui.meal||{}, it=m.items||[], sum=k=>it.reduce((a,x)=>a+(x[k]||0),0);
-  if(!aiAvail()) return `<section class="panel stack"><h3>Auswärts gegessen?</h3><p class="small muted" style="margin:0">Beschreib dein Essen und die KI schätzt die Nährwerte. Dafür braucht es deinen KI-Zugang (API-Schlüssel beim Trainer).</p></section>`;
+  if(!aiAvail()) return `<section class="panel stack"><h3>Auswärts gegessen?</h3><p class="small muted" style="margin:0">Beschreib dein Essen oder fotografiere den Teller, und die KI schätzt die Nährwerte. Dafür braucht es deinen KI-Zugang (API-Schlüssel beim Trainer).</p></section>`;
   return `<section class="panel stack">
     <h3>Auswärts gegessen?</h3>
     <form class="stack" id="mealform" style="gap:8px">
-      <label class="f" for="mealq">Was hast du gegessen und getrunken?<textarea id="mealq" rows="2" maxlength="400" placeholder="z. B. Cordon bleu mit Pommes und Salat, 1 Rivella" style="font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);resize:vertical">${esc(m.q||"")}</textarea></label>
-      <div class="row"><button class="btn" type="submit"${m.loading?" disabled":""}>${m.loading?"Schätze …":"Nährwerte schätzen"}</button>${it.length||m.err?`<button class="btn ghost" type="button" data-mealclr="1">Verwerfen</button>`:""}</div>
+      ${NATIVE&&NATIVE.mealPhoto?`<div class="row" style="align-items:center">${m.photo?`<img src="${m.photo}" alt="Dein Teller" style="width:96px;height:96px;object-fit:cover;border-radius:12px">`:""}<button class="btn ghost" type="button" data-mealphoto="camera">📷 ${m.photo?"Neues Foto":"Teller fotografieren"}</button><button class="btn ghost" type="button" data-mealphoto="gallery">Galerie</button></div>`:""}
+      <label class="f" for="mealq">${m.photo?"Noch etwas dazu? (optional, z. B. Getränke oder Sauce)":"Was hast du gegessen und getrunken?"}<textarea id="mealq" rows="2" maxlength="400" placeholder="z. B. Cordon bleu mit Pommes und Salat, 1 Rivella" style="font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);resize:vertical">${esc(m.q||"")}</textarea></label>
+      <div class="row"><button class="btn" type="submit"${m.loading?" disabled":""}>${m.loading?"Schätze …":"Nährwerte schätzen"}</button>${it.length||m.err||m.photo?`<button class="btn ghost" type="button" data-mealclr="1">Verwerfen</button>`:""}</div>
     </form>
     ${m.err?`<p class="small" style="margin:0;color:var(--red)">${esc(m.err)}</p>`:""}
     ${it.length?`<ul class="exlist">${it.map(x=>`<li><span>${esc(x.n)}</span><span class="presc">${x.k} kcal · ${x.p} g P</span></li>`).join("")}
@@ -2873,14 +2874,16 @@ function mealHtml(){
       <div class="row"><button class="btn" type="button" data-mealadd="1">Eintragen</button><span class="small muted" style="align-self:center">Schätzung, kann 20–30 % daneben liegen.</span></div>`:""}
   </section>`;
 }
+window.onMealPhoto=function(d){const m=ui.meal||{}; ui.meal=d?{q:m.q||"",photo:d}:{...m,loading:false}; if(ui.tab==="ernaehrung") render()};
 async function mealEstimate(q){
-  ui.meal={q,loading:true}; render();
+  const photo=ui.meal&&ui.meal.photo||null;
+  ui.meal={q,photo,loading:true}; render();
   try{
-    const o=await aiAsk(q,MEAL_SYS);
+    const o=await aiAsk(photo?(q?"Foto meines Tellers. Dazu: "+q:"Foto meines Tellers. Schätze die Mahlzeit."):q,MEAL_SYS,!!photo);
     const n=v=>Math.max(0,Math.min(5000,Math.round(Number(v)||0)));
     const items=(Array.isArray(o&&o.items)?o.items:[]).slice(0,8).map(x=>({n:String(x&&x.n||"Posten").slice(0,60),k:n(x.k),p:n(x.p),c:n(x.c),f:n(x.f)})).filter(x=>x.k>0);
-    ui.meal=items.length?{q,items,note:String(o.note||"").slice(0,200)}:{q,err:"Die KI konnte daraus nichts schätzen. Beschreib das Essen etwas genauer."};
-  }catch(e){ui.meal={q,err:e.message==="nokey"?"Kein KI-Zugang eingerichtet.":e.message}}
+    ui.meal=items.length?{q,photo,items,note:String(o.note||"").slice(0,200)}:{q,photo,err:String(o&&o.note||"")||"Die KI konnte daraus nichts schätzen. Beschreib das Essen etwas genauer."};
+  }catch(e){ui.meal={q,photo,err:e.message==="nokey"?"Kein KI-Zugang eingerichtet.":e.message}}
   if(ui.tab==="ernaehrung") render();
 }
 function scanHtml(){
@@ -2982,7 +2985,7 @@ document.addEventListener("toggle",e=>{const d=e.target; if(!d.dataset||!d.datas
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-mealphoto],[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.motionexp){try{NATIVE.exportMotion("4peak-bewegungsdaten-"+todayIso+".zip")}catch(e){} return}
@@ -2999,8 +3002,9 @@ document.getElementById("view").addEventListener("click",e=>{
     applyCustomEx(); save(); render(); return}
   if(t.dataset.backup){backupAction(t.dataset.backup); return}
   if(t.dataset.scanforget){if(state.scans) delete state.scans[t.dataset.scanforget]; ui.scan=null; save(); render(); return}
-  if(t.dataset.mealclr){ui.meal=null; render(); return}
-  if(t.dataset.mealadd){const it=ui.meal&&ui.meal.items||[]; if(!it.length) return; const L=state.food[ui.foodDay]||(state.food[ui.foodDay]=[]); for(const x of it) L.push({n:("🍽 "+x.n).slice(0,60),k:x.k,p:x.p,c:x.c,f:x.f}); ui.meal=null; save(); render(); return}
+  if(t.dataset.mealphoto){const q=document.getElementById("mealq"); ui.meal={...(ui.meal||{}),q:q?q.value:""}; NATIVE.mealPhoto(t.dataset.mealphoto); return}
+  if(t.dataset.mealclr){ui.meal=null; NATIVE&&NATIVE.clearMealPhoto&&NATIVE.clearMealPhoto(); render(); return}
+  if(t.dataset.mealadd){const it=ui.meal&&ui.meal.items||[]; if(!it.length) return; const L=state.food[ui.foodDay]||(state.food[ui.foodDay]=[]); for(const x of it) L.push({n:("🍽 "+x.n).slice(0,60),k:x.k,p:x.p,c:x.c,f:x.f}); ui.meal=null; NATIVE&&NATIVE.clearMealPhoto&&NATIVE.clearMealPhoto(); save(); render(); return}
   if(t.dataset.scan){ui.scan={loading:true}; render(); NATIVE.scanBarcode(); return}
   if(t.dataset.health){if(NATIVE) NATIVE.requestHealth(); t.textContent="Wird geladen …"; return}
   if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
@@ -3154,7 +3158,7 @@ document.getElementById("view").addEventListener("submit",e=>{
     (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push({n:`${p.name}, ${g} g`.slice(0,60),k:Math.round(p.kcal*g/100),p:Math.round(p.prot*g/100)});
     ui.scan=null; save(); render(); return}
   if(e.target.id==="scanform"){e.preventDefault(); const s=ui.scan, g=Math.max(1,Number(document.getElementById("sg").value)||100); (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push(Object.assign({n:`${s.name||"Gescannt"}${s.brand?" ("+s.brand+")":""}, ${g} g`.slice(0,60),k:Math.round((s.kcal||0)*g/100),p:Math.round((s.prot||0)*g/100)},s.carb!=null?{c:Math.round(s.carb*g/100)}:{},s.fat!=null?{f:Math.round(s.fat*g/100)}:{})); ui.scan=null; save(); render(); return}
-  if(e.target.id==="mealform"){e.preventDefault(); const q=document.getElementById("mealq").value.trim(); if(q.length>2&&!(ui.meal&&ui.meal.loading)) mealEstimate(q); return}
+  if(e.target.id==="mealform"){e.preventDefault(); const q=document.getElementById("mealq").value.trim(); if((q.length>2||(ui.meal&&ui.meal.photo))&&!(ui.meal&&ui.meal.loading)) mealEstimate(q); return}
   if(e.target.id==="foodform"){e.preventDefault(); const g=Math.round(Number(document.getElementById("fg").value)||0), n0=document.getElementById("fn").value.trim()||"Eintrag", n=ui.f100&&g?`${n0}, ${g} g`:n0, num=id=>{const v=document.getElementById(id).value; return v===""?null:Math.max(0,Math.round(Number(v)||0))}, k=num("fk")||0, p=num("fp")||0, c=num("fc"), f=num("ff");
     if(!k&&!p) return; ui.f100=null; const en={n:n.slice(0,60),k,p}; if(c!=null) en.c=c; if(f!=null) en.f=f; (state.food[ui.foodDay]||(state.food[ui.foodDay]=[])).push(en); save(); render(); return}
   if(e.target.id!=="pform") return; e.preventDefault();

@@ -16,12 +16,12 @@ object AiCoach {
      * Direkt per HTTPS (HttpURLConnection). Die Java-Bibliothek kam auf dem Handy nicht durch
      * (Verbindungsfehler, dann Zeitüberschreitung), der einfache Weg funktioniert wie die Lebensmittel-Suche.
      */
-    suspend fun ask(apiKey: String, system: String, user: String, effort: String = "medium"): JSONObject = withContext(Dispatchers.IO) {
-        direct(apiKey, system, user, effort)
+    suspend fun ask(apiKey: String, system: String, user: String, effort: String = "medium", imageJpegB64: String? = null): JSONObject = withContext(Dispatchers.IO) {
+        direct(apiKey, system, user, effort, imageJpegB64)
     }
 
     /** Gleiche Anfrage ohne Bibliothek, über HttpURLConnection (wie die Lebensmittel-Suche) */
-    private fun direct(apiKey: String, system: String, user: String, effort: String): JSONObject {
+    private fun direct(apiKey: String, system: String, user: String, effort: String, imageJpegB64: String?): JSONObject {
         val t0 = System.currentTimeMillis()
         val out = JSONObject()
         try {
@@ -29,7 +29,12 @@ object AiCoach {
                 .put("model", MODEL)
                 .put("max_tokens", 16000)
                 .put("system", system)
-                .put("messages", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", user)))
+                .put("messages", org.json.JSONArray().put(JSONObject().put("role", "user").put("content",
+                    if (imageJpegB64 == null) user
+                    else org.json.JSONArray()
+                        .put(JSONObject().put("type", "image").put("source", JSONObject()
+                            .put("type", "base64").put("media_type", "image/jpeg").put("data", imageJpegB64)))
+                        .put(JSONObject().put("type", "text").put("text", user)))))
                 .put("output_config", JSONObject().put("effort", effort))
                 .put("fallbacks", "default")
             val con = (java.net.URL("https://api.anthropic.com/v1/messages").openConnection() as java.net.HttpURLConnection).apply {

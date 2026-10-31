@@ -73,6 +73,44 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             web.evaluateJavascript("window.onNotifyPermission && window.onNotifyPermission($ok)", null)
         }
 
+    /** Teller-Foto: verkleinert als JPEG (Base64) gemerkt, bis die KI-Schätzung läuft */
+    private var mealPhoto: String? = null
+    private var mealUri: android.net.Uri? = null
+
+    private val takeMeal =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+            val u = mealUri
+            if (ok && u != null) deliverMealPhoto(u) else web.evaluateJavascript("window.onMealPhoto && window.onMealPhoto(null)", null)
+        }
+
+    private val pickMeal =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) deliverMealPhoto(uri) else web.evaluateJavascript("window.onMealPhoto && window.onMealPhoto(null)", null)
+        }
+
+    private fun deliverMealPhoto(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val b64 = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    // ImageDecoder dreht das Bild nach EXIF; lange Seite auf 1280 px für die KI
+                    val src = android.graphics.ImageDecoder.createSource(contentResolver, uri)
+                    val bmp = android.graphics.ImageDecoder.decodeBitmap(src) { dec, info, _ ->
+                        val w = info.size.width; val h = info.size.height; val m = maxOf(w, h)
+                        if (m > 1280) dec.setTargetSize(w * 1280 / m, h * 1280 / m)
+                        dec.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                    }
+                    val bos = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, bos)
+                    android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
+                }.getOrNull()
+            }
+            mealPhoto = b64
+            runCatching { java.io.File(cacheDir, "meal").listFiles()?.forEach { it.delete() } }
+            val arg = if (b64 == null) "null" else JSONObject.quote("data:image/jpeg;base64,$b64")
+            web.evaluateJavascript("window.onMealPhoto && window.onMealPhoto($arg)", null)
+        }
+    }
+
     /** Datum aus Widget oder Erinnerung: Die Seite startet dann das Training dieses Tages. */
     private var pendingStart: String? = null
 
@@ -468,6 +506,39 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             val effort = if (system.contains("chattest") || system.contains("schätzt Nährwerte")) "low" else "medium"
             lifecycleScope.launch {
                 val res = runCatching { AiCoach.ask(key, system, user, effort) }
+                    .getOrElse { e -> JSONObject().put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}).") }
+                web.evaluateJavascript("window.onAiResult && window.onAiResult(${JSONObject.quote(id)}, ${JSONObject.quote(res.toString())})", null)
+            }
+        }
+
+        /** Teller fotografieren ("camera") oder aus der Galerie wählen; Bild kommt über window.onMealPhoto zurück */
+        @JavascriptInterface
+        fun mealPhoto(source: String) {
+            runOnUiThread {
+                runCatching {
+                    if (source == "camera") {
+                        val dir = java.io.File(cacheDir, "meal").apply { mkdirs() }
+                        val f = java.io.File(dir, "teller.jpg")
+                        val u = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.files", f)
+                        mealUri = u
+                        takeMeal.launch(u)
+                    } else {
+                        pickMeal.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }.onFailure { web.evaluateJavascript("window.onMealPhoto && window.onMealPhoto(null)", null) }
+            }
+        }
+
+        @JavascriptInterface
+        fun clearMealPhoto() { mealPhoto = null }
+
+        /** Wie aiAsk, aber mit dem zuletzt aufgenommenen Teller-Foto */
+        @JavascriptInterface
+        fun aiAskImage(id: String, key: String, system: String, user: String) {
+            val img = mealPhoto
+            lifecycleScope.launch {
+                val res = if (img == null) JSONObject().put("error", "Das Foto ist nicht mehr da, bitte nochmals aufnehmen.")
+                else runCatching { AiCoach.ask(key, system, user, "low", img) }
                     .getOrElse { e -> JSONObject().put("error", "Die KI hat nicht geantwortet (${e.javaClass.simpleName}).") }
                 web.evaluateJavascript("window.onAiResult && window.onAiResult(${JSONObject.quote(id)}, ${JSONObject.quote(res.toString())})", null)
             }
