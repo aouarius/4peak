@@ -502,7 +502,7 @@ a.chip{text-decoration:none;color:var(--ink)}
       <span class="logo" aria-hidden="true"><svg viewBox="26 26 56 56" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"><path d="M52.00,34.49 L30.06,65.75 L47.02,65.75 L47.02,73.51 L78.06,73.51 Z M52.23,35.82 L52.23,73.51 M52.23,61.09 L57.21,61.09 L57.21,65.75 L52.23,65.75 M47.13,48.90 L38.37,61.32 L47.13,61.32 Z M52.23,53.89 L59.43,45.80"/></svg></span>
       <div style="min-width:0">
         <h1>4Peak</h1>
-        <p class="sub">Plan, Training, Ernährung und Supplements an einem Ort.</p>
+        <p class="sub">Plan, Training und Ernährung an einem Ort.</p>
       </div>
     </div>
     <div class="hdr-actions">
@@ -518,7 +518,6 @@ a.chip{text-decoration:none;color:var(--ink)}
     <button role="tab" data-tab="ernaehrung">Ernährung</button>
     <button role="tab" data-tab="plan">Plan</button>
     <button role="tab" data-tab="uebungen">Übungen</button>
-    <button role="tab" data-tab="supps">Supplements</button>
     <button role="tab" data-tab="wear">Wearables</button>
     <button role="tab" data-tab="profil">Ziele &amp; Profil</button>
   </nav>
@@ -1126,7 +1125,7 @@ function viewKalender0(){
           <button class="btn" data-start="${sel}">${ui.run&&!ui.run.edit&&ui.run.date===sel?"Training fortsetzen":"Training starten"}</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>`}
       </div>`:""}
       ${acts.map(a=>`<div class="small"><b>${a.name?esc(a.name):"Wearable-Aktivität"}${s||done?" (zusätzlich)":""}:</b> ${a.dur} min${a.avg?`, Ø ${a.avg} bpm, max ${a.max||"–"} bpm`:""}${a.kcal?`, ${a.kcal} kcal`:""} <span class="muted">(${esc(a.src)})</span></div>`).join("")}
-      ${state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
+      ${!SUPPS_OFF&&state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
         ${state.mySupps.filter(id=>suppDue(id,sel)).map(id=>{const sp=SUPPS.find(x=>x.id===id); if(!sp) return ""; return `<label class="checkline"><input type="checkbox" data-supp="${id}" ${supsToday.includes(id)?"checked":""}> ${esc(sp.n)} <span class="muted small">${esc(suppLineProducts(id)||sp.dose(p))}${(e=>e?` · ${e.k} kcal, ${e.p} g Protein`:"")(suppEnergy(id))}</span></label>`}).join("")}
       </div>`:""}
     </section>
@@ -1397,10 +1396,9 @@ function remindHtml(){
   const R=state.remind, row=(k,label)=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><label class="checkline" style="margin:0;min-width:0"><input type="checkbox" data-remind="${k}" ${R[k].on?"checked":""}> ${label}</label><input type="time" data-remindt="${k}" value="${esc(R[k].t)}" style="width:auto;flex:none" ${R[k].on?"":"disabled"}></div>`;
   return `<section class="panel stack" id="remind" style="margin-top:14px"><h2>Erinnerungen</h2>
     ${row("train","An Trainingstagen")}
-    ${row("supp","Supplements")}
     ${state.coach.on?row("food","Ernährung eintragen (Trainer)"):""}
     ${ui.remMsg?`<p class="small" style="margin:0">${esc(ui.remMsg)}</p>`:""}
-    <p class="small muted" style="margin:0">Die App erinnert dich nur, wenn heute ein Training geplant und noch nicht erledigt ist oder ein Supplement noch nicht abgehakt ist. Das Widget mit deinem heutigen Training findest du so: Startbildschirm lange gedrückt halten, Widgets, 4Peak.</p>
+    <p class="small muted" style="margin:0">Die App erinnert dich nur, wenn heute ein Training geplant und noch nicht erledigt ist oder du heute noch nichts gegessen eingetragen hast. Das Widget mit deinem heutigen Training findest du so: Startbildschirm lange gedrückt halten, Widgets, 4Peak.</p>
   </section>`;
 }
 function backupHtml(){
@@ -2171,7 +2169,10 @@ function productsHtml(){
     </details>
   </section>`;
 }
+/* Supplements sind ausgebaut (Alex, 2026-10-31); Daten bleiben gespeichert, erscheinen aber nirgends mehr */
+const SUPPS_OFF=true;
 function suppDue(id,dateIso){
+  if(SUPPS_OFF) return false;
   if(id==="koffein") return !!sessionFor(dateIso)||!!(state.done[dateIso]);
   const prods=(state.myProducts||[]).map(prodById).filter(pr=>pr&&CAT_SUPP[pr.cat]===id&&pr.every);
   if(prods.length){const n=Math.round(parseIso(dateIso).getTime()/DAY); return prods.some(pr=>n%pr.every===0)}
@@ -2945,11 +2946,11 @@ function scanHtml(){
       <button class="btn" type="submit" style="align-self:flex-end">Eintragen</button>
       <span class="small muted" id="scanprev" style="align-self:flex-end">${scanPrev(s,g)}</span>
     </form>`}
-    ${sp?`<p class="small" style="margin:0">Das ist ein Supplement aus deinem Katalog: <b>${esc(sp.brand)} ${esc(sp.name)}</b>. ${state.myProducts.includes(sp.id)?"Es ist schon bei deinen Produkten.":`<button class="linkbtn" data-prodadd="${esc(sp.id)}">Zu meinen Produkten</button>`}</p>`:""}
+    ${sp&&!SUPPS_OFF?`<p class="small" style="margin:0">Das ist ein Supplement aus deinem Katalog: <b>${esc(sp.brand)} ${esc(sp.name)}</b>. ${state.myProducts.includes(sp.id)?"Es ist schon bei deinen Produkten.":`<button class="linkbtn" data-prodadd="${esc(sp.id)}">Zu meinen Produkten</button>`}</p>`:""}
     ${s.own?`<p class="small muted" style="margin:0">Von dir gespeichert. <button class="linkbtn" data-scanforget="${esc(s.ean)}">Vergessen</button></p>`:`<p class="sources" style="margin:0">Nährwerte von <a href="https://world.openfoodfacts.org/product/${esc(s.ean)}" target="_blank" rel="noopener">Open Food Facts</a>, bitte mit der Packung abgleichen.</p>`}
   </div>`;
 }
-const VIEWS={kalender:viewKalender,training:viewTraining,fortschritt:viewFortschritt,ernaehrung:viewErnaehrung,plan:viewPlan,uebungen:viewUebungen,supps:viewSupps,wear:viewWear,profil:viewProfil};
+const VIEWS={kalender:viewKalender,training:viewTraining,fortschritt:viewFortschritt,ernaehrung:viewErnaehrung,plan:viewPlan,uebungen:viewUebungen,supps:SUPPS_OFF?()=>{ui.tab="kalender"; return viewKalender()}:viewSupps,wear:viewWear,profil:viewProfil};
 /* Untere Leiste (Handy): vier frei wählbare Bereiche plus „Mehr“ */
 const NAV_TABS=[
   ["kalender","Kalender",'<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'],
@@ -2958,10 +2959,10 @@ const NAV_TABS=[
   ["ernaehrung","Ernährung",'<path d="M12 7c-1.5-2.5-6-2.5-7 1.5S6.5 20 9 20c1.2 0 1.8-.6 3-.6s1.8.6 3 .6c2.5 0 5-7.5 4-11.5S13.5 4.5 12 7z"/><path d="M12 7c0-2 1-3.5 2.5-4"/>'],
   ["plan","Plan",'<rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 14h7M8.5 18h4"/>'],
   ["uebungen","Übungen",'<path d="M5 4.5h10.5a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10.5M9 8.5h6"/>'],
-  ["supps","Supplements",'<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M10 9.8l4 5.4"/>'],
+  !SUPPS_OFF&&["supps","Supplements",'<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M10 9.8l4 5.4"/>'],
   ["wear","Wearables",'<rect x="7" y="7" width="10" height="10" rx="3"/><path d="M9 7l1-4h4l1 4M9 17l1 4h4l1-4M10 12h1l1-1.5 1 3 1-1.5h0"/>'],
   ["profil","Profil",'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5"/>'],
-];
+].filter(Boolean);
 const NAV_DEFAULT=["kalender","training","fortschritt","ernaehrung"];
 const navIcon=p=>`<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg></span>`;
 function navTabs(){
