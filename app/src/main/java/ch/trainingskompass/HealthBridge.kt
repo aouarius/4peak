@@ -38,6 +38,15 @@ class HealthBridge(private val context: Context) {
     suspend fun hasAll(): Boolean =
         client.permissionController.getGrantedPermissions().containsAll(PERMISSIONS)
 
+    /** Körperwerte, für die noch keine Freigabe da ist (deutsche Namen für die Anzeige) */
+    suspend fun missingBody(): List<String> {
+        val g = client.permissionController.getGrantedPermissions()
+        return listOf(
+            WeightRecord::class to "Gewicht", BodyFatRecord::class to "Körperfett", LeanBodyMassRecord::class to "Fettfreie Masse",
+            BodyWaterMassRecord::class to "Körperwasser", BoneMassRecord::class to "Knochenmasse", BasalMetabolicRateRecord::class to "Grundumsatz",
+        ).filter { HealthPermission.getReadPermission(it.first) !in g }.map { it.second }
+    }
+
     suspend fun hasAny(): Boolean =
         client.permissionController.getGrantedPermissions().any { it in PERMISSIONS }
 

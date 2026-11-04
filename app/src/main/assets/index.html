@@ -930,6 +930,7 @@ window.onWatchSessions=function(arr){
 };
 window.onNativeHealth=function(h){
   if(!h||typeof h!=="object") return;
+  ui.hcMissing=Array.isArray(h.missing)?h.missing:null;
   state.health={at:new Date().toISOString(),rest:Array.isArray(h.rest)?h.rest:[],hrv:Array.isArray(h.hrv)?h.hrv:[],sleep:Array.isArray(h.sleep)?h.sleep:[],error:h.error||""};
   // Sport aus Health Connect (z. B. Samsung Health) als Aktivität übernehmen; Trainings dieser App nicht doppelt
   let added=0;
@@ -2716,7 +2717,12 @@ function lineChart(pts,unit){
 /* Körperzusammensetzung von der Waage (über Health Connect): letzte Werte, Veränderung, Verläufe */
 function bodyCompHtml(bw){
   const has=k=>bw.filter(x=>x[k]!=null), bf=has("f"), ln=has("lean");
-  if(!bf.length&&!ln.length&&!has("water").length) return `<p class="small muted" style="margin:0">Mit einer Waage, die an Health Connect überträgt (z. B. Withings), kommen Gewicht, Körperfett und weitere Körperwerte automatisch hierher.</p>`;
+  const miss=ui.hcMissing||[], native=NATIVE&&NATIVE.requestHealth;
+  const perm=native&&miss.length?`<div class="panel stack" style="background:var(--sunk);gap:8px"><b>Freigabe fehlt: ${esc(miss.join(", "))}</b>
+      <span class="small">Ohne diese Freigabe in Health Connect kommen die Werte deiner Waage nicht in 4Peak.</span>
+      <div class="row"><button class="btn small" data-health="1">Freigabe erteilen</button>${NATIVE.openHealthSettings?`<button class="btn ghost small" data-hcset="1">Health Connect öffnen</button>`:""}</div>
+      <span class="small muted">Kommt keine Abfrage, dann in Health Connect → App-Berechtigungen → 4Peak alles einschalten.</span></div>`:"";
+  if(!bf.length&&!ln.length&&!has("water").length) return `<h3>Körperzusammensetzung</h3>${perm}<p class="small muted" style="margin:0">${native&&!state.health?`Noch keine Daten aus Health Connect geladen. <button class="linkbtn" data-health="1">Jetzt laden</button>`:miss.length?"":"Noch keine Werte. Wiege dich mit der Waage und prüfe in der Withings-App, dass die Synchronisation mit Health Connect eingeschaltet ist; danach erscheinen Körperfett, fettfreie Masse und Co. hier."}</p>`;
   const last=k=>{const a=has(k); return a.length?a[a.length-1]:null}, dl=(k,u,dig)=>{const a=has(k); if(a.length<2) return ""; const d=a[a.length-1][k]-a[0][k]; return `${d>0?"+":""}${fmt(d,dig)} ${u} seit ${parseIso(a[0].d).getDate()}.${parseIso(a[0].d).getMonth()+1}.`};
   const lf=last("f"), T=[];
   if(lf){T.push(tile("Körperfett",fmt(lf.f,1)+" %",dl("f","%",1))); T.push(tile("Fettmasse",fmt(lf.v*lf.f/100,1)+" kg",""))}
@@ -2724,7 +2730,7 @@ function bodyCompHtml(bw){
   const lw=last("water"); if(lw) T.push(tile("Körperwasser",fmt(lw.water,1)+" kg",lw.v?fmt(lw.water/lw.v*100,0)+" % des Gewichts":""));
   const lb=last("bone"); if(lb) T.push(tile("Knochenmasse",fmt(lb.bone,1)+" kg",""));
   const lm=last("bmr"); if(lm) T.push(tile("Grundumsatz",fmt(lm.bmr)+" kcal","laut Waage"));
-  return `<h3>Körperzusammensetzung</h3><div class="tiles">${T.join("")}</div>
+  return `<h3>Körperzusammensetzung</h3>${perm}<div class="tiles">${T.join("")}</div>
     ${bf.length>1?`<div class="small muted">Körperfett (%)</div>${lineChart(bf.map(x=>({d:x.d,v:x.f})),"%")}`:""}
     ${ln.length>1?`<div class="small muted">Fettfreie Masse (kg)</div>${lineChart(ln.map(x=>({d:x.d,v:x.lean})),"kg")}`:""}
     <p class="small muted" style="margin:0">Werte der Waage über Health Connect. Körperfett per Waage schwankt mit Wasserhaushalt und Tageszeit: am besten immer morgens nüchtern messen und auf den Trend achten.</p>`;
@@ -3082,7 +3088,7 @@ document.addEventListener("toggle",e=>{const d=e.target; if(!d.dataset||!d.datas
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-mealphoto],[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-hcset],[data-mealphoto],[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.motionexp){try{NATIVE.exportMotion("4peak-bewegungsdaten-"+todayIso+".zip")}catch(e){} return}
@@ -3103,6 +3109,7 @@ document.getElementById("view").addEventListener("click",e=>{
   if(t.dataset.mealclr){ui.meal=null; NATIVE&&NATIVE.clearMealPhoto&&NATIVE.clearMealPhoto(); render(); return}
   if(t.dataset.mealadd){const it=ui.meal&&ui.meal.items||[]; if(!it.length) return; const L=state.food[ui.foodDay]||(state.food[ui.foodDay]=[]); for(const x of it) L.push({n:("🍽 "+x.n).slice(0,60),k:x.k,p:x.p,c:x.c,f:x.f}); ui.meal=null; NATIVE&&NATIVE.clearMealPhoto&&NATIVE.clearMealPhoto(); save(); render(); return}
   if(t.dataset.scan){ui.scan={loading:true}; render(); NATIVE.scanBarcode(); return}
+  if(t.dataset.hcset){NATIVE.openHealthSettings(); return}
   if(t.dataset.health){if(NATIVE) NATIVE.requestHealth(); t.textContent="Wird geladen …"; return}
   if(t.dataset.brand){ui.prodBrand=ui.prodBrand===t.dataset.brand&&!ui.prodQ?"":t.dataset.brand; ui.prodQ=""; render(); return}
   if(t.dataset.prodadd){const pr=prodById(t.dataset.prodadd); if(!state.myProducts.includes(pr.id)) state.myProducts.push(pr.id); const sid=CAT_SUPP[pr.cat]; if(sid&&!state.mySupps.includes(sid)) state.mySupps.push(sid); save(); render(); return}

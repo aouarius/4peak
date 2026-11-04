@@ -366,6 +366,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 JSONObject().put("error", "Die Daten aus Health Connect konnten nicht gelesen werden.")
             }
         }
+        if (health.available()) runCatching { obj.put("missing", JSONArray(health.missingBody())) }
         web.evaluateJavascript("window.onNativeHealth && window.onNativeHealth($obj)", null)
     }
 
@@ -558,6 +559,15 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         @JavascriptInterface
         fun scanBarcode() {
             runOnUiThread { startBarcodeScan() }
+        }
+
+        /** Health-Connect-Einstellungen öffnen, falls Android die Abfrage nicht mehr zeigt */
+        @JavascriptInterface
+        fun openHealthSettings() {
+            runOnUiThread {
+                runCatching { startActivity(Intent(androidx.health.connect.client.HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)) }
+                    .onFailure { runCatching { startActivity(Intent("android.health.connect.action.HEALTH_HOME_SETTINGS")) } }
+            }
         }
 
         @JavascriptInterface
