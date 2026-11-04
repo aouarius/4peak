@@ -106,33 +106,28 @@ class HealthBridge(private val context: Context) {
 
         // Gewicht und Körperfett der letzten 120 Tage, z. B. von einer Withings-Waage; pro Tag die letzte Messung
         val longRange = TimeRangeFilter.between(end.minus(120, ChronoUnit.DAYS), end)
-        val weight = runCatching {
-            client.readRecords(ReadRecordsRequest(WeightRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+        // Kurzer Befund für die Anzeige, falls nichts ankommt: Anzahl Messungen, Quellen, Fehler
+        val diag = JSONObject()
+        fun <T : androidx.health.connect.client.records.Record> body(cls: kotlin.reflect.KClass<T>, label: String): List<T> =
+            runCatching { client.readRecords(ReadRecordsRequest(cls, timeRangeFilter = longRange, pageSize = 1000)).records }
+                .onSuccess { r -> diag.put(label, "${r.size}" + if (r.isNotEmpty()) " (" + r.map { it.metadata.dataOrigin.packageName.substringAfterLast('.') }.distinct().joinToString() + ")" else "") }
+                .onFailure { e -> diag.put(label, "Fehler: ${e.javaClass.simpleName}") }
+                .getOrDefault(emptyList())
+        val weight = body(WeightRecord::class, "Gewicht")
                 .groupBy { day(it.time) }
                 .mapValues { (_, r) -> r.maxBy { it.time }.weight.inKilograms }
-        }.getOrDefault(emptyMap())
-        val fat = runCatching {
-            client.readRecords(ReadRecordsRequest(BodyFatRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+        val fat = body(BodyFatRecord::class, "Körperfett")
                 .groupBy { day(it.time) }
                 .mapValues { (_, r) -> r.maxBy { it.time }.percentage.value }
-        }.getOrDefault(emptyMap())
         // Weitere Werte der Waage (Withings & Co.): fettfreie Masse, Wasser, Knochen, Grundumsatz
-        val lean = runCatching {
-            client.readRecords(ReadRecordsRequest(LeanBodyMassRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+        val lean = body(LeanBodyMassRecord::class, "Fettfreie Masse")
                 .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.mass.inKilograms }
-        }.getOrDefault(emptyMap())
-        val water = runCatching {
-            client.readRecords(ReadRecordsRequest(BodyWaterMassRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+        val water = body(BodyWaterMassRecord::class, "Körperwasser")
                 .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.mass.inKilograms }
-        }.getOrDefault(emptyMap())
-        val bone = runCatching {
-            client.readRecords(ReadRecordsRequest(BoneMassRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+        val bone = body(BoneMassRecord::class, "Knochenmasse")
                 .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.mass.inKilograms }
-        }.getOrDefault(emptyMap())
-        val bmr = runCatching {
-            client.readRecords(ReadRecordsRequest(BasalMetabolicRateRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+        val bmr = body(BasalMetabolicRateRecord::class, "Grundumsatz")
                 .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.basalMetabolicRate.inKilocaloriesPerDay }
-        }.getOrDefault(emptyMap())
         val bw = JSONArray()
         (weight.keys + fat.keys + lean.keys + water.keys + bone.keys).toSortedSet().forEach { d ->
             val o = JSONObject().put("d", d.toString())
@@ -148,6 +143,7 @@ class HealthBridge(private val context: Context) {
         return JSONObject()
             .put("ex", ex)
             .put("bw", bw)
+            .put("bwdiag", diag)
             .put("rest", series(rest, "v"))
             .put("hrv", series(hrv, "v"))
             .put("sleep", series(sleep, "min"))

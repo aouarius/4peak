@@ -930,7 +930,7 @@ window.onWatchSessions=function(arr){
 };
 window.onNativeHealth=function(h){
   if(!h||typeof h!=="object") return;
-  ui.hcMissing=Array.isArray(h.missing)?h.missing:null;
+  ui.hcMissing=Array.isArray(h.missing)?h.missing:null; ui.hcDiag=h.bwdiag&&typeof h.bwdiag==="object"?h.bwdiag:null; ui.hcAt=new Date();
   state.health={at:new Date().toISOString(),rest:Array.isArray(h.rest)?h.rest:[],hrv:Array.isArray(h.hrv)?h.hrv:[],sleep:Array.isArray(h.sleep)?h.sleep:[],error:h.error||""};
   // Sport aus Health Connect (z. B. Samsung Health) als Aktivität übernehmen; Trainings dieser App nicht doppelt
   let added=0;
@@ -2722,7 +2722,8 @@ function bodyCompHtml(bw){
       <span class="small">Ohne diese Freigabe in Health Connect kommen die Werte deiner Waage nicht in 4Peak.</span>
       <div class="row"><button class="btn small" data-health="1">Freigabe erteilen</button>${NATIVE.openHealthSettings?`<button class="btn ghost small" data-hcset="1">Health Connect öffnen</button>`:""}</div>
       <span class="small muted">Kommt keine Abfrage, dann in Health Connect → App-Berechtigungen → 4Peak alles einschalten.</span></div>`:"";
-  if(!bf.length&&!ln.length&&!has("water").length) return `<h3>Körperzusammensetzung</h3>${perm}<p class="small muted" style="margin:0">${native&&!state.health?`Noch keine Daten aus Health Connect geladen. <button class="linkbtn" data-health="1">Jetzt laden</button>`:miss.length?"":"Noch keine Werte. Wiege dich mit der Waage und prüfe in der Withings-App, dass die Synchronisation mit Health Connect eingeschaltet ist; danach erscheinen Körperfett, fettfreie Masse und Co. hier."}</p>`;
+  if(!bf.length&&!ln.length&&!has("water").length) return `<h3>Körperzusammensetzung</h3>${perm}<p class="small muted" style="margin:0">${native&&!state.health?`Noch keine Daten aus Health Connect geladen. <button class="linkbtn" data-health="1">Jetzt laden</button>`:miss.length?"":"Noch keine Werte. Wiege dich mit der Waage und prüfe in der Withings-App, dass die Synchronisation mit Health Connect eingeschaltet ist; danach erscheinen Körperfett, fettfreie Masse und Co. hier."}</p>
+    ${ui.hcDiag?`<p class="small muted" style="margin:0">Health Connect, letzte 120 Tage (geprüft ${String(ui.hcAt.getHours()).padStart(2,"0")}:${String(ui.hcAt.getMinutes()).padStart(2,"0")}): ${Object.entries(ui.hcDiag).map(([k,v])=>`${esc(k)} ${esc(String(v))}`).join(" · ")} <button class="linkbtn" data-health="1">Neu laden</button></p>`:""}`;
   const last=k=>{const a=has(k); return a.length?a[a.length-1]:null}, dl=(k,u,dig)=>{const a=has(k); if(a.length<2) return ""; const d=a[a.length-1][k]-a[0][k]; return `${d>0?"+":""}${fmt(d,dig)} ${u} seit ${parseIso(a[0].d).getDate()}.${parseIso(a[0].d).getMonth()+1}.`};
   const lf=last("f"), T=[];
   if(lf){T.push(tile("Körperfett",fmt(lf.f,1)+" %",dl("f","%",1))); T.push(tile("Fettmasse",fmt(lf.v*lf.f/100,1)+" kg",""))}
