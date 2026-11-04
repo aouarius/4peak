@@ -5,6 +5,10 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.BasalMetabolicRateRecord
+import androidx.health.connect.client.records.BodyWaterMassRecord
+import androidx.health.connect.client.records.BoneMassRecord
+import androidx.health.connect.client.records.LeanBodyMassRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
@@ -103,10 +107,32 @@ class HealthBridge(private val context: Context) {
                 .groupBy { day(it.time) }
                 .mapValues { (_, r) -> r.maxBy { it.time }.percentage.value }
         }.getOrDefault(emptyMap())
+        // Weitere Werte der Waage (Withings & Co.): fettfreie Masse, Wasser, Knochen, Grundumsatz
+        val lean = runCatching {
+            client.readRecords(ReadRecordsRequest(LeanBodyMassRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+                .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.mass.inKilograms }
+        }.getOrDefault(emptyMap())
+        val water = runCatching {
+            client.readRecords(ReadRecordsRequest(BodyWaterMassRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+                .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.mass.inKilograms }
+        }.getOrDefault(emptyMap())
+        val bone = runCatching {
+            client.readRecords(ReadRecordsRequest(BoneMassRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+                .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.mass.inKilograms }
+        }.getOrDefault(emptyMap())
+        val bmr = runCatching {
+            client.readRecords(ReadRecordsRequest(BasalMetabolicRateRecord::class, timeRangeFilter = longRange, pageSize = 1000)).records
+                .groupBy { day(it.time) }.mapValues { (_, r) -> r.maxBy { it.time }.basalMetabolicRate.inKilocaloriesPerDay }
+        }.getOrDefault(emptyMap())
         val bw = JSONArray()
-        weight.toSortedMap().forEach { (d, v) ->
-            val o = JSONObject().put("d", d.toString()).put("v", Math.round(v * 10) / 10.0)
+        (weight.keys + fat.keys + lean.keys + water.keys + bone.keys).toSortedSet().forEach { d ->
+            val o = JSONObject().put("d", d.toString())
+            weight[d]?.let { o.put("v", Math.round(it * 10) / 10.0) }
             fat[d]?.let { o.put("f", Math.round(it * 10) / 10.0) }
+            lean[d]?.let { o.put("lean", Math.round(it * 10) / 10.0) }
+            water[d]?.let { o.put("water", Math.round(it * 10) / 10.0) }
+            bone[d]?.let { o.put("bone", Math.round(it * 10) / 10.0) }
+            bmr[d]?.let { o.put("bmr", Math.round(it)) }
             bw.put(o)
         }
 
@@ -160,6 +186,10 @@ class HealthBridge(private val context: Context) {
             HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
             HealthPermission.getReadPermission(WeightRecord::class),
             HealthPermission.getReadPermission(BodyFatRecord::class),
+            HealthPermission.getReadPermission(LeanBodyMassRecord::class),
+            HealthPermission.getReadPermission(BodyWaterMassRecord::class),
+            HealthPermission.getReadPermission(BoneMassRecord::class),
+            HealthPermission.getReadPermission(BasalMetabolicRateRecord::class),
         )
     }
 }
