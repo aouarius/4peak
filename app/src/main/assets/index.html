@@ -955,7 +955,7 @@ window.onNativeHealth=function(h){
   if(bwc){const last=state.bw.slice().sort((a,b)=>a.d<b.d?-1:1).pop(); state.profile.weight=last.v; save()}
   if(added||bwc){state.acts.sort((a,b)=>a.date<b.date?-1:1); render()}
   const r=state.health.rest.slice(-7).map(x=>Number(x.v)).filter(v=>v>30&&v<110); if(r.length) state.profile.restHr=Math.round(r.reduce((x,y)=>x+y,0)/r.length)
-  save(); if(ui.tab==="wear") render();
+  save(); if(ui.tab==="wear"||ui.tab==="fortschritt") render();
 };
 function recovery(h){
   const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;

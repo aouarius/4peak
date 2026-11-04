@@ -114,6 +114,25 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     /** Datum aus Widget oder Erinnerung: Die Seite startet dann das Training dieses Tages. */
     private var pendingStart: String? = null
 
+    /** Sport und Körperwerte aus Health Connect still nachladen, sobald die Seite bereit ist (einmal pro Start) */
+    private var startupHealthDone = false
+    private fun startupHealth() {
+        if (startupHealthDone) return
+        startupHealthDone = true
+        lifecycleScope.launch {
+            if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) {
+                deliverHealth()
+                // Neue Datenarten (z. B. Gewicht und Körperfett der Waage) einmalig nachfragen
+                val prefs = getSharedPreferences("health", MODE_PRIVATE)
+                val v = HealthBridge.PERMISSIONS.size
+                if (prefs.getInt("asked", 0) < v && runCatching { !health.hasAll() }.getOrDefault(false)) {
+                    prefs.edit().putInt("asked", v).apply()
+                    healthPermissions.launch(HealthBridge.PERMISSIONS)
+                }
+            }
+        }
+    }
+
     private fun deliverStart() {
         val d = pendingStart ?: return
         if (!pageReady) return
@@ -176,6 +195,7 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
                 override fun onPageFinished(view: WebView, url: String) {
                     pageReady = true
+                    startupHealth()
                     pullWatchLogs()
                     pullLive()
                     deliverStart()
@@ -223,20 +243,13 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         pullWatchLogs()
         pullMotion()
         pullLive()
-        // Sport aus Samsung Health still nachladen, wenn Health Connect schon freigegeben ist
-        lifecycleScope.launch {
-            if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) {
-                deliverHealth()
-                // Neue Datenarten (z. B. Gewicht und Körperfett der Waage) einmalig nachfragen
-                val prefs = getSharedPreferences("health", MODE_PRIVATE)
-                val v = HealthBridge.PERMISSIONS.size
-                if (prefs.getInt("asked", 0) < v && runCatching { !health.hasAll() }.getOrDefault(false)) {
-                    prefs.edit().putInt("asked", v).apply()
-                    healthPermissions.launch(HealthBridge.PERMISSIONS)
-                }
-            }
+        // Zurück in der App (z. B. nach dem Wiegen): neue Werte aus Health Connect holen, höchstens alle 2 Minuten
+        if (pageReady && startupHealthDone && System.currentTimeMillis() - lastHealthPull > 120_000) {
+            lastHealthPull = System.currentTimeMillis()
+            lifecycleScope.launch { if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) deliverHealth() }
         }
     }
+    private var lastHealthPull = 0L
 
     override fun onDestroy() {
         if (isFinishing) hr.disconnect()
