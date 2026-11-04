@@ -108,7 +108,7 @@ class HealthBridge(private val context: Context) {
         val longRange = TimeRangeFilter.between(end.minus(120, ChronoUnit.DAYS), end)
         // Kurzer Befund für die Anzeige, falls nichts ankommt: Anzahl Messungen, Quellen, Fehler
         val diag = JSONObject()
-        fun <T : androidx.health.connect.client.records.Record> body(cls: kotlin.reflect.KClass<T>, label: String): List<T> =
+        suspend fun <T : androidx.health.connect.client.records.Record> body(cls: kotlin.reflect.KClass<T>, label: String): List<T> =
             runCatching { client.readRecords(ReadRecordsRequest(cls, timeRangeFilter = longRange, pageSize = 1000)).records }
                 .onSuccess { r -> diag.put(label, "${r.size}" + if (r.isNotEmpty()) " (" + r.map { it.metadata.dataOrigin.packageName.substringAfterLast('.') }.distinct().joinToString() + ")" else "") }
                 .onFailure { e -> diag.put(label, "Fehler: ${e.javaClass.simpleName}") }
