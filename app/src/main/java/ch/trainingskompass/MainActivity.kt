@@ -224,7 +224,18 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         pullMotion()
         pullLive()
         // Sport aus Samsung Health still nachladen, wenn Health Connect schon freigegeben ist
-        lifecycleScope.launch { if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) deliverHealth() }
+        lifecycleScope.launch {
+            if (runCatching { health.available() && health.hasAny() }.getOrDefault(false)) {
+                deliverHealth()
+                // Neue Datenarten (z. B. Gewicht und Körperfett der Waage) einmalig nachfragen
+                val prefs = getSharedPreferences("health", MODE_PRIVATE)
+                val v = HealthBridge.PERMISSIONS.size
+                if (prefs.getInt("asked", 0) < v && runCatching { !health.hasAll() }.getOrDefault(false)) {
+                    prefs.edit().putInt("asked", v).apply()
+                    healthPermissions.launch(HealthBridge.PERMISSIONS)
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
