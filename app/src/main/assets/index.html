@@ -704,10 +704,14 @@ const T = {
   z2:{n:"Zone 2 locker",c:"green",x:[["z2","cardio","30–45 min"]]},
   int:{n:"Intervalle 4×4",c:"green",x:[["intervals","cardio","ca. 40 min gesamt"]]}
 };
+// Freier Plan vom Trainer: eigene Tage t1…t6 (Namen und Übungen kommen aus state.custom / state.customNames)
+for(let i=1;i<=6;i++) T["t"+i]={n:"Tag "+i,c:["blue","red","yellow"][(i-1)%3],x:(i%2?T.gkA:T.gkB).x};
+const sessName=k=>(state.customNames&&state.customNames[k])||T[k].n;
 
 const SPLITS={gk:{n:"Ganzkörper, abwechselnd A/B",seq:["gkA","gkB"]},ul:{n:"Oberkörper/Unterkörper",seq:["upA","loA","upB","loB"]},ppl:{n:"Push/Pull/Beine",seq:["push","pull","legs"]}};
 function splitFor(p){
   const d=p.weekdays.length;
+  if(p.split==="frei") return {n:"Freier Plan vom Trainer",seq:Array.from({length:Math.min(6,Math.max(1,d))},(_,i)=>"t"+(i+1))};
   if(p.goal!=="ausd"&&SPLITS[p.split]) return SPLITS[p.split];
   if(p.goal==="ausd") return {n:"Polarisiert (ca. 80 % locker, 20 % hart) plus Kraft",seq:["z2long","int","gkA","z2","gkB","z2long","z2"].slice(0,Math.max(d,1))};
   if(d<=3) return {n:"Ganzkörper, abwechselnd A/B",seq:["gkA","gkB"]};
@@ -751,7 +755,7 @@ function buildSession(key,p,deload){
     out.push({id,role,sets:half(base),reps:x.reps||(br&&!isTimed(id,pr.r)&&!isTimed(id,EX[id].r||"")?br:pr.r),rir:deload?"3–4":pr.rir,rest:pr.rest,...ss});
   }
   if(!tmpl && G.finisher && t.c!=="green") out.push({id:"z2",role:"cardio",txt:G.finisher+" Zone 2 im Anschluss"});
-  return {key,name:t.n,c:t.c,items:out,deload};
+  return {key,name:sessName(key),c:t.c,items:out,deload};
 }
 
 /* ---------- Zustand ---------- */
@@ -1152,9 +1156,9 @@ function viewPlan(){
       <div class="row">
         <button class="btn${ui.editPlan?"":" ghost"}" data-editplan="1">${ui.editPlan?"Fertig":"Plan bearbeiten"}</button>
         ${p.goal!=="ausd"?`<label class="f" for="planSplit" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 240px;min-width:0;max-width:100%">Aufteilung<select id="planSplit" style="flex:1 1 180px;min-width:0;max-width:100%">
-          ${[["auto","Automatisch"],["gk","Ganzkörper"],["ul","Oberkörper/Unterkörper"],["ppl","Push/Pull/Beine"]].map(([v,t])=>`<option value="${v}"${(p.split||"auto")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:""}
+          ${[["auto","Automatisch"],["gk","Ganzkörper"],["ul","Oberkörper/Unterkörper"],["ppl","Push/Pull/Beine"],["frei","Frei (vom Trainer geplant)"]].map(([v,t])=>`<option value="${v}"${(p.split||"auto")===v?" selected":""}>${t}</option>`).join("")}</select></label>`:""}
       </div>
-      ${(u=>u&&uniq.length>1?`<label class="f" for="planNext" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;max-width:100%">Als Nächstes am ${WD[isoWd(parseIso(u.date))]}, ${parseIso(u.date).getDate()}.${parseIso(u.date).getMonth()+1}.<select id="planNext" style="flex:1 1 180px;min-width:0;max-width:100%">${uniq.map(k=>`<option value="${k}"${u.s.key===k?" selected":""}>${esc(T[k].n)}</option>`).join("")}</select></label>`:"")(upcoming())}
+      ${(u=>u&&uniq.length>1?`<label class="f" for="planNext" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;max-width:100%">Als Nächstes am ${WD[isoWd(parseIso(u.date))]}, ${parseIso(u.date).getDate()}.${parseIso(u.date).getMonth()+1}.<select id="planNext" style="flex:1 1 180px;min-width:0;max-width:100%">${uniq.map(k=>`<option value="${k}"${u.s.key===k?" selected":""}>${esc(sessName(k))}</option>`).join("")}</select></label>`:"")(upcoming())}
       ${p.split==="ppl"&&p.weekdays.length<6?`<p class="small muted" style="margin:0">Mit Push/Pull/Beine und weniger als 6 Tagen wird jeder Muskel seltener als zweimal pro Woche trainiert.</p>`:""}
       ${ui.editPlan?`<p class="small muted" style="margin:0">Tausche Übungen, ändere Sätze und Wiederholungen oder die Reihenfolge. Kalender und Trainingsmodus übernehmen die Änderungen sofort.</p>`:""}
       <div class="cards">${uniq.map(k=>{if(ui.editPlan) return editCardHtml(k); const s=buildSession(k,p,false);return `<div class="panel" style="background:var(--bg)">
@@ -1704,6 +1708,7 @@ function coachData(){
     uebungen:ex, moegliche_tauschuebungen:alt,
     plan_einheiten:[...new Set(splitFor(p).seq)].map(k=>{const s=buildSession(k,p,false); return {key:k,name:s.name,uebungen:s.items.map(i=>i.role==="cardio"?`${i.id} (Ausdauer) ${i.txt}`:`${i.id} ${i.sets}×${i.reps}`)}}),
     minuten_pro_einheit_max_kraftuebungen:maxStrength(p.len),
+    freie_tage_keys:Array.from({length:Math.min(6,Math.max(1,p.weekdays.length))},(_,i)=>"t"+(i+1)), trainingstage:p.weekdays.map(i=>WD[i]),
     tatsaechlich_gemacht_8_wochen:(()=>{const o={}; for(const [d,x] of h) for(const [id,arr] of Object.entries(x.sets||{})){const w=work(arr); if(!w.length||!EX[id]) continue; const e=o[id]||(o[id]={n:EX[id].n,im_plan:ids.has(id),mal:0,zuletzt:""}); e.mal++; if(d>=e.zuletzt){e.zuletzt=d; e.letzte_saetze=w.map(setAi).join("; ")} const b1=Math.round(exBest(id,arr)); if(b1>0) (e.e1rm_verlauf=e.e1rm_verlauf||[]).push(`${d}: ${b1}`)} for(const e of Object.values(o)) if(e.e1rm_verlauf) e.e1rm_verlauf=e.e1rm_verlauf.slice(-8); return o})(),
     regel_hinweise:coachTips().map(t=>t.t)};
 }
@@ -1761,7 +1766,8 @@ function aiAction(a){
     return {l:`${EX[a.ex].n} ins nächste Training`,f:()=>{const E=c.extra=c.extra||{}; (E[u.date]=E[u.date]||[]).push({id:a.ex,sets,reps,dur:it.dur})}}}
   if(a.type==="ready"&&u&&READY_N[a.mode]) return {l:`Nächstes Training: ${READY_N[a.mode]}`,f:()=>{if(a.mode==="normal") delete c.ready[u.date]; else c.ready[u.date]=a.mode}};
   if(a.type==="replan"&&Array.isArray(a.sessions)){
-    const keys=new Set(splitFor(state.profile).seq), plan={};
+    const frei=!!a.frei, nd=Math.min(6,Math.max(1,state.profile.weekdays.length));
+    const keys=new Set(frei?Array.from({length:nd},(_,i)=>"t"+(i+1)):splitFor(state.profile).seq), plan={}, names={};
     for(const x of a.sessions){
       if(!x||!keys.has(x.key)||!Array.isArray(x.items)) continue;
       const seen=new Set(), L=[];
@@ -1772,13 +1778,13 @@ function aiAction(a){
         const reps=okReps(it.reps)||/^\d{1,3}(–\d{1,3})?\s*s$/.test(String(it.reps||""))?String(it.reps):(EX[id].r||"8–12");
         L.push({id,role:core?"core":str<2&&it.main!==false?"main":"acc",sets:Math.max(1,Math.min(6,Math.round(+it.sets||3))),reps});
       }
-      if(L.filter(y=>y.role!=="cardio").length>=2) plan[x.key]=L.slice(0,10);
+      if(L.filter(y=>y.role!=="cardio").length>=2){plan[x.key]=L.slice(0,10); if(frei&&x.name) names[x.key]=String(x.name).slice(0,30)}
     }
-    const ks=Object.keys(plan); if(!ks.length) return null;
-    const prev=ks.map(k=>`<div style="margin-top:6px"><b>${esc(T[k].n)}</b><br>${plan[k].map(y=>esc(EX[y.id].n)+(y.role==="cardio"?` (${esc(y.dur)})`:` ${y.sets}×${esc(y.reps)}`)).join("<br>")}</div>`).join("");
-    return {l:`Neuen Plan übernehmen (${ks.length} ${ks.length===1?"Einheit":"Einheiten"})`,prev,f:()=>{c.planBackup={at:todayIso,custom:JSON.parse(JSON.stringify(state.custom||{}))}; for(const k of ks) state.custom[k]=plan[k]; ui.coachGo="plan"}};
+    const ks=Object.keys(plan); if(!ks.length||(frei&&ks.length<keys.size)) return null;
+    const prev=ks.map(k=>`<div style="margin-top:6px"><b>${esc(names[k]||sessName(k))}</b><br>${plan[k].map(y=>esc(EX[y.id].n)+(y.role==="cardio"?` (${esc(y.dur)})`:` ${y.sets}×${esc(y.reps)}`)).join("<br>")}</div>`).join("");
+    return {l:`Neuen Plan übernehmen (${ks.length} ${ks.length===1?"Einheit":"Einheiten"})`,prev,f:()=>{c.planBackup={at:todayIso,custom:JSON.parse(JSON.stringify(state.custom||{})),split:state.profile.split||"auto",names:{...(state.customNames||{})}}; for(const k of ks) state.custom[k]=plan[k]; if(frei){state.profile.split="frei"; state.customNames={...(state.customNames||{}),...names}} ui.coachGo="plan"}};
   }
-  if(a.type==="undoplan"&&c.planBackup) return {l:"Alten Plan zurückholen",f:()=>{state.custom=c.planBackup.custom||{}; delete c.planBackup; ui.coachGo="plan"}};
+  if(a.type==="undoplan"&&c.planBackup) return {l:"Alten Plan zurückholen",f:()=>{state.custom=c.planBackup.custom||{}; if(c.planBackup.split) state.profile.split=c.planBackup.split; if(c.planBackup.names) state.customNames=c.planBackup.names; delete c.planBackup; ui.coachGo="plan"}};
   if(a.type==="block") return {l:"Neuen Block planen",f:()=>{setTimeout(blockPlan,0)}};
   const tabs={ernaehrung:"Zur Ernährung",profil:"Zum Profil",fortschritt:"Zum Fortschritt",plan:"Zum Plan"};
   if(a.type==="goto"&&tabs[a.tab]) return {l:tabs[a.tab],f:()=>{if(a.tab==="ernaehrung") ui.foodDay=todayIso; ui.coachGo=a.tab}};
@@ -1825,6 +1831,7 @@ AKTION ist genau eine von:
 {"type":"kcal","delta":<-300 bis 300>} Kalorienziel anpassen
 {"type":"block"} neuen Trainingsblock planen
 {"type":"replan","sessions":[{"key":"<key aus plan_einheiten>","items":[{"id":"<id aus uebungs_katalog>","sets":<1–6>,"reps":"z. B. 6–10 oder 30–45 s"}, …]}, …]} ganze Einheiten neu zusammenstellen, wenn die Person das will (z. B. "plan mir alle Übungen neu"). Gehe dabei von tatsaechlich_gemacht_8_wochen aus: Übungen, die die Person regelmässig macht (auch solche, die nicht im Plan stehen, z. B. Maschinen im Studio), bleiben drin und kommen in die passende Einheit; ergänze nur, was für Ziel und Muskelbalance fehlt, und streiche, was sie nie macht. Passe nach Leistung an: Steigt der e1RM, bleibt die Übung; stagniert oder fällt er über 3–4 Wochen (oder Anstrengung oft 9–10, Uhr zeigt starkes Verlangsamen), wechsle auf eine Variante oder einen anderen Wiederholungsbereich; zu wenige Wochensätze für einen Muskel → Satz oder Übung dazu, zu viele bei schlechter Erholung (Schlaf, HRV) → weniger. Gib zu neuen Gewichten zusätzlich "weight"-Aktionen für die wichtigsten Übungen. Pro Einheit die vollständige Liste in der gewünschten Reihenfolge: zuerst 1–2 schwere Grundübungen, dann Ergänzungen, Rumpf zum Schluss; höchstens minuten_pro_einheit_max_kraftuebungen Kraftübungen plus 1 Rumpfübung; Ausdauer mit {"id":"z2","dur":"20 min"}. Nur Übungen aus uebungs_katalog: Geräte in profil.ohne_geraete (z. B. lh = Langhantel, kb = Kettlebell) hat die Person ausgeschaltet, nimm dafür Kurzhantel-, Kabel- oder Maschinenvarianten. Beachte Ziel, Niveau, Wochensätze pro Muskel (10–20 pro Woche bei Muskelaufbau), Favoriten, Notizen (Schmerzen) und nope_uebungen. Wiederhole Einheiten, die bleiben sollen, nicht. Im text dann kurz, was sich ändert und warum (darf hier bis 8 Sätze sein). Die Person sieht eine Vorschau und übernimmt mit einem Tipp.
+Will die Person ein ganz neues Programm ohne feste Aufteilung (nicht Ganzkörper/Oberkörper/Unterkörper), dann setze "frei":true und plane für JEDEN key aus freie_tage_keys einen eigenen Tag mit "name" (kurz, z. B. "Tag 1 · Beine & Zug"): {"type":"replan","frei":true,"sessions":[{"key":"t1","name":"…","items":[…]},…]}. Richte dich nach aktueller Trainingswissenschaft: 10–20 harte Sätze pro Muskel und Woche (bei wenig Zeit eher unten), jeden Muskel 2× pro Woche, Sätze 0–3 Wiederholungen vor dem Muskelversagen, 6–30 Wiederholungen wirken ähnlich (schwere Grundübungen 5–10, Ergänzungen 8–15), Übungen mit Belastung in gedehnter Position bevorzugen (z. B. rumänisches Kreuzheben, Schrägbank-Curls, Trizeps über Kopf, tiefe Kniebeugen/Beinpresse), 2–3 min Pause bei Grundübungen, grosse Übungen zuerst, Belastung über die Tage verteilen (nicht zwei schwere Beintage hintereinander).
 {"type":"undoplan"} vorherigen Plan wiederherstellen (wenn die Person den neuen Plan nicht will)
 Verwende nur Übungs-IDs aus den Daten.`;
 const actKey=a=>`${a.date}|${(a.name||"").toLowerCase()}|${a.dur}`;
