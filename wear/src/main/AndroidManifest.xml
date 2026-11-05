@@ -3,6 +3,8 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
@@ -37,6 +39,17 @@
             android:name=".WorkoutService"
             android:exported="false"
             android:foregroundServiceType="health" />
+
+        <!-- Puls und Schlaf im Hintergrund (Health Services, passive Daten) -->
+        <service
+            android:name=".PassiveDataService"
+            android:exported="true"
+            android:permission="com.google.android.wearable.healthservices.permission.PASSIVE_DATA_BINDING" />
+        <receiver android:name=".PassiveBootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Neuer Plan vom Handy, auch wenn die App zu ist -->
         <service android:name=".PlanListenerService" android:exported="true">

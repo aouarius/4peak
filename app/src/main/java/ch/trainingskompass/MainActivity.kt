@@ -383,6 +383,15 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             obj.put("missing", JSONArray(health.missingBody()))
             obj.put("hmissing", JSONArray(health.missingRecovery()))
         }
+        // Puls und Schlaf, die die 4Peak-Uhr selbst im Hintergrund erfasst (Samsung Health gibt beides nicht weiter)
+        runCatching {
+            val buffer = dataClient.dataItems.await()
+            try {
+                buffer.filter { it.uri.path == "/passive/summary" }.mapNotNull { DataMapItem.fromDataItem(it).dataMap.getString("json") }
+                    .maxByOrNull { runCatching { JSONObject(it).optLong("at") }.getOrDefault(0L) }
+                    ?.let { obj.put("watch", JSONObject(it)) }
+            } finally { buffer.release() }
+        }
         web.evaluateJavascript("window.onNativeHealth && window.onNativeHealth($obj)", null)
     }
 

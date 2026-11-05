@@ -117,6 +117,30 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             }
         }
 
+    // Puls und Schlaf im Hintergrund: erst Sensoren, dann "immer erlauben", danach anmelden. Jede Abfrage nur einmal.
+    private val bgPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { Passive.register(this) }
+    private val basePermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { askBackground() }
+
+    private fun setupPassive() {
+        val p = getSharedPreferences("passive", MODE_PRIVATE)
+        val need = listOf(Manifest.permission.BODY_SENSORS, Manifest.permission.ACTIVITY_RECOGNITION).filterNot { granted(it) }
+        if (need.isNotEmpty() && !p.getBoolean("askedBase", false)) {
+            p.edit().putBoolean("askedBase", true).apply()
+            basePermission.launch(need.toTypedArray())
+        } else askBackground()
+    }
+
+    private fun askBackground() {
+        val p = getSharedPreferences("passive", MODE_PRIVATE)
+        if (Build.VERSION.SDK_INT >= 33 && granted(Manifest.permission.BODY_SENSORS) &&
+            !granted(Manifest.permission.BODY_SENSORS_BACKGROUND) && !p.getBoolean("askedBg", false)) {
+            p.edit().putBoolean("askedBg", true).apply()
+            bgPermission.launch(Manifest.permission.BODY_SENSORS_BACKGROUND)
+        } else Passive.register(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Nach einem Absturz zuerst den Fehler zeigen (ohne Compose, damit das sicher klappt)
@@ -129,6 +153,8 @@ class WatchActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         startPending()
         lifecycleScope.launch { loadPlanFromDataLayer() }
         lifecycleScope.launch { sendMotion() }
+        if (pendingStart == null) runCatching { setupPassive() }
+        Passive.send(this, force = true)
         // Ende vom Handy, auch wenn die App gerade im Hintergrund war (kommt über PlanListenerService)
         lifecycleScope.launch { phoneLive.collect { j -> if (j != null) { phoneLive.value = null; applyLive(j) } } }
         setContent { App() }

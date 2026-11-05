@@ -996,6 +996,11 @@ window.onNativeHealth=function(h){
   if(!h||typeof h!=="object") return;
   ui.hcMissing=Array.isArray(h.missing)?h.missing:null; ui.hcDiag=h.bwdiag&&typeof h.bwdiag==="object"?h.bwdiag:null; ui.hcHMissing=Array.isArray(h.hmissing)?h.hmissing:null; ui.hcHDiag=h.hdiag&&typeof h.hdiag==="object"?h.hdiag:null; ui.hcAt=new Date();
   state.health={at:new Date().toISOString(),rest:Array.isArray(h.rest)?h.rest:[],hrv:Array.isArray(h.hrv)?h.hrv:[],sleep:Array.isArray(h.sleep)?h.sleep:[],error:h.error||""};
+  // Werte, die die 4Peak-Uhr selbst erfasst, füllen Tage ohne Daten aus Health Connect
+  const w=h.watch&&typeof h.watch==="object"?h.watch:null;
+  if(w){const fill=(k,arr)=>{const have=new Set(state.health[k].map(x=>x.d)); for(const x of arr||[]) if(x&&x.d&&!have.has(x.d)) state.health[k].push({...x,src:"uhr"}); state.health[k].sort((a,b)=>a.d<b.d?-1:1)};
+    fill("rest",w.rest); fill("sleep",w.sleep);
+    ui.hcHDiag={...(ui.hcHDiag||{}),"4Peak-Uhr":`${(w.rest||[]).length} Tage Ruhepuls, ${(w.sleep||[]).length} Nächte Schlaf, ${w.hrN||0} Pulswerte${w.err?", Fehler: "+w.err:""}`}}
   // Sport aus Health Connect (z. B. Samsung Health) als Aktivität übernehmen; Trainings dieser App nicht doppelt
   let added=0;
   for(const x of Array.isArray(h.ex)?h.ex:[]){
@@ -1044,7 +1049,7 @@ function nativeHtml(){
       <div class="row"><button class="btn small" data-health="1">Freigabe erteilen</button>${NATIVE.openHealthSettings?`<button class="btn ghost small" data-hcset="1">Health Connect öffnen</button>`:""}</div>
       <span class="small muted">Kommt keine Abfrage, dann in Health Connect → App-Berechtigungen → 4Peak alles einschalten.</span></div>`:""}
     ${h&&!h.error&&ui.hcHDiag?`<p class="small muted" data-keep="1" style="margin:0">Health Connect, letzte 14 Tage: ${Object.entries(ui.hcHDiag).map(([k,v])=>`${esc(k)} ${esc(String(v))}`).join(" · ")}</p>
-      ${!h.sleep.length&&!/Fehler/.test(ui.hcHDiag.Schlaf||"")?`<p class="small muted" data-keep="1" style="margin:0">Kein Schlaf angekommen: In Samsung Health → Einstellungen → Health Connect prüfen, dass Schlaf geteilt wird.</p>`:""}
+      ${!h.sleep.length&&!/Fehler/.test(ui.hcHDiag.Schlaf||"")?`<p class="small muted" data-keep="1" style="margin:0">Noch kein Schlaf da. Die 4Peak-Uhr erfasst Puls und Schlaf jetzt selbst: Öffne die Uhr-App einmal und erlaube die Sensoren „immer“. Nach der ersten Nacht erscheinen die Werte hier.</p>`:""}
       ${!h.hrv.length?`<p class="small muted" data-keep="1" style="margin:0">HRV: Samsung Health gibt die HRV nicht an Health Connect weiter. Die Erholung wird dann aus Ruhepuls und Schlaf geschätzt.</p>`:""}`:""}
     <div><button class="btn" data-health="1">${h?"Gesundheitsdaten aktualisieren":"Gesundheitsdaten aus Health Connect laden"}</button></div>
     ${h?`<p class="small muted" style="margin:0">Stand ${new Date(h.at).toLocaleString("de-CH")}. Dein Ruhepuls-Schnitt der letzten 7 Tage wird für die Pulszonen übernommen.</p>`:""}
