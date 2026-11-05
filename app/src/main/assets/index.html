@@ -994,7 +994,7 @@ window.onWatchSessions=function(arr){
 };
 window.onNativeHealth=function(h){
   if(!h||typeof h!=="object") return;
-  ui.hcMissing=Array.isArray(h.missing)?h.missing:null; ui.hcDiag=h.bwdiag&&typeof h.bwdiag==="object"?h.bwdiag:null; ui.hcAt=new Date();
+  ui.hcMissing=Array.isArray(h.missing)?h.missing:null; ui.hcDiag=h.bwdiag&&typeof h.bwdiag==="object"?h.bwdiag:null; ui.hcHMissing=Array.isArray(h.hmissing)?h.hmissing:null; ui.hcHDiag=h.hdiag&&typeof h.hdiag==="object"?h.hdiag:null; ui.hcAt=new Date();
   state.health={at:new Date().toISOString(),rest:Array.isArray(h.rest)?h.rest:[],hrv:Array.isArray(h.hrv)?h.hrv:[],sleep:Array.isArray(h.sleep)?h.sleep:[],error:h.error||""};
   // Sport aus Health Connect (z. B. Samsung Health) als Aktivität übernehmen; Trainings dieser App nicht doppelt
   let added=0;
@@ -1027,6 +1027,7 @@ function recovery(h){
   if(hv.length<3&&rs.length<3) return null;
   const hl=hv.length?hv[hv.length-1]:null, ha=avg(hv.slice(0,-1)), rl=rs.length?rs[rs.length-1]:null, ra=avg(rs.slice(0,-1));
   const low=(hl!=null&&ha&&hl<ha*0.9)||(rl!=null&&ra&&rl>ra+5);
+  if(hv.length<3) return low?{t:"Erholung eingeschränkt",d:"Dein Ruhepuls liegt über deinem Wochenschnitt. Heute leichter trainieren oder Zone 2 statt Intervalle."}:{t:"Gut erholt",d:"Dein Ruhepuls liegt im Bereich deines Wochenschnitts. Das geplante Training passt."};
   return low?{t:"Erholung eingeschränkt",d:"Die HRV liegt unter oder der Ruhepuls über deinem Wochenschnitt. Heute leichter trainieren oder Zone 2 statt Intervalle."}
             :{t:"Gut erholt",d:"HRV und Ruhepuls liegen im Bereich deines Wochenschnitts. Das geplante Training passt."};
 }
@@ -1039,6 +1040,12 @@ function nativeHtml(){
     ${h&&!h.error?`<div class="tiles">${tile("Ruhepuls",last(h.rest)?Math.round(last(h.rest).v)+" bpm":"–")}${tile("HRV",last(h.hrv)?Math.round(last(h.hrv).v)+" ms":"–")}${tile("Schlaf",sl?Math.floor(sl.min/60)+" h "+String(sl.min%60).padStart(2,"0")+" min":"–")}</div>`:""}
     ${rc?`<p style="margin:0"><b>${rc.t}.</b> ${rc.d}</p>`:""}
     ${h&&h.error?`<p class="small" style="margin:0">${esc(h.error)}</p>`:""}
+    ${NATIVE&&NATIVE.requestHealth&&(ui.hcHMissing||[]).length?`<div class="panel stack" style="background:var(--sunk);gap:8px"><b>Freigabe fehlt: ${esc(ui.hcHMissing.join(", "))}</b>
+      <div class="row"><button class="btn small" data-health="1">Freigabe erteilen</button>${NATIVE.openHealthSettings?`<button class="btn ghost small" data-hcset="1">Health Connect öffnen</button>`:""}</div>
+      <span class="small muted">Kommt keine Abfrage, dann in Health Connect → App-Berechtigungen → 4Peak alles einschalten.</span></div>`:""}
+    ${h&&!h.error&&ui.hcHDiag?`<p class="small muted" data-keep="1" style="margin:0">Health Connect, letzte 14 Tage: ${Object.entries(ui.hcHDiag).map(([k,v])=>`${esc(k)} ${esc(String(v))}`).join(" · ")}</p>
+      ${!h.sleep.length&&!/Fehler/.test(ui.hcHDiag.Schlaf||"")?`<p class="small muted" data-keep="1" style="margin:0">Kein Schlaf angekommen: In Samsung Health → Einstellungen → Health Connect prüfen, dass Schlaf geteilt wird.</p>`:""}
+      ${!h.hrv.length?`<p class="small muted" data-keep="1" style="margin:0">HRV: Samsung Health gibt die HRV nicht an Health Connect weiter. Die Erholung wird dann aus Ruhepuls und Schlaf geschätzt.</p>`:""}`:""}
     <div><button class="btn" data-health="1">${h?"Gesundheitsdaten aktualisieren":"Gesundheitsdaten aus Health Connect laden"}</button></div>
     ${h?`<p class="small muted" style="margin:0">Stand ${new Date(h.at).toLocaleString("de-CH")}. Dein Ruhepuls-Schnitt der letzten 7 Tage wird für die Pulszonen übernommen.</p>`:""}
   </section>`;

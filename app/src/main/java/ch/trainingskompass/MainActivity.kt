@@ -379,7 +379,10 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
                 JSONObject().put("error", "Die Daten aus Health Connect konnten nicht gelesen werden.")
             }
         }
-        if (health.available()) runCatching { obj.put("missing", JSONArray(health.missingBody())) }
+        if (health.available()) runCatching {
+            obj.put("missing", JSONArray(health.missingBody()))
+            obj.put("hmissing", JSONArray(health.missingRecovery()))
+        }
         web.evaluateJavascript("window.onNativeHealth && window.onNativeHealth($obj)", null)
     }
 

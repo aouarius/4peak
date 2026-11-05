@@ -47,6 +47,15 @@ class HealthBridge(private val context: Context) {
         ).filter { HealthPermission.getReadPermission(it.first) !in g }.map { it.second }
     }
 
+    /** Fehlende Freigaben für Erholungsdaten (deutsche Namen für die Anzeige) */
+    suspend fun missingRecovery(): List<String> {
+        val g = client.permissionController.getGrantedPermissions()
+        return listOf(
+            RestingHeartRateRecord::class to "Ruhepuls", HeartRateVariabilityRmssdRecord::class to "HRV",
+            SleepSessionRecord::class to "Schlaf", HeartRateRecord::class to "Puls",
+        ).filter { HealthPermission.getReadPermission(it.first) !in g }.map { it.second }
+    }
+
     suspend fun hasAny(): Boolean =
         client.permissionController.getGrantedPermissions().any { it in PERMISSIONS }
 
@@ -56,24 +65,56 @@ class HealthBridge(private val context: Context) {
         val zone = ZoneId.systemDefault()
         fun day(t: Instant): LocalDate = t.atZone(zone).toLocalDate()
 
-        val rest = runCatching {
-            client.readRecords(ReadRecordsRequest(RestingHeartRateRecord::class, timeRangeFilter = range)).records
-                .groupBy { day(it.time) }
-                .mapValues { (_, r) -> r.map { it.beatsPerMinute.toDouble() }.average() }
-        }.getOrDefault(emptyMap())
+        // Befund für die Anzeige: Anzahl Einträge und Quellen pro Datenart, oder der Fehler
+        val hdiag = JSONObject()
+        suspend fun <T : androidx.health.connect.client.records.Record> recs(cls: kotlin.reflect.KClass<T>, label: String, r: TimeRangeFilter = range): List<T> =
+            runCatching {
+                val all = mutableListOf<T>()
+                var token: String? = null
+                do {
+                    val resp = client.readRecords(ReadRecordsRequest(cls, timeRangeFilter = r, pageSize = 1000, pageToken = token))
+                    all += resp.records
+                    token = resp.pageToken
+                } while (token != null && all.size < 20000)
+                all.toList()
+            }
+                .onSuccess { l -> hdiag.put(label, "${l.size}" + if (l.isNotEmpty()) " (" + l.map { it.metadata.dataOrigin.packageName.substringAfterLast('.') }.distinct().joinToString() + ")" else "") }
+                .onFailure { e -> hdiag.put(label, "Fehler: ${e.javaClass.simpleName}") }
+                .getOrDefault(emptyList())
 
-        val hrv = runCatching {
-            client.readRecords(ReadRecordsRequest(HeartRateVariabilityRmssdRecord::class, timeRangeFilter = range)).records
-                .groupBy { day(it.time) }
-                .mapValues { (_, r) -> r.map { it.heartRateVariabilityMillis }.average() }
-        }.getOrDefault(emptyMap())
+        val restRec = recs(RestingHeartRateRecord::class, "Ruhepuls")
+            .groupBy { day(it.time) }
+            .mapValues { (_, r) -> r.map { it.beatsPerMinute.toDouble() }.average() }
+
+        val hrv = recs(HeartRateVariabilityRmssdRecord::class, "HRV")
+            .groupBy { day(it.time) }
+            .mapValues { (_, r) -> r.map { it.heartRateVariabilityMillis }.average() }
 
         // Schlaf zählt für den Tag, an dem man aufwacht
-        val sleep = runCatching {
-            client.readRecords(ReadRecordsRequest(SleepSessionRecord::class, timeRangeFilter = range)).records
-                .groupBy { day(it.endTime) }
-                .mapValues { (_, r) -> r.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toDouble() }
-        }.getOrDefault(emptyMap())
+        val sleepRec = recs(SleepSessionRecord::class, "Schlaf")
+        val sleep = sleepRec
+            .groupBy { day(it.endTime) }
+            .mapValues { (_, r) -> r.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toDouble() }
+
+        // Samsung Health schreibt meist keinen Ruhepuls, aber laufend Pulswerte. Daraus ein Ruhepuls pro Tag:
+        // Schnitt der 5 tiefsten Werte im Schlaf (ohne Schlafdaten: 0–7 Uhr), der Tag ist der Aufwachtag.
+        val rest = if (restRec.size >= 3) restRec else {
+            val hr = recs(HeartRateRecord::class, "Puls (Einzelwerte)")
+            val samples = hr.flatMap { it.samples }
+            val byDay = mutableMapOf<LocalDate, MutableList<Double>>()
+            for (s in samples) {
+                val inSleep = sleepRec.firstOrNull { !s.time.isBefore(it.startTime) && !s.time.isAfter(it.endTime) }
+                val d = when {
+                    inSleep != null -> day(inSleep.endTime)
+                    sleepRec.isEmpty() && s.time.atZone(zone).hour < 7 -> day(s.time)
+                    else -> null
+                } ?: continue
+                byDay.getOrPut(d) { mutableListOf() } += s.beatsPerMinute.toDouble()
+            }
+            val calc = byDay.filterValues { it.size >= 5 }.mapValues { (_, v) -> v.sorted().take(5).average() }
+            if (calc.isNotEmpty()) hdiag.put("Ruhepuls", (hdiag.optString("Ruhepuls") + ", aus Nachtpuls berechnet für ${calc.size} Tage").trimStart(',', ' '))
+            restRec + calc.filterKeys { it !in restRec }
+        }
 
         // Sport-Einheiten, z. B. von Samsung Health erkannt oder auf der Uhr gestartet; mit Puls und Kalorien
         val ex = JSONArray()
@@ -144,6 +185,7 @@ class HealthBridge(private val context: Context) {
             .put("ex", ex)
             .put("bw", bw)
             .put("bwdiag", diag)
+            .put("hdiag", hdiag)
             .put("rest", series(rest, "v"))
             .put("hrv", series(hrv, "v"))
             .put("sleep", series(sleep, "min"))
