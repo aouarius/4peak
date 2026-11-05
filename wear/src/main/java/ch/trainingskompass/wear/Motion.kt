@@ -29,6 +29,7 @@ object Motion : SensorEventListener {
         "legpress", "legext", "legcurl", "seatedcurl", "calf", "seatedcalf", "legpresscalf", "hipabd",
         "plank", "sideplank", "deadbug", "hollow", "lsit", "copenhagen", "supporthold", "deadhang",
         "tuckfl", "birddog", "clamshell", "pallof", "farmer", "cablekick", "tibraise", "rotarycalf",
+        "hipadd", "glutemach", "hipthrustm", "kneelcurl", "standcalf",
     )
 
     fun supports(id: String) = id !in NO_COUNT
