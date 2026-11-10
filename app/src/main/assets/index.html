@@ -1085,15 +1085,24 @@ function moveSession(from,to){
   for(const k of Object.keys(M)) if(M[k]===k) delete M[k];
   return true;
 }
+function cancelDay(d){
+  if(state.done[d]) return;
+  const M=state.moves=state.moves||{}, a=srcOf(d)||d;
+  delete M[a]; for(const k of Object.keys(M)) if(M[k]===a) delete M[k];
+  const C=state.cancel=state.cancel||[]; if(!C.includes(a)) C.push(a);
+}
+function uncancelDay(d){state.cancel=(state.cancel||[]).filter(x=>x!==d)}
 function unmoveSession(d){
   const M=state.moves||{}, a=srcOf(d); if(!a||a===d) return;
   delete M[a]; for(const k of Object.keys(M)) if(M[k]===a) delete M[k];
 }
 function planFor(dateIso){
   const p=state.profile, d=parseIso(dateIso), start=parseIso(p.start);
-  if(d<start||!p.weekdays.includes(isoWd(d))) return null;
+  // Ausgefallene Trainingstage (state.cancel) zählen nicht: die Reihenfolge rückt auf den nächsten Termin nach
+  const cx=new Set(state.cancel||[]);
+  if(d<start||!p.weekdays.includes(isoWd(d))||cx.has(dateIso)) return null;
   let count=0;
-  for(let t=start.getTime(); t<d.getTime(); t+=DAY){const x=new Date(t); if(p.weekdays.includes(isoWd(x))) count++;}
+  for(let t=start.getTime(); t<d.getTime(); t+=DAY){const x=new Date(t); if(p.weekdays.includes(isoWd(x))&&!cx.has(iso(x))) count++;}
   // Sommerzeit-sicher: count über Kalendertage
   const sp=splitFor(p);
   const week=Math.floor(Math.round((mondayOf(d)-mondayOf(start))/DAY)/7);
@@ -1197,6 +1206,7 @@ function viewKalender0(){
         <div class="muted small">${WD[isoWd(dSel)]}, ${dSel.getDate()}. ${MONTHS[dSel.getMonth()]}${s?` · Woche ${s.week}`:""}</div>
         <h2>${s?esc(s.name):done?"Training":"Trainingsfrei"}</h2>
         ${s&&s.from?`<p class="small muted" style="margin:4px 0 0">Verschoben vom ${WD[isoWd(parseIso(s.from))]}, ${parseIso(s.from).getDate()}.${parseIso(s.from).getMonth()+1}. · <button class="linkbtn" data-unmove="${sel}">Zurückschieben</button></p>`:""}
+        ${!s&&!done&&(state.cancel||[]).includes(sel)?`<p class="small muted" data-keep="1" style="margin:4px 0 0">Training ausgefallen, die Einheiten sind auf die nächsten Termine nachgerückt. <button class="linkbtn" data-uncancel="${sel}">Wiederherstellen</button></p>`:""}
         ${s&&s.deload?`<p class="small muted" style="margin:4px 0 0">Deload-Woche: halbe Sätze, mehr Reserve. Danach geht es mit mehr Gewicht weiter.</p>`:""}
       </div>
       ${done&&done.sets&&Object.keys(done.sets).length?doneHtml(done):s?sessionHtml(s):done?"":`<p class="muted" style="margin:0">Erholung. Lockere Bewegung wie Spazieren ist gut.${upcoming.length?` Nächste Einheit: ${WD[isoWd(upcoming[0][0])]}, ${upcoming[0][0].getDate()}.${upcoming[0][0].getMonth()+1}. (${esc(upcoming[0][1].name)})`:""}</p>`}
@@ -1206,7 +1216,8 @@ function viewKalender0(){
           <button class="btn ghost" data-undone="${sel}">${ui.delDone===sel?"Wirklich löschen?":"Löschen"}</button>`
         :`<label class="f" style="flex-direction:row;align-items:center;gap:8px" for="rpe">Anstrengung
             <select id="rpe">${[5,6,7,8,9,10].map(v=>`<option${v===8?" selected":""}>${v}</option>`).join("")}</select></label>
-          <button class="btn" data-start="${sel}">${ui.run&&!ui.run.edit&&ui.run.date===sel?"Training fortsetzen":"Training starten"}</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>`}
+          <button class="btn" data-start="${sel}">${ui.run&&!ui.run.edit&&ui.run.date===sel?"Training fortsetzen":"Training starten"}</button><button class="btn ghost" data-done="${sel}">Nur abhaken</button>
+          <button class="btn ghost" data-cancelday="${sel}">Fällt aus</button>`}
       </div>`:""}
       ${acts.map(a=>`<div class="small"><b>${a.name?esc(a.name):"Wearable-Aktivität"}${s||done?" (zusätzlich)":""}:</b> ${a.dur} min${a.avg?`, Ø ${a.avg} bpm, max ${a.max||"–"} bpm`:""}${a.kcal?`, ${a.kcal} kcal`:""} <span class="muted">(${esc(a.src)})</span></div>`).join("")}
       ${state.mySupps.length?`<div><h3 style="margin-bottom:6px">Supplements heute</h3>
@@ -3170,8 +3181,10 @@ document.addEventListener("toggle",e=>{const d=e.target; if(!d.dataset||!d.datas
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab)});
 document.getElementById("view").addEventListener("click",e=>{
   if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(err){}}
-  const t=e.target.closest("[data-hcset],[data-mealphoto],[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
+  const t=e.target.closest("[data-cancelday],[data-uncancel],[data-hcset],[data-mealphoto],[data-mealadd],[data-mealclr],[data-motionexp],[data-exmusc],[data-exmarkc],[data-exfilt],[data-exreset],[data-day],[data-mon],[data-done],[data-undone],[data-editdone],[data-editsave],[data-editcancel],[data-ex],[data-goto],#btconnect,[data-start],[data-rest],[data-cardio],[data-logset],[data-repeat],[data-fav],[data-block],[data-blockrun],[data-applyrec],[data-prodadd],[data-prodrm],[data-prodfood],[data-brand],[data-editplan],button[data-pe],[data-skipex],[data-finish],[data-closesum],[data-fday],[data-wuck],[data-wumod],[data-wucardio],[data-wumin],[data-askmeal],[data-fdel],[data-health],[data-scan],[data-scanforget],[data-stype],[data-hist],[data-exnew],[data-exdel],[data-backup],[data-unmove],[data-media],[data-rdone],[data-rhold],[data-coach],[data-coachdo],[data-coachhide],[data-chat],[data-chatsend],[data-chatdo],[data-chatclear],[data-memdel],[data-feel],[data-ready],[data-blockdo],[data-rtype],[data-rprev],[data-radd],[data-rdel],[data-rwarm],[data-wu],[data-rundel],[data-runadd],[data-runaddid],[data-watchsend],[data-watchask],[data-pickmus],[data-info]"); if(!t) return;
   if(t.dataset.unmove){unmoveSession(t.dataset.unmove); save(); render(); return}
+  if(t.dataset.cancelday){cancelDay(t.dataset.cancelday); save(); render(); pushWatch(); return}
+  if(t.dataset.uncancel){uncancelDay(t.dataset.uncancel); save(); render(); pushWatch(); return}
   if(t.hasAttribute("data-stype")){ui.run.type=t.dataset.stype; keepInputs(render); return}
   if(t.dataset.motionexp){try{NATIVE.exportMotion("4peak-bewegungsdaten-"+todayIso+".zip")}catch(e){} return}
   if(t.dataset.exmusc!=null){ui.exMus=t.dataset.exmusc; ui.exMark=""; render(); return}
